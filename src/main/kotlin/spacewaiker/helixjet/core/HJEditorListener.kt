@@ -2,12 +2,14 @@
 
 import com.intellij.openapi.editor.event.EditorFactoryEvent
 import com.intellij.openapi.editor.event.EditorFactoryListener
+import spacewaiker.helixjet.editor.HJEditorMode
 
-class HelixJetEditorListener : EditorFactoryListener {
+class HJEditorListener : EditorFactoryListener {
     override fun editorCreated(event: EditorFactoryEvent) {
-        HelixJetStateService.attach(event.editor)
+        HJStateService.attach(event.editor)
     }
+
     override fun editorReleased(event: EditorFactoryEvent) {
-        HelixJetStateService.detach(event.editor)
+        HJStateService.detach(event.editor)
     }
 }

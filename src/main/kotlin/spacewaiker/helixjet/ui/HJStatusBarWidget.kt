@@ -4,11 +4,11 @@ import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.StatusBar
 import com.intellij.openapi.wm.StatusBarWidget
-import spacewaiker.helixjet.editor.Mode
-import spacewaiker.helixjet.core.HelixJetStateService
+import spacewaiker.helixjet.editor.HJEditorMode
+import spacewaiker.helixjet.core.HJStateService
 import java.awt.Component
 
-class HelixJetStatusBarWidget(private val project: Project) :
+class HJStatusBarWidget(private val project: Project) :
     StatusBarWidget, StatusBarWidget.TextPresentation {
         companion object {
             const val ID = "HelixJetModeWidget"
@@ -23,9 +23,10 @@ class HelixJetStatusBarWidget(private val project: Project) :
 
     override fun getText(): String {
         val editor = FileEditorManager.getInstance(project).selectedTextEditor ?: return ""
-        return when (HelixJetStateService.get(editor)?.mode) {
-            Mode.NORMAL -> "NOR"
-            Mode.INSERT -> "INS"
+        return when (HJStateService.get(editor)?.mode) {
+            HJEditorMode.NORMAL -> "NOR"
+            HJEditorMode.INSERT -> "INS"
+            HJEditorMode.SELECT -> "SEL"
             null -> ""
         }
     }

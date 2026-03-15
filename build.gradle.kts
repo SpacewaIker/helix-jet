@@ -24,6 +24,9 @@ dependencies {
         // Add plugin dependencies for compilation here, example:
         // bundledPlugin("com.intellij.java")
     }
+
+    implementation("com.akuleshov7:ktoml-core:0.7.1")
+    implementation("com.akuleshov7:ktoml-file:0.7.1")
 }
 
 intellijPlatform {

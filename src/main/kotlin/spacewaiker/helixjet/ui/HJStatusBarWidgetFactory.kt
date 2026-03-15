@@ -6,11 +6,11 @@ import com.intellij.openapi.wm.StatusBar
 import com.intellij.openapi.wm.StatusBarWidget
 import com.intellij.openapi.wm.StatusBarWidgetFactory
 
-class HelixJetStatusBarWidgetFactory : StatusBarWidgetFactory {
-    override fun getId() = HelixJetStatusBarWidget.ID
+class HJStatusBarWidgetFactory : StatusBarWidgetFactory {
+    override fun getId() = HJStatusBarWidget.ID
     override fun getDisplayName() = "HelixJet Mode"
     override fun isAvailable(project: Project) = true
-    override fun createWidget(project: Project) = HelixJetStatusBarWidget(project)
+    override fun createWidget(project: Project) = HJStatusBarWidget(project)
     override fun disposeWidget(widget: StatusBarWidget) = Disposer.dispose(widget)
     override fun canBeEnabledOn(statusBar: StatusBar) = true
 }
