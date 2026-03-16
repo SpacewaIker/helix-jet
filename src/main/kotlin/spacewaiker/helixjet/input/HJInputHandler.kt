@@ -1,5 +1,6 @@
 ﻿package spacewaiker.helixjet.input
 
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Editor
 import spacewaiker.helixjet.editor.HJEditorMode
 import spacewaiker.helixjet.editor.HJEditorState
@@ -20,6 +21,8 @@ sealed class HJInputKey {
 }
 
 object HJInputHandler {
+    private val logger = Logger.getInstance(this::class.java)
+
     fun handle(editor: Editor, key: HJInputKey): Boolean {
         if (HJEditorState.mode == HJEditorMode.INSERT && key is HJInputKey.Character) {
             return false
@@ -32,7 +35,11 @@ object HJInputHandler {
             action = HJEditorState.config.mapping[Pair(HJEditorMode.NORMAL, key)]
         }
 
-        action?.invoke(editor)
+        if (action == null) {
+            logger.info("Could not find an action corresponding to $key in mode ${HJEditorState.mode}")
+        } else {
+            action.invoke(editor)
+        }
 
         return true
     }

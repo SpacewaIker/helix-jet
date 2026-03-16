@@ -6,10 +6,15 @@ import spacewaiker.helixjet.input.HJInputKey
 import com.akuleshov7.ktoml.tree.nodes.TomlFile
 import com.akuleshov7.ktoml.tree.nodes.TomlKeyValuePrimitive
 import com.akuleshov7.ktoml.tree.nodes.TomlNode
+import com.intellij.openapi.diagnostic.Logger
 import java.io.File
 import kotlin.collections.get
 
 class HJConfiguration {
+    companion object {
+        private val logger = Logger.getInstance(this::class.java)
+    }
+
     constructor() {
         applyConfigKeymap()
     }
@@ -23,23 +28,28 @@ class HJConfiguration {
         return try {
             val file = File(configFile)
             if (!file.exists()) {
-                println("Configuration file not found: $configFile")
+                logger.info("Configuration file not found: $configFile")
                 return null
             }
             if (!file.canRead()) {
-                println("Configuration file is not readable: $configFile")
+                logger.warn("Configuration file is not readable: $configFile")
                 return null
             }
             val content = file.readText()
 
-            Toml(inputConfig = TomlInputConfig(ignoreUnknownNames = true)).tomlParser.parseString(content)
+            val toml = Toml(inputConfig = TomlInputConfig(ignoreUnknownNames = true)).tomlParser.parseString(content)
+            logger.info("Successfully parsed toml configuration")
+            toml
         } catch (e: Exception) {
-            println("Failed to load configuration file: $configFile")
-            println(e.message)
+            logger.error("Failed to load configuration file: $configFile")
+            logger.error(e.message)
             null
         }
     }
 
+    /**
+     * Overload default keymap configuration with user defined config file, if one exists.
+     */
     private fun applyConfigKeymap() {
         val keys = loadConfiguration()?.children?.find { node -> node.name == "keys" } ?: return
 

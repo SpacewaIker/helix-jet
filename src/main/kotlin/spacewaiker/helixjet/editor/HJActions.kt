@@ -1,6 +1,7 @@
 ﻿package spacewaiker.helixjet.editor
 
 import com.intellij.openapi.command.WriteCommandAction
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.editor.LogicalPosition
@@ -10,6 +11,8 @@ import spacewaiker.helixjet.ui.HJStatusBarWidget
 typealias HJAction = (Editor) -> Unit
 
 object HJActions {
+    private val logger = Logger.getInstance(this::class.java)
+
     var actions: Map<String, HJAction> = mapOf(
         "insert_mode" to fun(editor: Editor) { switchToMode(editor, HJEditorMode.INSERT) },
         "select_mode" to fun(editor: Editor) { switchToMode(editor, HJEditorMode.SELECT) },
