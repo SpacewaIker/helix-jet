@@ -6,7 +6,7 @@ enum class HJEditorMode {
     SELECT,
 }
 
-class HJEditorState {
+object HJEditorState {
     var mode: HJEditorMode = HJEditorMode.NORMAL
     var config: HJConfiguration = HJConfiguration()
 }

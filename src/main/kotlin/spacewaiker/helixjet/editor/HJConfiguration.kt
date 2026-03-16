@@ -14,7 +14,7 @@ class HJConfiguration {
         applyConfigKeymap()
     }
 
-    var mapping: HashMap<Pair<HJEditorMode, HJInputKey>, HJAction> = defaultMapping
+    var mapping: HashMap<Pair<HJEditorMode, HJInputKey>, HJAction> = defaultMappingParsed()
 
     private fun loadConfiguration(): TomlFile? {
         val userHome = System.getProperty("user.home")
@@ -68,16 +68,34 @@ class HJConfiguration {
     }
 }
 
-private val defaultMapping: HashMap<Pair<HJEditorMode, HJInputKey>, HJAction> = hashMapOf(
-    Pair(HJEditorMode.NORMAL, HJInputKey.Character('h')) to HJActions.actions["move_char_left"]!!,
-    Pair(HJEditorMode.NORMAL, HJInputKey.Character('j')) to HJActions.actions["move_visual_line_down"]!!,
-    Pair(HJEditorMode.NORMAL, HJInputKey.Character('k')) to HJActions.actions["move_visual_line_up"]!!,
-    Pair(HJEditorMode.NORMAL, HJInputKey.Character('l')) to HJActions.actions["move_char_right"]!!,
+private fun defaultMappingParsed(): HashMap<Pair<HJEditorMode, HJInputKey>, HJAction> {
+    val map = HashMap<Pair<HJEditorMode, HJInputKey>, HJAction>()
 
-    Pair(HJEditorMode.NORMAL, HJInputKey.Character('v')) to HJActions.actions["select_mode"]!!,
-    Pair(HJEditorMode.NORMAL, HJInputKey.Character('i')) to HJActions.actions["insert_mode"]!!,
-    Pair(HJEditorMode.NORMAL, HJInputKey.Character(';')) to HJActions.actions["collapse_selection"]!!,
+    for ((key, value) in defaultMapping) {
+        HJActions.actions[value]?.let { action ->
+            val mode = key.first
+            val keys = key.second
+            for (key in keys) {
+                HJInputKey.fromString(key)?.let { map.put(Pair(mode, it), action) }
+            }
+        }
+    }
 
-    Pair(HJEditorMode.INSERT, HJInputKey.Escape) to HJActions.actions["normal_mode"]!!,
-    Pair(HJEditorMode.SELECT, HJInputKey.Escape) to HJActions.actions["normal_mode"]!!,
+    return map
+}
+
+private val defaultMapping: Map<Pair<HJEditorMode, Array<String>>, String> = mapOf(
+    Pair(HJEditorMode.NORMAL, arrayOf("h")) to "move_char_left",
+    Pair(HJEditorMode.NORMAL, arrayOf("j")) to "move_visual_line_down",
+    Pair(HJEditorMode.NORMAL, arrayOf("k")) to "move_visual_line_up",
+    Pair(HJEditorMode.NORMAL, arrayOf("l")) to "move_char_right",
+
+    Pair(HJEditorMode.NORMAL, arrayOf("v")) to "select_mode",
+    Pair(HJEditorMode.NORMAL, arrayOf("i")) to "insert_mode",
+
+    Pair(HJEditorMode.NORMAL, arrayOf("d")) to "delete_selection",
+    Pair(HJEditorMode.NORMAL, arrayOf(";")) to "collapse_selection",
+
+    Pair(HJEditorMode.INSERT, arrayOf("esc")) to "normal_mode",
+    Pair(HJEditorMode.SELECT, arrayOf("esc")) to "normal_mode",
 )
