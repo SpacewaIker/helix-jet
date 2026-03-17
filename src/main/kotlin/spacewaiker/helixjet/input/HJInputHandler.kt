@@ -47,6 +47,25 @@ sealed class HJInputKey {
             }
         }
     }
+
+    override fun toString(): String {
+        return when (this) {
+            is Character -> c.toString()
+            Escape -> "Escape"
+            Up -> "Up"
+            Down -> "Down"
+            Left -> "Left"
+            Right -> "Right"
+            Home -> "Home"
+            End -> "End"
+            PageUp -> "PageUp"
+            PageDown -> "PageDown"
+            Space -> "Space"
+            Backspace -> "Backspace"
+            Tab -> "Tab"
+            Del -> "Del"
+        }
+    }
 }
 
 object HJInputHandler {

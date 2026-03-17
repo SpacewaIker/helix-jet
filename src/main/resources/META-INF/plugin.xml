@@ -8,14 +8,11 @@
     <name>Helix-jet</name>
 
     <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
-    <vendor url="https://www.yourcompany.com">YourCompany</vendor>
+    <vendor url="https://github.com/spacewaiker">SpacewaIker</vendor>
 
     <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#plugin-description -->
-    <description><![CDATA[
-        Enter short description for your plugin here.<br>
-        <em>most HTML tags may be used</em>
-    ]]></description>
+    <description>Helix Editor keybindings for JetBrains IDEs.</description>
 
     <!-- Product and plugin compatibility requirements.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
@@ -27,7 +24,8 @@
     <extensions defaultExtensionNs="com.intellij">
         <editorFactoryListener implementation="spacewaiker.helixjet.core.HJEditorListener"/>
         <postStartupActivity implementation="spacewaiker.helixjet.core.HJStartupActivity"/>
-        <statusBarWidgetFactory implementation="spacewaiker.helixjet.ui.HJStatusBarWidgetFactory" id="HelixModeWidget" order="first"/>
+        <statusBarWidgetFactory implementation="spacewaiker.helixjet.ui.HJStatusBarModeWidgetFactory" id="HelixModeWidget" order="first"/>
+        <statusBarWidgetFactory implementation="spacewaiker.helixjet.ui.HJStatusBarLogoWidgetFactory" id="HelixLogoWidget" order="first"/>
     </extensions>
 
 </idea-plugin>
