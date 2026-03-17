@@ -7,14 +7,43 @@ import spacewaiker.helixjet.editor.HJEditorState
 
 sealed class HJInputKey {
     object Escape : HJInputKey()
+    object Up : HJInputKey()
+    object Down : HJInputKey()
+    object Left : HJInputKey()
+    object Right : HJInputKey()
+    object Home : HJInputKey()
+    object End : HJInputKey()
+    object PageUp : HJInputKey()
+    object PageDown : HJInputKey()
+    object Space : HJInputKey()
+    object Backspace : HJInputKey()
+    object Tab : HJInputKey()
+    object Del : HJInputKey()
     data class Character(val c: Char) : HJInputKey()
 
     companion object {
+        private val logger = Logger.getInstance(this::class.java)
+
         fun fromString(s: String): HJInputKey? {
             return when (s) {
                 "esc" -> Escape
-                else if s.length == 1 && s[0].isLetter() -> Character(s[0])
-                else -> null
+                "up" -> Up
+                "down" -> Down
+                "left" -> Left
+                "right" -> Right
+                "home" -> Home
+                "end" -> End
+                "pageup" -> PageUp
+                "pagedown" -> PageDown
+                "space" -> Space
+                "backspace" -> Backspace
+                "tab" -> Tab
+                "del" -> Del
+                else if s.length == 1 -> Character(s[0])
+                else -> {
+                    logger.warn("Unknown character $s")
+                    null
+                }
             }
         }
     }
