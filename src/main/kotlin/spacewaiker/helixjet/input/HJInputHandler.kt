@@ -86,7 +86,7 @@ object HJInputHandler {
         if (action == null) {
             logger.info("Could not find an action corresponding to $key in mode ${HJEditorState.mode}")
         } else {
-            action.invoke(editor)
+            action.execute(editor)
         }
 
         return true
