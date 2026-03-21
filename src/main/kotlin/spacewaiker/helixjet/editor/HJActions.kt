@@ -1,5 +1,11 @@
 ﻿package spacewaiker.helixjet.editor
 
+import com.intellij.ide.DataManager
+import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.ActionPlaces
+import com.intellij.openapi.actionSystem.ActionUiKind
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.IdeActions
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Editor
@@ -35,9 +41,18 @@ class HJAction {
 object HJActions {
     val logger = Logger.getInstance(this::class.java)
 
-    val actions: Map<String, HJAction> = createActionsMap()
+    private val actions: MutableMap<String, HJAction> = createActionsMap()
 
-    private fun createActionsMap(): Map<String, HJAction> {
+    fun getAction(name: String): HJAction? {
+        val ideAction = name.removeSurrounding("<", ">")
+        if (ideAction != name) {
+            actions[name] = HJAction(name) { editor: Editor -> executeIdeAction(editor, ideAction) }
+        }
+
+        return actions[name]
+    }
+
+    private fun createActionsMap(): MutableMap<String, HJAction> {
         val map = mutableMapOf<String, HJAction>()
 
         // @formatter:off
@@ -49,36 +64,12 @@ object HJActions {
             HJAction("move_line_down") { editor: Editor -> moveCaretLogicalPosition(editor, 1, 0) },
             HJAction("move_visual_line_up") { editor: Editor -> moveCaretVisualPosition(editor, -1, 0) },
             HJAction("move_visual_line_down") { editor: Editor -> moveCaretVisualPosition(editor, 1, 0) },
-            HJAction("extend_char_left") { editor: Editor ->
-                val caret = editor.caretModel.primaryCaret.offset
-                moveCaretOffset(editor, -1)
-                extendSelectionToCaret(editor, caret)
-            },
-            HJAction("extend_char_right") { editor: Editor ->
-                val caret = editor.caretModel.primaryCaret.offset
-                moveCaretOffset(editor, 1)
-                extendSelectionToCaret(editor, caret)
-            },
-            HJAction("extend_line_up") { editor: Editor ->
-                val caret = editor.caretModel.primaryCaret.offset
-                moveCaretLogicalPosition(editor, -1, 0)
-                extendSelectionToCaret(editor, caret)
-            },
-            HJAction("extend_line_down") { editor: Editor ->
-                val caret = editor.caretModel.primaryCaret.offset
-                moveCaretLogicalPosition(editor, 1, 0)
-                extendSelectionToCaret(editor, caret)
-            },
-            HJAction("extend_visual_line_up") { editor: Editor ->
-                val caret = editor.caretModel.primaryCaret.offset
-                moveCaretVisualPosition(editor, -1, 0)
-                extendSelectionToCaret(editor, caret)
-            },
-            HJAction("extend_visual_line_down") { editor: Editor ->
-                val caret = editor.caretModel.primaryCaret.offset
-                moveCaretVisualPosition(editor, 1, 0)
-                extendSelectionToCaret(editor, caret)
-            },
+            HJAction("extend_char_left") { editor: Editor -> extendSelectionWithMovement(editor) { e: Editor -> moveCaretOffset(e, -1) } },
+            HJAction("extend_char_right") { editor: Editor -> extendSelectionWithMovement(editor) { e: Editor -> moveCaretOffset(e, 1) } },
+            HJAction("extend_line_up") { editor: Editor -> extendSelectionWithMovement(editor) { e: Editor -> moveCaretLogicalPosition(e, -1, 0) } },
+            HJAction("extend_line_down") { editor: Editor -> extendSelectionWithMovement(editor) { e: Editor -> moveCaretLogicalPosition(e, 1, 0) } },
+            HJAction("extend_visual_line_up") { editor: Editor -> extendSelectionWithMovement(editor) { e: Editor -> moveCaretVisualPosition(e, -1, 0) } },
+            HJAction("extend_visual_line_down") { editor: Editor -> extendSelectionWithMovement(editor) { e: Editor -> moveCaretVisualPosition(e, 1, 0) } },
             HJAction("copy_selection_on_next_line"),
             HJAction("copy_selection_on_prev_line"),
             HJAction("move_next_word_start"),
@@ -154,25 +145,29 @@ object HJActions {
             HJAction("extend_to_line_bounds"),
             HJAction("shrink_to_line_bounds"),
             HJAction("delete_selection") { editor: Editor ->
+                extendSelection(editor)
                 editor.selectionModel.copySelectionToClipboard()
                 deleteSelection(editor)
-                collapseSelection(editor)
+                editor.selectionModel.removeSelection()
                 switchToMode(editor, HJEditorMode.NORMAL)
             },
             HJAction("delete_selection_noyank") { editor: Editor ->
+                extendSelection(editor)
                 deleteSelection(editor)
-                collapseSelection(editor)
+                editor.selectionModel.removeSelection()
                 switchToMode(editor, HJEditorMode.NORMAL)
             },
             HJAction("change_selection") { editor: Editor ->
+                extendSelection(editor)
                 editor.selectionModel.copySelectionToClipboard()
                 deleteSelection(editor)
-                collapseSelection(editor)
+                editor.selectionModel.removeSelection()
                 switchToMode(editor, HJEditorMode.INSERT)
             },
             HJAction("change_selection_noyank") { editor: Editor ->
+                extendSelection(editor)
                 deleteSelection(editor)
-                collapseSelection(editor)
+                editor.selectionModel.removeSelection()
                 switchToMode(editor, HJEditorMode.INSERT)
             },
             HJAction("collapse_selection") { editor: Editor -> collapseSelection(editor) },
@@ -264,12 +259,12 @@ object HJActions {
             HJAction("delete_word_forward"),
             HJAction("kill_to_line_start"),
             HJAction("kill_to_line_end"),
-            HJAction("undo") { _: Editor -> com.intellij.ide.actions.UndoAction() },
-            HJAction("redo") { _: Editor -> com.intellij.ide.actions.RedoAction() },
+            HJAction("undo") { editor: Editor -> executeIdeAction(editor, IdeActions.ACTION_UNDO) },
+            HJAction("redo") { editor: Editor -> executeIdeAction(editor, IdeActions.ACTION_REDO) },
             HJAction("earlier"),
             HJAction("later"),
             HJAction("commit_undo_checkpoint"),
-            HJAction("yank") { editor: Editor -> editor.selectionModel.copySelectionToClipboard() },
+            HJAction("yank") { editor: Editor -> extendSelection(editor); editor.selectionModel.copySelectionToClipboard() },
             HJAction("yank_to_clipboard"),
             HJAction("yank_joined"),
             HJAction("yank_joined_to_clipboard"),
@@ -394,23 +389,27 @@ object HJActions {
 }
 
 private fun moveCaretLogicalPosition(editor: Editor, deltaLine: Int, deltaColumn: Int) {
-    if (HJEditorState.mode != HJEditorMode.SELECT) collapseSelection(editor)
     val position = editor.caretModel.primaryCaret.logicalPosition
-    editor.caretModel.primaryCaret.moveToLogicalPosition(
-        LogicalPosition(
-            position.line + deltaLine, position.column + deltaColumn
-        )
-    )
+    val newPosition = try {
+        LogicalPosition(position.line + deltaLine, position.column + deltaColumn)
+    } catch (_: IllegalArgumentException) {
+        return
+    }
+
+    if (HJEditorState.mode != HJEditorMode.SELECT) collapseSelection(editor)
+    editor.caretModel.primaryCaret.moveToLogicalPosition(newPosition)
 }
 
 private fun moveCaretVisualPosition(editor: Editor, deltaLine: Int, deltaColumn: Int) {
-    if (HJEditorState.mode != HJEditorMode.SELECT) collapseSelection(editor)
     val position = editor.caretModel.primaryCaret.logicalPosition
-    editor.caretModel.primaryCaret.moveToVisualPosition(
-        VisualPosition(
-            position.line + deltaLine, position.column + deltaColumn
-        )
-    )
+    val newPosition = try {
+        VisualPosition(position.line + deltaLine, position.column + deltaColumn)
+    } catch (_: IllegalArgumentException) {
+        return
+    }
+
+    if (HJEditorState.mode != HJEditorMode.SELECT) collapseSelection(editor)
+    editor.caretModel.primaryCaret.moveToVisualPosition(newPosition)
 }
 
 private fun moveCaretOffset(editor: Editor, deltaOffset: Int): Int {
@@ -421,34 +420,6 @@ private fun moveCaretOffset(editor: Editor, deltaOffset: Int): Int {
     return offset
 }
 
-private fun extendSelectionToCaret(editor: Editor, previousCaret: Int) {
-    if (!editor.selectionModel.hasSelection()) {
-        val caret = editor.caretModel.primaryCaret.offset
-        editor.selectionModel.setSelection(caret, caret + 1)
-    }
-
-    // treat selection anchors as block anchors, so subtract 1 from selection end now and add 1 at the end
-    val selectionStart = editor.selectionModel.selectionStart
-    val selectionEnd = editor.selectionModel.selectionEnd - 1
-    val caret = editor.caretModel.primaryCaret.offset
-
-    val otherAnchor = if (caret >= previousCaret) { // moving forward
-        if (previousCaret == selectionEnd) { // moving end
-            selectionStart
-        } else { // moving start
-            selectionEnd
-        }
-    } else { // moving backward
-        if (previousCaret == selectionStart) { // moving start
-            selectionEnd
-        } else { // moving end
-            selectionStart
-        }
-    }
-
-    editor.selectionModel.setSelection(min(otherAnchor, caret), max(otherAnchor, caret) + 1)
-}
-
 fun switchToMode(editor: Editor, newMode: HJEditorMode) {
     if (HJEditorState.mode == newMode) return
     HJEditorState.mode = newMode
@@ -457,24 +428,26 @@ fun switchToMode(editor: Editor, newMode: HJEditorMode) {
         WindowManager.getInstance().getStatusBar(it)?.updateWidget(HJStatusBarModeWidget.ID)
     }
     if (newMode == HJEditorMode.SELECT) {
-        extendSelectionToCaret(editor, editor.caretModel.primaryCaret.offset)
+        extendSelection(editor)
     }
 }
 
 private fun collapseSelection(editor: Editor) {
     editor.selectionModel.removeSelection()
     if (HJEditorState.mode == HJEditorMode.SELECT) {
-        extendSelectionToCaret(editor, editor.caretModel.primaryCaret.offset)
+        extendSelection(editor)
     }
 }
 
 private fun deleteSelection(editor: Editor) {
-    val caret = editor.caretModel.primaryCaret
-    val start = caret.selectionStart
-    var end = caret.selectionEnd
-    if (caret.offset == end) end += 1
-
+    val start = editor.selectionModel.selectionStart
+    val end = editor.selectionModel.selectionEnd
     WriteCommandAction.runWriteCommandAction(editor.project) {
         editor.document.deleteString(start, end)
     }
+}
+
+fun executeIdeAction(editor: Editor, actionId: String) {
+    val action = ActionManager.getInstance().getAction(actionId) ?: return
+    ActionManager.getInstance().tryToExecute(action, null, editor.contentComponent, ActionPlaces.UNKNOWN, true)
 }

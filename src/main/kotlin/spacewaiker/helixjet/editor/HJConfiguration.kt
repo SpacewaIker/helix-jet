@@ -66,11 +66,11 @@ class HJConfiguration {
             when (child) {
                 is TomlKeyValuePrimitive -> {
                     val key = child.key.toString()[0]
-                    var action = HJActions.actions[child.value.content as? String]
+                    var action = (child.value.content as? String)?.let { HJActions.getAction(it) }
                     if (key.isLetter()) {
                         if (action == null) {
                             logger.warn("Missing action ${child.value.content} for key $key defined in user config. Mapping to no_op.")
-                            action = HJActions.actions["no_op"]!!
+                            action = HJActions.getAction("no_op")!!
                         } else {
                             logger.debug("Remapping $key to ${child.value.content} as defined in user config")
                         }
@@ -107,7 +107,7 @@ private fun tryAddMapping(
     action: String,
 ) {
     val key = HJInputKey.fromString(key)
-    val action = HJActions.actions[action]
+    val action = HJActions.getAction(action)
     if (key != null && action != null) {
         map[Pair(mode, key)] = action
     }
