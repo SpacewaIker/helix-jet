@@ -6,6 +6,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
+import com.intellij.openapi.ui.naturalSorted
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.util.IconLoader
 import com.intellij.openapi.wm.StatusBar
@@ -45,10 +46,18 @@ class HJStatusBarLogoWidget(private val project: Project) : StatusBarWidget, Sta
             })
             add(object : AnAction("Print All Mappings") {
                 override fun actionPerformed(e: AnActionEvent) {
-                    HJEditorState.config.mapping.forEach { (key, value) ->
-                        val mode = key.first
-                        val inputKey = key.second
-                        println("[$mode] $inputKey -> ${value.name}")
+                    val mapping = HJEditorState.config.mapping.map { entry ->
+                        Triple(
+                            entry.key.first,
+                            entry.key.second,
+                            entry.value
+                        )
+                    }
+                    mapping.naturalSorted().forEach { triple ->
+                        val mode = triple.first.toString()
+                        val inputKey = triple.second.toString()
+                        val action = triple.third.name
+                        println("[$mode] $inputKey -> $action")
                     }
                 }
             })

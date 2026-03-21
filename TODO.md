@@ -8,6 +8,5 @@
 
 # Fixes
 
-- add map Editor -> Range to state. Keep track of Ranges so that you get correct movement
-- Add/check boundary checks for vertical movement at start and end of file
+- editor actions "slow actions" on EDT
 - Try to figure out if I need all of the logic within moveVertically & VerticallyVisual

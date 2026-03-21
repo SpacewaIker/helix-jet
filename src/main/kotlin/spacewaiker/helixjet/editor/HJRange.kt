@@ -99,11 +99,17 @@ class HJRange {
     }
 
     /**
-     * Apply this range to the provided Editor.
+     * Save this range to the HJEditorState and apply it to provided Editor.
      */
-    fun apply(editor: Editor) {
+    fun saveAndApply(editor: Editor) {
+        HJEditorState.putRange(editor, this)
+
         editor.caretModel.moveToOffset(cursor)
-        editor.selectionModel.setSelection(from, to)
+        if (len <= 1 && HJEditorState.mode == HJEditorMode.NORMAL) {
+            editor.selectionModel.removeSelection()
+        } else {
+            editor.selectionModel.setSelection(from, to)
+        }
     }
 
     companion object {

@@ -19,7 +19,11 @@ sealed class HJInputKey {
     object Backspace : HJInputKey()
     object Tab : HJInputKey()
     object Del : HJInputKey()
-    data class Character(val c: Char) : HJInputKey()
+    data class Character(val c: Char) : HJInputKey() {
+        override fun toString(): String {
+            return "$c"
+        }
+    }
 
     companion object {
         private val logger = Logger.getInstance(this::class.java)
@@ -50,7 +54,6 @@ sealed class HJInputKey {
 
     override fun toString(): String {
         return when (this) {
-            is Character -> c.toString()
             Escape -> "Escape"
             Up -> "Up"
             Down -> "Down"
@@ -64,6 +67,7 @@ sealed class HJInputKey {
             Backspace -> "Backspace"
             Tab -> "Tab"
             Del -> "Del"
+            else -> ""
         }
     }
 }

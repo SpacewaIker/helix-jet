@@ -7,12 +7,10 @@ import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorFactory
-import com.intellij.openapi.editor.LogicalPosition
-import com.intellij.openapi.editor.VisualPosition
 import com.intellij.openapi.wm.WindowManager
 import spacewaiker.helixjet.ui.HJStatusBarModeWidget
 
-//typealias HJAction = (Editor) -> Unit
+
 class HJAction {
     constructor(name: String, action: ((Editor) -> Unit)? = null) {
         this.name = name
@@ -52,64 +50,47 @@ object HJActions {
 
         // @formatter:off
         defActions(map, arrayOf(
-            HJAction("no_op") { _: Editor -> },
-//            HJAction("move_char_left") { editor: Editor -> moveCaretDeltaOffset(editor, -1) },
-//            HJAction("move_char_right") { editor: Editor -> moveCaretDeltaOffset(editor, 1) },
-//            HJAction("move_line_up") { editor: Editor -> moveCaretLogicalPosition(editor, -1, 0) },
-//            HJAction("move_line_down") { editor: Editor -> moveCaretLogicalPosition(editor, 1, 0) },
-//            HJAction("move_visual_line_up") { editor: Editor -> moveCaretVisualPosition(editor, -1, 0) },
-//            HJAction("move_visual_line_down") { editor: Editor -> moveCaretVisualPosition(editor, 1, 0) },
-//            HJAction("extend_char_left") { editor: Editor -> extendSelectionWithMovement(editor) { e: Editor -> moveCaretDeltaOffset(e, -1) } },
-//            HJAction("extend_char_right") { editor: Editor -> extendSelectionWithMovement(editor) { e: Editor -> moveCaretDeltaOffset(e, 1) } },
-//            HJAction("extend_line_up") { editor: Editor -> extendSelectionWithMovement(editor) { e: Editor -> moveCaretLogicalPosition(e, -1, 0) } },
-//            HJAction("extend_line_down") { editor: Editor -> extendSelectionWithMovement(editor) { e: Editor -> moveCaretLogicalPosition(e, 1, 0) } },
-//            HJAction("extend_visual_line_up") { editor: Editor -> extendSelectionWithMovement(editor) { e: Editor -> moveCaretVisualPosition(e, -1, 0) } },
-//            HJAction("extend_visual_line_down") { editor: Editor -> extendSelectionWithMovement(editor) { e: Editor -> moveCaretVisualPosition(e, 1, 0) } },
-            HJAction("move_char_left") { e: Editor -> moveImpl(e, HJCharMovementKind.HORIZONTAL, HJMovementDirection.BACKWARD, 1, false) },
-            HJAction("move_char_right") { e: Editor -> moveImpl(e, HJCharMovementKind.HORIZONTAL, HJMovementDirection.FORWARD, 1, false) },
-            HJAction("move_line_up") { e: Editor -> moveImpl(e, HJCharMovementKind.VERTICAL, HJMovementDirection.BACKWARD, 1, false) },
-            HJAction("move_line_down") { e: Editor -> moveImpl(e, HJCharMovementKind.VERTICAL, HJMovementDirection.FORWARD, 1, false) },
-            HJAction("move_visual_line_up") { e: Editor -> moveImpl(e, HJCharMovementKind.VERTICAL_VISUAL, HJMovementDirection.BACKWARD, 1, false) },
-            HJAction("move_visual_line_down") { e: Editor -> moveImpl(e, HJCharMovementKind.VERTICAL_VISUAL, HJMovementDirection.FORWARD, 1, false) },
-            HJAction("extend_char_left") { e: Editor -> moveImpl(e, HJCharMovementKind.HORIZONTAL, HJMovementDirection.BACKWARD, 1, true) },
-            HJAction("extend_char_right") { e: Editor -> moveImpl(e, HJCharMovementKind.HORIZONTAL, HJMovementDirection.FORWARD, 1, true) },
-            HJAction("extend_line_up") { e: Editor -> moveImpl(e, HJCharMovementKind.VERTICAL, HJMovementDirection.BACKWARD, 1, true) },
-            HJAction("extend_line_down") { e: Editor -> moveImpl(e, HJCharMovementKind.VERTICAL, HJMovementDirection.FORWARD, 1, true) },
-            HJAction("extend_visual_line_up") { e: Editor -> moveImpl(e, HJCharMovementKind.VERTICAL_VISUAL, HJMovementDirection.BACKWARD, 1, true) },
-            HJAction("extend_visual_line_down") { e: Editor -> moveImpl(e, HJCharMovementKind.VERTICAL_VISUAL, HJMovementDirection.FORWARD, 1, true) },
+            HJAction("no_op") { _ -> },
+            HJAction("move_char_left") { e -> moveImpl(e, HJCharMovementKind.HORIZONTAL, HJMovementDirection.BACKWARD, 1, false) },
+            HJAction("move_char_right") { e -> moveImpl(e, HJCharMovementKind.HORIZONTAL, HJMovementDirection.FORWARD, 1, false) },
+            HJAction("move_line_up") { e -> moveImpl(e, HJCharMovementKind.VERTICAL, HJMovementDirection.BACKWARD, 1, false) },
+            HJAction("move_line_down") { e -> moveImpl(e, HJCharMovementKind.VERTICAL, HJMovementDirection.FORWARD, 1, false) },
+            HJAction("move_visual_line_up") { e -> moveImpl(e, HJCharMovementKind.VERTICAL_VISUAL, HJMovementDirection.BACKWARD, 1, false) },
+            HJAction("move_visual_line_down") { e -> moveImpl(e, HJCharMovementKind.VERTICAL_VISUAL, HJMovementDirection.FORWARD, 1, false) },
+            HJAction("extend_char_left") { e -> moveImpl(e, HJCharMovementKind.HORIZONTAL, HJMovementDirection.BACKWARD, 1, true) },
+            HJAction("extend_char_right") { e -> moveImpl(e, HJCharMovementKind.HORIZONTAL, HJMovementDirection.FORWARD, 1, true) },
+            HJAction("extend_line_up") { e -> moveImpl(e, HJCharMovementKind.VERTICAL, HJMovementDirection.BACKWARD, 1, true) },
+            HJAction("extend_line_down") { e -> moveImpl(e, HJCharMovementKind.VERTICAL, HJMovementDirection.FORWARD, 1, true) },
+            HJAction("extend_visual_line_up") { e -> moveImpl(e, HJCharMovementKind.VERTICAL_VISUAL, HJMovementDirection.BACKWARD, 1, true) },
+            HJAction("extend_visual_line_down") { e -> moveImpl(e, HJCharMovementKind.VERTICAL_VISUAL, HJMovementDirection.FORWARD, 1, true) },
             HJAction("copy_selection_on_next_line"),
             HJAction("copy_selection_on_prev_line"),
-            HJAction("move_next_word_start") { editor: Editor ->
-                getNextWordStart(editor)?.let {
-                    collapseSelection(editor)
-                    extendSelectionWithMovement(editor) { e: Editor -> moveCaretToOffset(e, it) }
-                }
-            },
-            HJAction("move_prev_word_start"),
-            HJAction("move_next_word_end"),
-            HJAction("move_prev_word_end"),
-            HJAction("move_next_long_word_start"),
-            HJAction("move_prev_long_word_start"),
-            HJAction("move_next_long_word_end"),
-            HJAction("move_prev_long_word_end"),
-            HJAction("move_next_sub_word_start"),
-            HJAction("move_prev_sub_word_start"),
-            HJAction("move_next_sub_word_end"),
-            HJAction("move_prev_sub_word_end"),
+            HJAction("move_next_word_start") { e -> moveWordImpl(e, HJWordMotionTarget.NEXT_WORD_START, 1, false) },
+            HJAction("move_prev_word_start") { e -> moveWordImpl(e, HJWordMotionTarget.PREV_WORD_START, 1, false) },
+            HJAction("move_next_word_end") { e -> moveWordImpl(e, HJWordMotionTarget.NEXT_WORD_END, 1, false) },
+            HJAction("move_prev_word_end") { e -> moveWordImpl(e, HJWordMotionTarget.PREV_WORD_END, 1, false) },
+            HJAction("move_next_long_word_start") { e -> moveWordImpl(e, HJWordMotionTarget.NEXT_LONG_WORD_START, 1, false) },
+            HJAction("move_prev_long_word_start") { e -> moveWordImpl(e, HJWordMotionTarget.PREV_LONG_WORD_START, 1, false) },
+            HJAction("move_next_long_word_end") { e -> moveWordImpl(e, HJWordMotionTarget.NEXT_LONG_WORD_END, 1, false) },
+            HJAction("move_prev_long_word_end") { e -> moveWordImpl(e, HJWordMotionTarget.PREV_LONG_WORD_END, 1, false) },
+            HJAction("move_next_sub_word_start") { e -> moveWordImpl(e, HJWordMotionTarget.NEXT_SUB_WORD_START, 1, false) },
+            HJAction("move_prev_sub_word_start") { e -> moveWordImpl(e, HJWordMotionTarget.PREV_SUB_WORD_START, 1, false) },
+            HJAction("move_next_sub_word_end") { e -> moveWordImpl(e, HJWordMotionTarget.NEXT_SUB_WORD_END, 1, false) },
+            HJAction("move_prev_sub_word_end") { e -> moveWordImpl(e, HJWordMotionTarget.PREV_SUB_WORD_END, 1, false) },
             HJAction("move_parent_node_end"),
             HJAction("move_parent_node_start"),
-            HJAction("extend_next_word_start"),
-            HJAction("extend_prev_word_start"),
-            HJAction("extend_next_word_end"),
-            HJAction("extend_prev_word_end"),
-            HJAction("extend_next_long_word_start"),
-            HJAction("extend_prev_long_word_start"),
-            HJAction("extend_next_long_word_end"),
-            HJAction("extend_prev_long_word_end"),
-            HJAction("extend_next_sub_word_start"),
-            HJAction("extend_prev_sub_word_start"),
-            HJAction("extend_next_sub_word_end"),
-            HJAction("extend_prev_sub_word_end"),
+            HJAction("extend_next_word_start") { e -> moveWordImpl(e, HJWordMotionTarget.NEXT_WORD_START, 1, true) },
+            HJAction("extend_prev_word_start") { e -> moveWordImpl(e, HJWordMotionTarget.PREV_WORD_START, 1, true) },
+            HJAction("extend_next_word_end") { e -> moveWordImpl(e, HJWordMotionTarget.NEXT_WORD_END, 1, true) },
+            HJAction("extend_prev_word_end") { e -> moveWordImpl(e, HJWordMotionTarget.PREV_WORD_END, 1, true) },
+            HJAction("extend_next_long_word_start") { e -> moveWordImpl(e, HJWordMotionTarget.NEXT_LONG_WORD_START, 1, true) },
+            HJAction("extend_prev_long_word_start") { e -> moveWordImpl(e, HJWordMotionTarget.PREV_LONG_WORD_START, 1, true) },
+            HJAction("extend_next_long_word_end") { e -> moveWordImpl(e, HJWordMotionTarget.NEXT_LONG_WORD_END, 1, true) },
+            HJAction("extend_prev_long_word_end") { e -> moveWordImpl(e, HJWordMotionTarget.PREV_LONG_WORD_END, 1, true) },
+            HJAction("extend_next_sub_word_start") { e -> moveWordImpl(e, HJWordMotionTarget.NEXT_SUB_WORD_START, 1, true) },
+            HJAction("extend_prev_sub_word_start") { e -> moveWordImpl(e, HJWordMotionTarget.PREV_SUB_WORD_START, 1, true) },
+            HJAction("extend_next_sub_word_end") { e -> moveWordImpl(e, HJWordMotionTarget.NEXT_SUB_WORD_END, 1, true) },
+            HJAction("extend_prev_sub_word_end") { e -> moveWordImpl(e, HJWordMotionTarget.PREV_SUB_WORD_END, 1, true) },
             HJAction("extend_parent_node_end"),
             HJAction("extend_parent_node_start"),
             HJAction("find_till_char"),
@@ -156,36 +137,36 @@ object HJActions {
             HJAction("select_line_below"),
             HJAction("extend_to_line_bounds"),
             HJAction("shrink_to_line_bounds"),
-            HJAction("delete_selection") { editor: Editor ->
+            HJAction("delete_selection") { editor ->
                 extendSelection(editor)
                 editor.selectionModel.copySelectionToClipboard()
                 deleteSelection(editor)
                 editor.selectionModel.removeSelection()
                 switchToMode(editor, HJEditorMode.NORMAL)
             },
-            HJAction("delete_selection_noyank") { editor: Editor ->
+            HJAction("delete_selection_noyank") { editor ->
                 extendSelection(editor)
                 deleteSelection(editor)
                 editor.selectionModel.removeSelection()
                 switchToMode(editor, HJEditorMode.NORMAL)
             },
-            HJAction("change_selection") { editor: Editor ->
+            HJAction("change_selection") { editor ->
                 extendSelection(editor)
                 editor.selectionModel.copySelectionToClipboard()
                 deleteSelection(editor)
                 editor.selectionModel.removeSelection()
                 switchToMode(editor, HJEditorMode.INSERT)
             },
-            HJAction("change_selection_noyank") { editor: Editor ->
+            HJAction("change_selection_noyank") { editor ->
                 extendSelection(editor)
                 deleteSelection(editor)
                 editor.selectionModel.removeSelection()
                 switchToMode(editor, HJEditorMode.INSERT)
             },
-            HJAction("collapse_selection") { editor: Editor -> collapseSelection(editor) },
+            HJAction("collapse_selection") { editor -> collapseSelection(editor) },
             HJAction("flip_selections"),
             HJAction("ensure_selections_forward"),
-            HJAction("insert_mode") { editor: Editor -> switchToMode(editor, HJEditorMode.INSERT) },
+            HJAction("insert_mode") { editor -> switchToMode(editor, HJEditorMode.INSERT) },
             HJAction("append_mode"),
             HJAction("command_mode"),
             HJAction("file_picker"),
@@ -212,9 +193,9 @@ object HJActions {
             HJAction("insert_at_line_end"),
             HJAction("open_below"),
             HJAction("open_above"),
-            HJAction("normal_mode") { editor: Editor -> switchToMode(editor, HJEditorMode.NORMAL) },
-            HJAction("select_mode") { editor: Editor -> switchToMode(editor, HJEditorMode.SELECT) },
-            HJAction("exit_select_mode") { editor: Editor -> if (HJEditorState.mode == HJEditorMode.SELECT) switchToMode(editor, HJEditorMode.NORMAL) },
+            HJAction("normal_mode") { editor -> switchToMode(editor, HJEditorMode.NORMAL) },
+            HJAction("select_mode") { editor -> switchToMode(editor, HJEditorMode.SELECT) },
+            HJAction("exit_select_mode") { editor -> if (HJEditorState.mode == HJEditorMode.SELECT) switchToMode(editor, HJEditorMode.NORMAL) },
             HJAction("goto_definition"),
             HJAction("goto_declaration"),
             HJAction("add_newline_above"),
@@ -271,12 +252,12 @@ object HJActions {
             HJAction("delete_word_forward"),
             HJAction("kill_to_line_start"),
             HJAction("kill_to_line_end"),
-            HJAction("undo") { editor: Editor -> executeIdeAction(editor, IdeActions.ACTION_UNDO) },
-            HJAction("redo") { editor: Editor -> executeIdeAction(editor, IdeActions.ACTION_REDO) },
+            HJAction("undo") { editor -> executeIdeAction(editor, IdeActions.ACTION_UNDO) },
+            HJAction("redo") { editor -> executeIdeAction(editor, IdeActions.ACTION_REDO) },
             HJAction("earlier"),
             HJAction("later"),
             HJAction("commit_undo_checkpoint"),
-            HJAction("yank") { editor: Editor -> extendSelection(editor); editor.selectionModel.copySelectionToClipboard() },
+            HJAction("yank") { editor -> extendSelection(editor); editor.selectionModel.copySelectionToClipboard() },
             HJAction("yank_to_clipboard"),
             HJAction("yank_joined"),
             HJAction("yank_joined_to_clipboard"),
@@ -300,7 +281,7 @@ object HJActions {
             HJAction("keep_primary_selection"),
             HJAction("remove_primary_selection"),
             HJAction("completion"),
-            HJAction("hover") { _: Editor -> com.intellij.openapi.editor.actions.ShowHoverInfoAction() },
+            HJAction("hover") { editor -> executeIdeAction(editor, "ShowHoverInfo") },
             HJAction("toggle_comments"),
             HJAction("toggle_line_comments"),
             HJAction("toggle_block_comments"),
@@ -379,6 +360,7 @@ object HJActions {
             HJAction("goto_prev_tabstop"),
             HJAction("rotate_selections_first"),
             HJAction("rotate_selections_last"),
+            HJAction("debug") { editor -> editor.document.charsSequence.forEach { c: Char -> println(c.code)}}
         ))
         // @formatter:on
 
@@ -407,69 +389,25 @@ fun moveImpl(
     count: Int,
     extend: Boolean,
 ) {
-    when (charMovement) {
-        HJCharMovementKind.HORIZONTAL -> {
-            moveHorizontally(editor.document, HJRange(editor), direction, count, extend).apply(editor)
-        }
-
-        HJCharMovementKind.VERTICAL -> {
-//            val newPosition = try {
-//                val position = editor.caretModel.logicalPosition
-//                LogicalPosition(position.line + direction.value, position.column)
-//            } catch (_: IllegalArgumentException) {
-//                return
-//            }
-//            editor.caretModel.moveToLogicalPosition(newPosition)
-            moveVertically(editor, HJRange(editor), direction, count, extend).apply(editor)
-        }
-
-        HJCharMovementKind.VERTICAL_VISUAL -> {
-//            val newPosition = try {
-//                val position = editor.caretModel.logicalPosition
-//                VisualPosition(position.line + direction.value, position.column)
-//            } catch (_: IllegalArgumentException) {
-//                return
-//            }
-//            editor.caretModel.moveToVisualPosition(newPosition)
-            moveVerticallyVisual(editor, HJRange(editor), direction, count, extend).apply(editor)
-        }
+    var range = HJEditorState.getRange(editor)
+    range = when (charMovement) {
+        HJCharMovementKind.HORIZONTAL -> moveHorizontally(editor.document, range, direction, count, extend)
+        HJCharMovementKind.VERTICAL -> moveVertically(editor, range, direction, count, extend)
+        HJCharMovementKind.VERTICAL_VISUAL -> moveVerticallyVisual(editor, range, direction, count, extend)
     }
+    range.saveAndApply(editor)
 }
 
-private fun moveCaretLogicalPosition(editor: Editor, deltaLine: Int, deltaColumn: Int) {
-    val position = editor.caretModel.primaryCaret.logicalPosition
-    val newPosition = try {
-        LogicalPosition(position.line + deltaLine, position.column + deltaColumn)
-    } catch (_: IllegalArgumentException) {
-        return
+fun moveWordImpl(editor: Editor, target: HJWordMotionTarget, count: Int, extend: Boolean) {
+    var range = HJEditorState.getRange(editor)
+    val newRange = wordMove(editor.document, range, target, count)
+    range = if (extend) {
+        val pos = newRange.cursor
+        range.putCursor(editor.document, pos, true)
+    } else {
+        newRange
     }
-
-    if (HJEditorState.mode != HJEditorMode.SELECT) collapseSelection(editor)
-    editor.caretModel.primaryCaret.moveToLogicalPosition(newPosition)
-}
-
-private fun moveCaretVisualPosition(editor: Editor, deltaLine: Int, deltaColumn: Int) {
-    val position = editor.caretModel.primaryCaret.logicalPosition
-    val newPosition = try {
-        VisualPosition(position.line + deltaLine, position.column + deltaColumn)
-    } catch (_: IllegalArgumentException) {
-        return
-    }
-
-    if (HJEditorState.mode != HJEditorMode.SELECT) collapseSelection(editor)
-    editor.caretModel.primaryCaret.moveToVisualPosition(newPosition)
-}
-
-private fun moveCaretDeltaOffset(editor: Editor, deltaOffset: Int): Int {
-    var offset = editor.caretModel.primaryCaret.offset
-    offset += deltaOffset
-    moveCaretToOffset(editor, offset)
-    return offset
-}
-
-private fun moveCaretToOffset(editor: Editor, offset: Int) {
-    if (HJEditorState.mode != HJEditorMode.SELECT) collapseSelection(editor)
-    editor.caretModel.primaryCaret.moveToOffset(offset)
+    range.saveAndApply(editor)
 }
 
 fun switchToMode(editor: Editor, newMode: HJEditorMode) {
