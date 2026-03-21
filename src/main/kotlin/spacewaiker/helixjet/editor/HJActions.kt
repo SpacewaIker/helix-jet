@@ -1,10 +1,7 @@
 ﻿package spacewaiker.helixjet.editor
 
-import com.intellij.ide.DataManager
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
-import com.intellij.openapi.actionSystem.ActionUiKind
-import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.IdeActions
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.diagnostic.Logger
@@ -14,8 +11,6 @@ import com.intellij.openapi.editor.LogicalPosition
 import com.intellij.openapi.editor.VisualPosition
 import com.intellij.openapi.wm.WindowManager
 import spacewaiker.helixjet.ui.HJStatusBarModeWidget
-import kotlin.math.max
-import kotlin.math.min
 
 //typealias HJAction = (Editor) -> Unit
 class HJAction {
@@ -58,21 +53,38 @@ object HJActions {
         // @formatter:off
         defActions(map, arrayOf(
             HJAction("no_op") { _: Editor -> },
-            HJAction("move_char_left") { editor: Editor -> moveCaretOffset(editor, -1) },
-            HJAction("move_char_right") { editor: Editor -> moveCaretOffset(editor, 1) },
-            HJAction("move_line_up") { editor: Editor -> moveCaretLogicalPosition(editor, -1, 0) },
-            HJAction("move_line_down") { editor: Editor -> moveCaretLogicalPosition(editor, 1, 0) },
-            HJAction("move_visual_line_up") { editor: Editor -> moveCaretVisualPosition(editor, -1, 0) },
-            HJAction("move_visual_line_down") { editor: Editor -> moveCaretVisualPosition(editor, 1, 0) },
-            HJAction("extend_char_left") { editor: Editor -> extendSelectionWithMovement(editor) { e: Editor -> moveCaretOffset(e, -1) } },
-            HJAction("extend_char_right") { editor: Editor -> extendSelectionWithMovement(editor) { e: Editor -> moveCaretOffset(e, 1) } },
-            HJAction("extend_line_up") { editor: Editor -> extendSelectionWithMovement(editor) { e: Editor -> moveCaretLogicalPosition(e, -1, 0) } },
-            HJAction("extend_line_down") { editor: Editor -> extendSelectionWithMovement(editor) { e: Editor -> moveCaretLogicalPosition(e, 1, 0) } },
-            HJAction("extend_visual_line_up") { editor: Editor -> extendSelectionWithMovement(editor) { e: Editor -> moveCaretVisualPosition(e, -1, 0) } },
-            HJAction("extend_visual_line_down") { editor: Editor -> extendSelectionWithMovement(editor) { e: Editor -> moveCaretVisualPosition(e, 1, 0) } },
+//            HJAction("move_char_left") { editor: Editor -> moveCaretDeltaOffset(editor, -1) },
+//            HJAction("move_char_right") { editor: Editor -> moveCaretDeltaOffset(editor, 1) },
+//            HJAction("move_line_up") { editor: Editor -> moveCaretLogicalPosition(editor, -1, 0) },
+//            HJAction("move_line_down") { editor: Editor -> moveCaretLogicalPosition(editor, 1, 0) },
+//            HJAction("move_visual_line_up") { editor: Editor -> moveCaretVisualPosition(editor, -1, 0) },
+//            HJAction("move_visual_line_down") { editor: Editor -> moveCaretVisualPosition(editor, 1, 0) },
+//            HJAction("extend_char_left") { editor: Editor -> extendSelectionWithMovement(editor) { e: Editor -> moveCaretDeltaOffset(e, -1) } },
+//            HJAction("extend_char_right") { editor: Editor -> extendSelectionWithMovement(editor) { e: Editor -> moveCaretDeltaOffset(e, 1) } },
+//            HJAction("extend_line_up") { editor: Editor -> extendSelectionWithMovement(editor) { e: Editor -> moveCaretLogicalPosition(e, -1, 0) } },
+//            HJAction("extend_line_down") { editor: Editor -> extendSelectionWithMovement(editor) { e: Editor -> moveCaretLogicalPosition(e, 1, 0) } },
+//            HJAction("extend_visual_line_up") { editor: Editor -> extendSelectionWithMovement(editor) { e: Editor -> moveCaretVisualPosition(e, -1, 0) } },
+//            HJAction("extend_visual_line_down") { editor: Editor -> extendSelectionWithMovement(editor) { e: Editor -> moveCaretVisualPosition(e, 1, 0) } },
+            HJAction("move_char_left") { e: Editor -> moveImpl(e, HJCharMovementKind.HORIZONTAL, HJMovementDirection.BACKWARD, 1, false) },
+            HJAction("move_char_right") { e: Editor -> moveImpl(e, HJCharMovementKind.HORIZONTAL, HJMovementDirection.FORWARD, 1, false) },
+            HJAction("move_line_up") { e: Editor -> moveImpl(e, HJCharMovementKind.VERTICAL, HJMovementDirection.BACKWARD, 1, false) },
+            HJAction("move_line_down") { e: Editor -> moveImpl(e, HJCharMovementKind.VERTICAL, HJMovementDirection.FORWARD, 1, false) },
+            HJAction("move_visual_line_up") { e: Editor -> moveImpl(e, HJCharMovementKind.VERTICAL_VISUAL, HJMovementDirection.BACKWARD, 1, false) },
+            HJAction("move_visual_line_down") { e: Editor -> moveImpl(e, HJCharMovementKind.VERTICAL_VISUAL, HJMovementDirection.FORWARD, 1, false) },
+            HJAction("extend_char_left") { e: Editor -> moveImpl(e, HJCharMovementKind.HORIZONTAL, HJMovementDirection.BACKWARD, 1, true) },
+            HJAction("extend_char_right") { e: Editor -> moveImpl(e, HJCharMovementKind.HORIZONTAL, HJMovementDirection.FORWARD, 1, true) },
+            HJAction("extend_line_up") { e: Editor -> moveImpl(e, HJCharMovementKind.VERTICAL, HJMovementDirection.BACKWARD, 1, true) },
+            HJAction("extend_line_down") { e: Editor -> moveImpl(e, HJCharMovementKind.VERTICAL, HJMovementDirection.FORWARD, 1, true) },
+            HJAction("extend_visual_line_up") { e: Editor -> moveImpl(e, HJCharMovementKind.VERTICAL_VISUAL, HJMovementDirection.BACKWARD, 1, true) },
+            HJAction("extend_visual_line_down") { e: Editor -> moveImpl(e, HJCharMovementKind.VERTICAL_VISUAL, HJMovementDirection.FORWARD, 1, true) },
             HJAction("copy_selection_on_next_line"),
             HJAction("copy_selection_on_prev_line"),
-            HJAction("move_next_word_start"),
+            HJAction("move_next_word_start") { editor: Editor ->
+                getNextWordStart(editor)?.let {
+                    collapseSelection(editor)
+                    extendSelectionWithMovement(editor) { e: Editor -> moveCaretToOffset(e, it) }
+                }
+            },
             HJAction("move_prev_word_start"),
             HJAction("move_next_word_end"),
             HJAction("move_prev_word_end"),
@@ -388,6 +400,42 @@ object HJActions {
     }
 }
 
+fun moveImpl(
+    editor: Editor,
+    charMovement: HJCharMovementKind,
+    direction: HJMovementDirection,
+    count: Int,
+    extend: Boolean,
+) {
+    when (charMovement) {
+        HJCharMovementKind.HORIZONTAL -> {
+            moveHorizontally(editor.document, HJRange(editor), direction, count, extend).apply(editor)
+        }
+
+        HJCharMovementKind.VERTICAL -> {
+//            val newPosition = try {
+//                val position = editor.caretModel.logicalPosition
+//                LogicalPosition(position.line + direction.value, position.column)
+//            } catch (_: IllegalArgumentException) {
+//                return
+//            }
+//            editor.caretModel.moveToLogicalPosition(newPosition)
+            moveVertically(editor, HJRange(editor), direction, count, extend).apply(editor)
+        }
+
+        HJCharMovementKind.VERTICAL_VISUAL -> {
+//            val newPosition = try {
+//                val position = editor.caretModel.logicalPosition
+//                VisualPosition(position.line + direction.value, position.column)
+//            } catch (_: IllegalArgumentException) {
+//                return
+//            }
+//            editor.caretModel.moveToVisualPosition(newPosition)
+            moveVerticallyVisual(editor, HJRange(editor), direction, count, extend).apply(editor)
+        }
+    }
+}
+
 private fun moveCaretLogicalPosition(editor: Editor, deltaLine: Int, deltaColumn: Int) {
     val position = editor.caretModel.primaryCaret.logicalPosition
     val newPosition = try {
@@ -412,12 +460,16 @@ private fun moveCaretVisualPosition(editor: Editor, deltaLine: Int, deltaColumn:
     editor.caretModel.primaryCaret.moveToVisualPosition(newPosition)
 }
 
-private fun moveCaretOffset(editor: Editor, deltaOffset: Int): Int {
-    if (HJEditorState.mode != HJEditorMode.SELECT) collapseSelection(editor)
+private fun moveCaretDeltaOffset(editor: Editor, deltaOffset: Int): Int {
     var offset = editor.caretModel.primaryCaret.offset
     offset += deltaOffset
-    editor.caretModel.primaryCaret.moveToOffset(offset)
+    moveCaretToOffset(editor, offset)
     return offset
+}
+
+private fun moveCaretToOffset(editor: Editor, offset: Int) {
+    if (HJEditorState.mode != HJEditorMode.SELECT) collapseSelection(editor)
+    editor.caretModel.primaryCaret.moveToOffset(offset)
 }
 
 fun switchToMode(editor: Editor, newMode: HJEditorMode) {

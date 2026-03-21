@@ -7,7 +7,8 @@ import kotlin.math.min
 fun extendSelectionWithMovement(editor: Editor, movement: (Editor) -> Unit) {
     // treat selection anchors as block anchors, so subtract 1 from selection end now and add 1 at the end
     val selectionStart = editor.selectionModel.selectionStart
-    val selectionEnd = editor.selectionModel.selectionEnd - 1
+    val selectionEnd =
+        max(editor.selectionModel.selectionEnd - 1, selectionStart) // if empty selection, don't set end before start
     val previousCaret = editor.caretModel.primaryCaret.offset
 
     // perform movement
