@@ -44,6 +44,7 @@ class HJStatusBarLogoWidget(private val project: Project) : StatusBarWidget, Sta
                     )
                 }
             })
+            addSeparator()
             add(object : AnAction("Print All Mappings") {
                 override fun actionPerformed(e: AnActionEvent) {
                     val mapping = HJEditorState.config.mapping.map { entry ->
@@ -62,6 +63,11 @@ class HJStatusBarLogoWidget(private val project: Project) : StatusBarWidget, Sta
                 }
             })
             addSeparator()
+            add(object : AnAction("Reload Config") {
+                override fun actionPerformed(e: AnActionEvent) {
+                    HJEditorState.config.reloadConfiguration()
+                }
+            })
             add(object : AnAction("Disable HelixJet") {
                 override fun actionPerformed(e: AnActionEvent) {
                     // todo: implement

@@ -11,15 +11,21 @@ import java.io.File
 import kotlin.collections.get
 
 class HJConfiguration {
-    companion object {
-        private val logger = Logger.getInstance(this::class.java)
-    }
+    var mapping: MutableMap<Pair<HJEditorMode, HJInputKey>, HJAction> = defaultMappingParsed()
 
     constructor() {
         applyConfigKeymap()
     }
 
-    var mapping: HashMap<Pair<HJEditorMode, HJInputKey>, HJAction> = defaultMappingParsed()
+    /**
+     * Reload configuration file.
+     *
+     * Resets mapping to default, overridden with configuration file.
+     */
+    fun reloadConfiguration() {
+        mapping = defaultMappingParsed()
+        applyConfigKeymap()
+    }
 
     private fun loadConfiguration(): TomlFile? {
         val userHome = System.getProperty("user.home")
@@ -82,10 +88,14 @@ class HJConfiguration {
             }
         }
     }
+
+    companion object {
+        private val logger = Logger.getInstance(this::class.java)
+    }
 }
 
-private fun defaultMappingParsed(): HashMap<Pair<HJEditorMode, HJInputKey>, HJAction> {
-    val map = HashMap<Pair<HJEditorMode, HJInputKey>, HJAction>()
+private fun defaultMappingParsed(): MutableMap<Pair<HJEditorMode, HJInputKey>, HJAction> {
+    val map: MutableMap<Pair<HJEditorMode, HJInputKey>, HJAction> = mutableMapOf()
 
     for ((key, value) in defaultMappingNormal) {
         tryAddMapping(map, HJEditorMode.NORMAL, key, value)
