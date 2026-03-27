@@ -13,7 +13,7 @@ import com.intellij.openapi.wm.StatusBar
 import com.intellij.openapi.wm.StatusBarWidget
 import com.intellij.util.Consumer
 import com.intellij.vcsUtil.showAbove
-import spacewaiker.helixjet.editor.HJEditorState
+import spacewaiker.helixjet.editor.HJState
 import java.awt.event.MouseEvent
 import javax.swing.Icon
 
@@ -47,7 +47,7 @@ class HJStatusBarLogoWidget(private val project: Project) : StatusBarWidget, Sta
             addSeparator()
             add(object : AnAction("Print All Mappings") {
                 override fun actionPerformed(e: AnActionEvent) {
-                    val mapping = HJEditorState.config.mapping.map { entry ->
+                    val mapping = HJState.config.mapping.map { entry ->
                         Triple(
                             entry.key.first,
                             entry.key.second,
@@ -65,7 +65,7 @@ class HJStatusBarLogoWidget(private val project: Project) : StatusBarWidget, Sta
             addSeparator()
             add(object : AnAction("Reload Config") {
                 override fun actionPerformed(e: AnActionEvent) {
-                    HJEditorState.config.reloadConfiguration()
+                    HJState.config.reloadConfiguration()
                 }
             })
             add(object : AnAction("Disable HelixJet") {

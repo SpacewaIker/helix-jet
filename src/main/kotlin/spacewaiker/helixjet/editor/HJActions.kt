@@ -1,4 +1,6 @@
-﻿package spacewaiker.helixjet.editor
+﻿@file:Suppress("BooleanLiteralArgument")
+
+package spacewaiker.helixjet.editor
 
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
@@ -8,6 +10,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.wm.WindowManager
+import spacewaiker.helixjet.input.HJInputKey
 import spacewaiker.helixjet.ui.HJStatusBarModeWidget
 
 
@@ -93,14 +96,14 @@ object HJActions {
             HJAction("extend_prev_sub_word_end") { e -> moveWordImpl(e, HJWordMotionTarget.PREV_SUB_WORD_END, 1, true) },
             HJAction("extend_parent_node_end"),
             HJAction("extend_parent_node_start"),
-            HJAction("find_till_char"),
-            HJAction("find_next_char"),
-            HJAction("extend_till_char"),
-            HJAction("extend_next_char"),
-            HJAction("till_prev_char"),
-            HJAction("find_prev_char"),
-            HJAction("extend_till_prev_char"),
-            HJAction("extend_prev_char"),
+            HJAction("find_till_char") { e -> findChar(e, 1, HJMovementDirection.FORWARD, false, false) },
+            HJAction("find_next_char") { e -> findChar(e, 1, HJMovementDirection.FORWARD, true, false) },
+            HJAction("extend_till_char") { e -> findChar(e, 1, HJMovementDirection.FORWARD, false, true) },
+            HJAction("extend_next_char") { e -> findChar(e, 1, HJMovementDirection.FORWARD, true, true) },
+            HJAction("till_prev_char") { e -> findChar(e, 1, HJMovementDirection.BACKWARD, false, false) },
+            HJAction("find_prev_char") { e -> findChar(e, 1, HJMovementDirection.BACKWARD, true, false) },
+            HJAction("extend_till_prev_char") { e -> findChar(e, 1, HJMovementDirection.BACKWARD, false, true) },
+            HJAction("extend_prev_char") { e -> findChar(e, 1, HJMovementDirection.BACKWARD, true, true) },
             HJAction("repeat_last_motion"),
             HJAction("replace"),
             HJAction("switch_case"),
@@ -195,7 +198,7 @@ object HJActions {
             HJAction("open_above"),
             HJAction("normal_mode") { editor -> switchToMode(editor, HJEditorMode.NORMAL) },
             HJAction("select_mode") { editor -> switchToMode(editor, HJEditorMode.SELECT) },
-            HJAction("exit_select_mode") { editor -> if (HJEditorState.mode == HJEditorMode.SELECT) switchToMode(editor, HJEditorMode.NORMAL) },
+            HJAction("exit_select_mode") { editor -> if (HJState.mode == HJEditorMode.SELECT) switchToMode(editor, HJEditorMode.NORMAL) },
             HJAction("goto_definition"),
             HJAction("goto_declaration"),
             HJAction("add_newline_above"),
@@ -389,17 +392,19 @@ fun moveImpl(
     count: Int,
     extend: Boolean,
 ) {
-    var range = HJEditorState.getRange(editor)
+    val hjEditor = HJState.getHJEditor(editor)
+    var range = hjEditor.range
     range = when (charMovement) {
         HJCharMovementKind.HORIZONTAL -> moveHorizontally(editor.document, range, direction, count, extend)
         HJCharMovementKind.VERTICAL -> moveVertically(editor, range, direction, count, extend)
         HJCharMovementKind.VERTICAL_VISUAL -> moveVerticallyVisual(editor, range, direction, count, extend)
     }
-    range.saveAndApply(editor)
+    hjEditor.saveAndApply(range)
 }
 
 fun moveWordImpl(editor: Editor, target: HJWordMotionTarget, count: Int, extend: Boolean) {
-    var range = HJEditorState.getRange(editor)
+    val hjEditor = HJState.getHJEditor(editor)
+    var range = hjEditor.range
     val newRange = wordMove(editor.document, range, target, count)
     range = if (extend) {
         val pos = newRange.cursor
@@ -407,12 +412,12 @@ fun moveWordImpl(editor: Editor, target: HJWordMotionTarget, count: Int, extend:
     } else {
         newRange
     }
-    range.saveAndApply(editor)
+    hjEditor.saveAndApply(range)
 }
 
 fun switchToMode(editor: Editor, newMode: HJEditorMode) {
-    if (HJEditorState.mode == newMode) return
-    HJEditorState.mode = newMode
+    if (HJState.mode == newMode) return
+    HJState.mode = newMode
     EditorFactory.getInstance().allEditors.forEach { it.settings.isBlockCursor = newMode != HJEditorMode.INSERT }
     editor.project?.let {
         WindowManager.getInstance().getStatusBar(it)?.updateWidget(HJStatusBarModeWidget.ID)
@@ -424,7 +429,7 @@ fun switchToMode(editor: Editor, newMode: HJEditorMode) {
 
 private fun collapseSelection(editor: Editor) {
     editor.selectionModel.removeSelection()
-    if (HJEditorState.mode == HJEditorMode.SELECT) {
+    if (HJState.mode == HJEditorMode.SELECT) {
         extendSelection(editor)
     }
 }
@@ -440,4 +445,62 @@ private fun deleteSelection(editor: Editor) {
 fun executeIdeAction(editor: Editor, actionId: String) {
     val action = ActionManager.getInstance().getAction(actionId) ?: return
     ActionManager.getInstance().tryToExecute(action, null, editor.contentComponent, ActionPlaces.UNKNOWN, true)
+}
+
+fun findChar(editor: Editor, count: Int, direction: HJMovementDirection, inclusive: Boolean, extend: Boolean) {
+    val key = HJInputKey.Character('e')
+
+    val motion = when (key) {
+        is HJInputKey.Enter, is HJInputKey.Tab, is HJInputKey.Character -> {
+            // contrary to Helix, where newlines can be different characters, here we only have to deal with \n when
+            // reading from a Document.
+            val ch = if (key == HJInputKey.Enter) '\n' else if (key == HJInputKey.Tab) '\t' else key.c
+            { hjEditor: HJEditor ->
+                val range = hjEditor.range
+                val cursorAnchor = range.cursor
+                val cursorHead = nextGraphemeBoundary(editor.document, cursorAnchor)
+
+                // exclusive search skips the next char after cursor to enable repeated application
+                val searchStartPos = when (Pair(inclusive, direction)) {
+                    Pair(true, HJMovementDirection.FORWARD) -> cursorHead
+                    Pair(true, HJMovementDirection.BACKWARD) -> cursorAnchor
+                    Pair(false, HJMovementDirection.FORWARD) -> cursorHead + 1
+                    Pair(false, HJMovementDirection.BACKWARD) -> cursorAnchor - 1
+                    else -> { // Should never happen
+                        HJActions.logger.error("Impossible condition")
+                        0
+                    }
+                }
+
+                var pos = findNthChar(editor.document, HJCharMatcher.Character(ch), searchStartPos, count, direction)
+                if (pos != null) {
+                    // exclusive search should stop on previous character
+                    pos = when (Pair(inclusive, direction)) {
+                        Pair(true, HJMovementDirection.FORWARD) -> pos
+                        Pair(true, HJMovementDirection.BACKWARD) -> pos
+                        Pair(false, HJMovementDirection.FORWARD) -> pos - 1
+                        Pair(false, HJMovementDirection.BACKWARD) -> pos + 1
+                        else -> { // Should never happen
+                            HJActions.logger.error("Impossible condition")
+                            0
+                        }
+                    }
+                }
+
+                val newRange = if (pos == null) range else {
+                    if (extend) {
+                        range.putCursor(hjEditor.editor.document, pos, true)
+                    } else {
+                        HJRange.point(range.cursor).putCursor(hjEditor.editor.document, pos, true)
+                    }
+                }
+
+                hjEditor.saveAndApply(newRange)
+            }
+        }
+
+        else -> return
+    }
+
+    HJState.getHJEditor(editor).applyMotion(motion)
 }

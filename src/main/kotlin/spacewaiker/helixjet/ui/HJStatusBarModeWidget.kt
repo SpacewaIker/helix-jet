@@ -4,7 +4,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.StatusBar
 import com.intellij.openapi.wm.StatusBarWidget
 import spacewaiker.helixjet.editor.HJEditorMode
-import spacewaiker.helixjet.editor.HJEditorState
+import spacewaiker.helixjet.editor.HJState
 import java.awt.Component
 
 class HJStatusBarModeWidget(private val project: Project) : StatusBarWidget, StatusBarWidget.TextPresentation {
@@ -20,7 +20,7 @@ class HJStatusBarModeWidget(private val project: Project) : StatusBarWidget, Sta
     override fun getAlignment() = Component.LEFT_ALIGNMENT
 
     override fun getText(): String {
-        return when (HJEditorState.mode) {
+        return when (HJState.mode) {
             HJEditorMode.NORMAL -> "NOR"
             HJEditorMode.INSERT -> "INS"
             HJEditorMode.SELECT -> "SEL"

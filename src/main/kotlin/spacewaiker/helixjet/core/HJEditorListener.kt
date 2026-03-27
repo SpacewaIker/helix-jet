@@ -3,16 +3,16 @@
 import com.intellij.openapi.editor.event.EditorFactoryEvent
 import com.intellij.openapi.editor.event.EditorFactoryListener
 import spacewaiker.helixjet.editor.HJEditorMode
-import spacewaiker.helixjet.editor.HJEditorState
+import spacewaiker.helixjet.editor.HJState
 import spacewaiker.helixjet.input.HJMouseListener
 
 class HJEditorListener : EditorFactoryListener {
     override fun editorCreated(event: EditorFactoryEvent) {
         val editor = event.editor
-        editor.settings.isBlockCursor = HJEditorState.mode != HJEditorMode.INSERT
+        editor.settings.isBlockCursor = HJState.mode != HJEditorMode.INSERT
 
-        // create entry for this editor in ranges map
-        HJEditorState.getRange(editor)
+        // create entry for this editor in HJEditors map
+        HJState.getHJEditor(editor)
 
         editor.addEditorMouseListener(HJMouseListener())
     }

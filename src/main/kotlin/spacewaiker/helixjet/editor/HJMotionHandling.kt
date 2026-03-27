@@ -284,3 +284,47 @@ private fun isSubWordBoundary(a: Char, b: Char, direction: HJMovementDirection):
         else -> false
     }
 }
+
+sealed class HJCharMatcher {
+    data class Character(val char: Char) : HJCharMatcher()
+    data class Function(val fn: (Char) -> Boolean) : HJCharMatcher()
+
+    fun matches(ch: Char): Boolean {
+        return when (this) {
+            is Character -> ch == this.char
+            is Function -> this.fn(ch)
+        }
+    }
+}
+
+fun findNthChar(doc: Document, charMatcher: HJCharMatcher, pos: Int, count: Int, direction: HJMovementDirection): Int? {
+    if (count == 0) return null
+
+    val chars = doc.charsSequence.toList().listIterator()
+    chars.skip(pos)
+
+    var n = count
+    var pos = pos
+
+    when (direction) {
+        HJMovementDirection.FORWARD -> while (true) {
+            if (!chars.hasNext()) return null
+            val c = chars.next()
+            if (charMatcher.matches(c)) {
+                n--
+                if (n == 0) return pos
+            }
+            pos++
+        }
+
+        HJMovementDirection.BACKWARD -> while (true) {
+            if (!chars.hasPrevious()) return null
+            val c = chars.previous()
+            pos--
+            if (charMatcher.matches(c)) {
+                n--
+                if (n == 0) return pos
+            }
+        }
+    }
+}
