@@ -1,13 +1,12 @@
 ﻿package spacewaiker.helixjet.ui
 
-import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.StatusBar
 import com.intellij.openapi.wm.StatusBarWidget
 import spacewaiker.helixjet.editor.HJEditorMode
 import spacewaiker.helixjet.editor.HJState
 import java.awt.Component
 
-class HJStatusBarModeWidget(private val project: Project) : StatusBarWidget, StatusBarWidget.TextPresentation {
+class HJStatusBarModeWidget : StatusBarWidget, StatusBarWidget.TextPresentation {
     companion object {
         const val ID = "HelixJetModeWidget"
     }

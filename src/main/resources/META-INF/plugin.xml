@@ -24,8 +24,12 @@
     <extensions defaultExtensionNs="com.intellij">
         <editorFactoryListener implementation="spacewaiker.helixjet.core.HJEditorListener"/>
         <postStartupActivity implementation="spacewaiker.helixjet.core.HJStartupActivity"/>
-        <statusBarWidgetFactory implementation="spacewaiker.helixjet.ui.HJStatusBarModeWidgetFactory" id="HelixModeWidget" order="first"/>
-        <statusBarWidgetFactory implementation="spacewaiker.helixjet.ui.HJStatusBarLogoWidgetFactory" id="HelixLogoWidget" order="first"/>
+        <statusBarWidgetFactory implementation="spacewaiker.helixjet.ui.HJStatusBarInputWidgetFactory"
+                                id="HelixInputWidget" order="first"/>
+        <statusBarWidgetFactory implementation="spacewaiker.helixjet.ui.HJStatusBarModeWidgetFactory"
+                                id="HelixModeWidget" order="first"/>
+        <statusBarWidgetFactory implementation="spacewaiker.helixjet.ui.HJStatusBarLogoWidgetFactory"
+                                id="HelixLogoWidget" order="first"/>
     </extensions>
 
 </idea-plugin>

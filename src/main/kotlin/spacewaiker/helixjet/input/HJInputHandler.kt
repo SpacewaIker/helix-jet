@@ -2,8 +2,11 @@
 
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.EditorFactory
+import com.intellij.openapi.wm.WindowManager
 import spacewaiker.helixjet.editor.HJEditorMode
 import spacewaiker.helixjet.editor.HJState
+import spacewaiker.helixjet.ui.HJStatusBarInputWidget
 
 sealed class HJInputKey {
     object Escape : HJInputKey()
@@ -77,10 +80,27 @@ sealed class HJInputKey {
 
 object HJInputHandler {
     private val logger = Logger.getInstance(this::class.java)
+    private var onNextKeyCallback: ((HJInputKey) -> Unit)? = null
+    private var lastKey: HJInputKey? = null
+    var pendingActionKey: HJInputKey? = null
 
+    /**
+     * Handle the given input key.
+     * Returns true if the key event was handled, false if it should be handled by the caller.
+     */
     fun handle(editor: Editor, key: HJInputKey): Boolean {
         if (HJState.mode == HJEditorMode.INSERT && key is HJInputKey.Character) {
             return false
+        }
+
+        lastKey = key
+
+        // if there is a callback set for the next key, execute it instead of normal key handling
+        if (onNextKeyCallback != null) {
+            onNextKeyCallback?.invoke(key)
+            onNextKeyCallback = null
+            updatePendingActionKey(null)
+            return true
         }
 
         var action = HJState.config.mapping[Pair(HJState.mode, key)]
@@ -97,5 +117,25 @@ object HJInputHandler {
         }
 
         return true
+    }
+
+    /**
+     * Set callback to be executed on next key press.
+     * Also sets last pressed key as "pending key" indicator in widget.
+     */
+    fun onNextKey(callback: (HJInputKey) -> Unit) {
+        if (onNextKeyCallback != null)
+            logger.warn("onNextKeyCallback already defined, replacing with new value")
+
+        onNextKeyCallback = callback
+
+        lastKey?.let { updatePendingActionKey(it) }
+    }
+
+    private fun updatePendingActionKey(newKey: HJInputKey?) {
+        pendingActionKey = newKey
+        EditorFactory.getInstance().editorList.first().project?.let {
+            WindowManager.getInstance().getStatusBar(it)?.updateWidget(HJStatusBarInputWidget.ID)
+        }
     }
 }
