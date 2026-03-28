@@ -18,7 +18,7 @@ class HJStatusBarInputWidget : StatusBarWidget, StatusBarWidget.TextPresentation
     override fun getAlignment() = Component.LEFT_ALIGNMENT
 
     override fun getText(): String {
-        return HJInputHandler.pendingActionKey?.toString() ?: ""
+        return HJInputHandler.pendingActionKey ?: ""
     }
 
     override fun install(statusBar: StatusBar) {

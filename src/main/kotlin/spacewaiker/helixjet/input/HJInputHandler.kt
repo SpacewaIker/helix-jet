@@ -4,6 +4,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.wm.WindowManager
+import spacewaiker.helixjet.editor.HJActionContext
 import spacewaiker.helixjet.editor.HJEditorMode
 import spacewaiker.helixjet.editor.HJState
 import spacewaiker.helixjet.ui.HJStatusBarInputWidget
@@ -82,7 +83,8 @@ object HJInputHandler {
     private val logger = Logger.getInstance(this::class.java)
     private var onNextKeyCallback: ((HJInputKey) -> Unit)? = null
     private var lastKey: HJInputKey? = null
-    var pendingActionKey: HJInputKey? = null
+    var pendingActionKey: String? = null
+    private var actionCount: String = ""
 
     /**
      * Handle the given input key.
@@ -103,9 +105,28 @@ object HJInputHandler {
             return true
         }
 
+        // proceed with normal key handling
+        return handleKeyNormalBehaviour(editor, key)
+    }
+
+    private fun handleKeyNormalBehaviour(editor: Editor, key: HJInputKey): Boolean {
+        // if the key is a number, we're inputting an action count
+        if (key is HJInputKey.Character && key.c.isDigit()) {
+            actionCount += key.c
+            updatePendingActionKey(actionCount)
+            return true
+        }
+        var count = 1
+        if (!actionCount.isEmpty()) {
+            // not a number, and action count is not empty, so we've finished entering our action count
+            count = actionCount.toInt()
+            actionCount = ""
+            updatePendingActionKey(null)
+        }
+
         var action = HJState.config.mapping[Pair(HJState.mode, key)]
 
-        // try to fallback to normal mode if no action is found for select mode
+        // try to fall back to normal mode if no action is found for select mode
         if (action == null && HJState.mode == HJEditorMode.SELECT) {
             action = HJState.config.mapping[Pair(HJEditorMode.NORMAL, key)]
         }
@@ -113,7 +134,8 @@ object HJInputHandler {
         if (action == null) {
             logger.info("Could not find an action corresponding to $key in mode ${HJState.mode}")
         } else {
-            action.execute(editor)
+            val cx = HJActionContext(editor, count)
+            action.execute(cx)
         }
 
         return true
@@ -129,10 +151,10 @@ object HJInputHandler {
 
         onNextKeyCallback = callback
 
-        lastKey?.let { updatePendingActionKey(it) }
+        lastKey?.let { updatePendingActionKey(it.toString()) }
     }
 
-    private fun updatePendingActionKey(newKey: HJInputKey?) {
+    private fun updatePendingActionKey(newKey: String?) {
         pendingActionKey = newKey
         EditorFactory.getInstance().editorList.first().project?.let {
             WindowManager.getInstance().getStatusBar(it)?.updateWidget(HJStatusBarInputWidget.ID)

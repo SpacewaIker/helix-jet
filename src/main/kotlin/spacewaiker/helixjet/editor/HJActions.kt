@@ -16,24 +16,29 @@ import spacewaiker.helixjet.ui.HJStatusBarModeWidget
 
 
 class HJAction {
-    constructor(name: String, action: ((Editor) -> Unit)? = null) {
+    constructor(name: String, action: ((HJActionContext) -> Unit)? = null) {
         this.name = name
         this.action = action
     }
 
-    fun execute(editor: Editor) {
+    fun execute(cx: HJActionContext) {
         if (action == null) {
             HJActions.logger.warn("Action $name is not yet defined")
         } else {
             HJActions.logger.debug("Executing action $name")
-            action(editor)
+            action(cx)
         }
     }
 
     val name: String
 
-    private val action: ((Editor) -> Unit)?
+    private val action: ((HJActionContext) -> Unit)?
 }
+
+data class HJActionContext(
+    val editor: Editor,
+    val count: Int = 1,
+)
 
 object HJActions {
     val logger = Logger.getInstance(this::class.java)
@@ -43,7 +48,7 @@ object HJActions {
     fun getAction(name: String): HJAction? {
         val ideAction = name.removeSurrounding("<", ">")
         if (ideAction != name) {
-            actions[name] = HJAction(name) { editor: Editor -> executeIdeAction(editor, ideAction) }
+            actions[name] = HJAction(name) { cx: HJActionContext -> executeIdeAction(cx, ideAction) }
         }
 
         return actions[name]
@@ -55,57 +60,57 @@ object HJActions {
         // @formatter:off
         defActions(map, arrayOf(
             HJAction("no_op") { _ -> },
-            HJAction("move_char_left") { e -> moveImpl(e, HJCharMovementKind.HORIZONTAL, HJMovementDirection.BACKWARD, 1, false) },
-            HJAction("move_char_right") { e -> moveImpl(e, HJCharMovementKind.HORIZONTAL, HJMovementDirection.FORWARD, 1, false) },
-            HJAction("move_line_up") { e -> moveImpl(e, HJCharMovementKind.VERTICAL, HJMovementDirection.BACKWARD, 1, false) },
-            HJAction("move_line_down") { e -> moveImpl(e, HJCharMovementKind.VERTICAL, HJMovementDirection.FORWARD, 1, false) },
-            HJAction("move_visual_line_up") { e -> moveImpl(e, HJCharMovementKind.VERTICAL_VISUAL, HJMovementDirection.BACKWARD, 1, false) },
-            HJAction("move_visual_line_down") { e -> moveImpl(e, HJCharMovementKind.VERTICAL_VISUAL, HJMovementDirection.FORWARD, 1, false) },
-            HJAction("extend_char_left") { e -> moveImpl(e, HJCharMovementKind.HORIZONTAL, HJMovementDirection.BACKWARD, 1, true) },
-            HJAction("extend_char_right") { e -> moveImpl(e, HJCharMovementKind.HORIZONTAL, HJMovementDirection.FORWARD, 1, true) },
-            HJAction("extend_line_up") { e -> moveImpl(e, HJCharMovementKind.VERTICAL, HJMovementDirection.BACKWARD, 1, true) },
-            HJAction("extend_line_down") { e -> moveImpl(e, HJCharMovementKind.VERTICAL, HJMovementDirection.FORWARD, 1, true) },
-            HJAction("extend_visual_line_up") { e -> moveImpl(e, HJCharMovementKind.VERTICAL_VISUAL, HJMovementDirection.BACKWARD, 1, true) },
-            HJAction("extend_visual_line_down") { e -> moveImpl(e, HJCharMovementKind.VERTICAL_VISUAL, HJMovementDirection.FORWARD, 1, true) },
+            HJAction("move_char_left") { cx -> moveImpl(cx, HJCharMovementKind.HORIZONTAL, HJMovementDirection.BACKWARD, false) },
+            HJAction("move_char_right") { cx -> moveImpl(cx, HJCharMovementKind.HORIZONTAL, HJMovementDirection.FORWARD, false) },
+            HJAction("move_line_up") { cx -> moveImpl(cx, HJCharMovementKind.VERTICAL, HJMovementDirection.BACKWARD, false) },
+            HJAction("move_line_down") { cx -> moveImpl(cx, HJCharMovementKind.VERTICAL, HJMovementDirection.FORWARD, false) },
+            HJAction("move_visual_line_up") { cx -> moveImpl(cx, HJCharMovementKind.VERTICAL_VISUAL, HJMovementDirection.BACKWARD, false) },
+            HJAction("move_visual_line_down") { cx -> moveImpl(cx, HJCharMovementKind.VERTICAL_VISUAL, HJMovementDirection.FORWARD, false) },
+            HJAction("extend_char_left") { cx -> moveImpl(cx, HJCharMovementKind.HORIZONTAL, HJMovementDirection.BACKWARD, true) },
+            HJAction("extend_char_right") { cx -> moveImpl(cx, HJCharMovementKind.HORIZONTAL, HJMovementDirection.FORWARD, true) },
+            HJAction("extend_line_up") { cx -> moveImpl(cx, HJCharMovementKind.VERTICAL, HJMovementDirection.BACKWARD, true) },
+            HJAction("extend_line_down") { cx -> moveImpl(cx, HJCharMovementKind.VERTICAL, HJMovementDirection.FORWARD, true) },
+            HJAction("extend_visual_line_up") { cx -> moveImpl(cx, HJCharMovementKind.VERTICAL_VISUAL, HJMovementDirection.BACKWARD, true) },
+            HJAction("extend_visual_line_down") { cx -> moveImpl(cx, HJCharMovementKind.VERTICAL_VISUAL, HJMovementDirection.FORWARD, true) },
             HJAction("copy_selection_on_next_line"),
             HJAction("copy_selection_on_prev_line"),
-            HJAction("move_next_word_start") { e -> moveWordImpl(e, HJWordMotionTarget.NEXT_WORD_START, 1, false) },
-            HJAction("move_prev_word_start") { e -> moveWordImpl(e, HJWordMotionTarget.PREV_WORD_START, 1, false) },
-            HJAction("move_next_word_end") { e -> moveWordImpl(e, HJWordMotionTarget.NEXT_WORD_END, 1, false) },
-            HJAction("move_prev_word_end") { e -> moveWordImpl(e, HJWordMotionTarget.PREV_WORD_END, 1, false) },
-            HJAction("move_next_long_word_start") { e -> moveWordImpl(e, HJWordMotionTarget.NEXT_LONG_WORD_START, 1, false) },
-            HJAction("move_prev_long_word_start") { e -> moveWordImpl(e, HJWordMotionTarget.PREV_LONG_WORD_START, 1, false) },
-            HJAction("move_next_long_word_end") { e -> moveWordImpl(e, HJWordMotionTarget.NEXT_LONG_WORD_END, 1, false) },
-            HJAction("move_prev_long_word_end") { e -> moveWordImpl(e, HJWordMotionTarget.PREV_LONG_WORD_END, 1, false) },
-            HJAction("move_next_sub_word_start") { e -> moveWordImpl(e, HJWordMotionTarget.NEXT_SUB_WORD_START, 1, false) },
-            HJAction("move_prev_sub_word_start") { e -> moveWordImpl(e, HJWordMotionTarget.PREV_SUB_WORD_START, 1, false) },
-            HJAction("move_next_sub_word_end") { e -> moveWordImpl(e, HJWordMotionTarget.NEXT_SUB_WORD_END, 1, false) },
-            HJAction("move_prev_sub_word_end") { e -> moveWordImpl(e, HJWordMotionTarget.PREV_SUB_WORD_END, 1, false) },
+            HJAction("move_next_word_start") { cx -> moveWordImpl(cx, HJWordMotionTarget.NEXT_WORD_START, false) },
+            HJAction("move_prev_word_start") { cx -> moveWordImpl(cx, HJWordMotionTarget.PREV_WORD_START, false) },
+            HJAction("move_next_word_end") { cx -> moveWordImpl(cx, HJWordMotionTarget.NEXT_WORD_END, false) },
+            HJAction("move_prev_word_end") { cx -> moveWordImpl(cx, HJWordMotionTarget.PREV_WORD_END, false) },
+            HJAction("move_next_long_word_start") { cx -> moveWordImpl(cx, HJWordMotionTarget.NEXT_LONG_WORD_START, false) },
+            HJAction("move_prev_long_word_start") { cx -> moveWordImpl(cx, HJWordMotionTarget.PREV_LONG_WORD_START, false) },
+            HJAction("move_next_long_word_end") { cx -> moveWordImpl(cx, HJWordMotionTarget.NEXT_LONG_WORD_END, false) },
+            HJAction("move_prev_long_word_end") { cx -> moveWordImpl(cx, HJWordMotionTarget.PREV_LONG_WORD_END, false) },
+            HJAction("move_next_sub_word_start") { cx -> moveWordImpl(cx, HJWordMotionTarget.NEXT_SUB_WORD_START, false) },
+            HJAction("move_prev_sub_word_start") { cx -> moveWordImpl(cx, HJWordMotionTarget.PREV_SUB_WORD_START, false) },
+            HJAction("move_next_sub_word_end") { cx -> moveWordImpl(cx, HJWordMotionTarget.NEXT_SUB_WORD_END, false) },
+            HJAction("move_prev_sub_word_end") { cx -> moveWordImpl(cx, HJWordMotionTarget.PREV_SUB_WORD_END, false) },
             HJAction("move_parent_node_end"),
             HJAction("move_parent_node_start"),
-            HJAction("extend_next_word_start") { e -> moveWordImpl(e, HJWordMotionTarget.NEXT_WORD_START, 1, true) },
-            HJAction("extend_prev_word_start") { e -> moveWordImpl(e, HJWordMotionTarget.PREV_WORD_START, 1, true) },
-            HJAction("extend_next_word_end") { e -> moveWordImpl(e, HJWordMotionTarget.NEXT_WORD_END, 1, true) },
-            HJAction("extend_prev_word_end") { e -> moveWordImpl(e, HJWordMotionTarget.PREV_WORD_END, 1, true) },
-            HJAction("extend_next_long_word_start") { e -> moveWordImpl(e, HJWordMotionTarget.NEXT_LONG_WORD_START, 1, true) },
-            HJAction("extend_prev_long_word_start") { e -> moveWordImpl(e, HJWordMotionTarget.PREV_LONG_WORD_START, 1, true) },
-            HJAction("extend_next_long_word_end") { e -> moveWordImpl(e, HJWordMotionTarget.NEXT_LONG_WORD_END, 1, true) },
-            HJAction("extend_prev_long_word_end") { e -> moveWordImpl(e, HJWordMotionTarget.PREV_LONG_WORD_END, 1, true) },
-            HJAction("extend_next_sub_word_start") { e -> moveWordImpl(e, HJWordMotionTarget.NEXT_SUB_WORD_START, 1, true) },
-            HJAction("extend_prev_sub_word_start") { e -> moveWordImpl(e, HJWordMotionTarget.PREV_SUB_WORD_START, 1, true) },
-            HJAction("extend_next_sub_word_end") { e -> moveWordImpl(e, HJWordMotionTarget.NEXT_SUB_WORD_END, 1, true) },
-            HJAction("extend_prev_sub_word_end") { e -> moveWordImpl(e, HJWordMotionTarget.PREV_SUB_WORD_END, 1, true) },
+            HJAction("extend_next_word_start") { cx -> moveWordImpl(cx, HJWordMotionTarget.NEXT_WORD_START, true) },
+            HJAction("extend_prev_word_start") { cx -> moveWordImpl(cx, HJWordMotionTarget.PREV_WORD_START, true) },
+            HJAction("extend_next_word_end") { cx -> moveWordImpl(cx, HJWordMotionTarget.NEXT_WORD_END, true) },
+            HJAction("extend_prev_word_end") { cx -> moveWordImpl(cx, HJWordMotionTarget.PREV_WORD_END, true) },
+            HJAction("extend_next_long_word_start") { cx -> moveWordImpl(cx, HJWordMotionTarget.NEXT_LONG_WORD_START, true) },
+            HJAction("extend_prev_long_word_start") { cx -> moveWordImpl(cx, HJWordMotionTarget.PREV_LONG_WORD_START, true) },
+            HJAction("extend_next_long_word_end") { cx -> moveWordImpl(cx, HJWordMotionTarget.NEXT_LONG_WORD_END, true) },
+            HJAction("extend_prev_long_word_end") { cx -> moveWordImpl(cx, HJWordMotionTarget.PREV_LONG_WORD_END, true) },
+            HJAction("extend_next_sub_word_start") { cx -> moveWordImpl(cx, HJWordMotionTarget.NEXT_SUB_WORD_START, true) },
+            HJAction("extend_prev_sub_word_start") { cx -> moveWordImpl(cx, HJWordMotionTarget.PREV_SUB_WORD_START, true) },
+            HJAction("extend_next_sub_word_end") { cx -> moveWordImpl(cx, HJWordMotionTarget.NEXT_SUB_WORD_END, true) },
+            HJAction("extend_prev_sub_word_end") { cx -> moveWordImpl(cx, HJWordMotionTarget.PREV_SUB_WORD_END, true) },
             HJAction("extend_parent_node_end"),
             HJAction("extend_parent_node_start"),
-            HJAction("find_till_char") { e -> findChar(e, 1, HJMovementDirection.FORWARD, false, false) },
-            HJAction("find_next_char") { e -> findChar(e, 1, HJMovementDirection.FORWARD, true, false) },
-            HJAction("extend_till_char") { e -> findChar(e, 1, HJMovementDirection.FORWARD, false, true) },
-            HJAction("extend_next_char") { e -> findChar(e, 1, HJMovementDirection.FORWARD, true, true) },
-            HJAction("till_prev_char") { e -> findChar(e, 1, HJMovementDirection.BACKWARD, false, false) },
-            HJAction("find_prev_char") { e -> findChar(e, 1, HJMovementDirection.BACKWARD, true, false) },
-            HJAction("extend_till_prev_char") { e -> findChar(e, 1, HJMovementDirection.BACKWARD, false, true) },
-            HJAction("extend_prev_char") { e -> findChar(e, 1, HJMovementDirection.BACKWARD, true, true) },
-            HJAction("repeat_last_motion"),
+            HJAction("find_till_char") { cx -> findChar(cx,  HJMovementDirection.FORWARD, false, false) },
+            HJAction("find_next_char") { cx -> findChar(cx,  HJMovementDirection.FORWARD, true, false) },
+            HJAction("extend_till_char") { cx -> findChar(cx,  HJMovementDirection.FORWARD, false, true) },
+            HJAction("extend_next_char") { cx -> findChar(cx,  HJMovementDirection.FORWARD, true, true) },
+            HJAction("till_prev_char") { cx -> findChar(cx,  HJMovementDirection.BACKWARD, false, false) },
+            HJAction("find_prev_char") { cx -> findChar(cx,  HJMovementDirection.BACKWARD, true, false) },
+            HJAction("extend_till_prev_char") { cx -> findChar(cx,  HJMovementDirection.BACKWARD, false, true) },
+            HJAction("extend_prev_char") { cx -> findChar(cx,  HJMovementDirection.BACKWARD, true, true) },
+            HJAction("repeat_last_motion") { cx -> HJState.getHJEditor(cx.editor).repeatLastMotion(1) },
             HJAction("replace"),
             HJAction("switch_case"),
             HJAction("switch_to_uppercase"),
@@ -141,36 +146,36 @@ object HJActions {
             HJAction("select_line_below"),
             HJAction("extend_to_line_bounds"),
             HJAction("shrink_to_line_bounds"),
-            HJAction("delete_selection") { editor ->
-                extendSelection(editor)
-                editor.selectionModel.copySelectionToClipboard()
-                deleteSelection(editor)
-                editor.selectionModel.removeSelection()
-                switchToMode(editor, HJEditorMode.NORMAL)
+            HJAction("delete_selection") { cx ->
+                extendSelection(cx.editor)
+                cx.editor.selectionModel.copySelectionToClipboard()
+                deleteSelection(cx.editor)
+                cx.editor.selectionModel.removeSelection()
+                switchToMode(cx.editor, HJEditorMode.NORMAL)
             },
-            HJAction("delete_selection_noyank") { editor ->
-                extendSelection(editor)
-                deleteSelection(editor)
-                editor.selectionModel.removeSelection()
-                switchToMode(editor, HJEditorMode.NORMAL)
+            HJAction("delete_selection_noyank") { cx ->
+                extendSelection(cx.editor)
+                deleteSelection(cx.editor)
+                cx.editor.selectionModel.removeSelection()
+                switchToMode(cx.editor, HJEditorMode.NORMAL)
             },
-            HJAction("change_selection") { editor ->
-                extendSelection(editor)
-                editor.selectionModel.copySelectionToClipboard()
-                deleteSelection(editor)
-                editor.selectionModel.removeSelection()
-                switchToMode(editor, HJEditorMode.INSERT)
+            HJAction("change_selection") { cx ->
+                extendSelection(cx.editor)
+                cx.editor.selectionModel.copySelectionToClipboard()
+                deleteSelection(cx.editor)
+                cx.editor.selectionModel.removeSelection()
+                switchToMode(cx.editor, HJEditorMode.INSERT)
             },
-            HJAction("change_selection_noyank") { editor ->
-                extendSelection(editor)
-                deleteSelection(editor)
-                editor.selectionModel.removeSelection()
-                switchToMode(editor, HJEditorMode.INSERT)
+            HJAction("change_selection_noyank") { cx ->
+                extendSelection(cx.editor)
+                deleteSelection(cx.editor)
+                cx.editor.selectionModel.removeSelection()
+                switchToMode(cx.editor, HJEditorMode.INSERT)
             },
-            HJAction("collapse_selection") { editor -> collapseSelection(editor) },
+            HJAction("collapse_selection") { cx -> collapseSelection(cx.editor) },
             HJAction("flip_selections"),
             HJAction("ensure_selections_forward"),
-            HJAction("insert_mode") { editor -> switchToMode(editor, HJEditorMode.INSERT) },
+            HJAction("insert_mode") { cx -> switchToMode(cx.editor, HJEditorMode.INSERT) },
             HJAction("append_mode"),
             HJAction("command_mode"),
             HJAction("file_picker"),
@@ -197,9 +202,9 @@ object HJActions {
             HJAction("insert_at_line_end"),
             HJAction("open_below"),
             HJAction("open_above"),
-            HJAction("normal_mode") { editor -> switchToMode(editor, HJEditorMode.NORMAL) },
-            HJAction("select_mode") { editor -> switchToMode(editor, HJEditorMode.SELECT) },
-            HJAction("exit_select_mode") { editor -> if (HJState.mode == HJEditorMode.SELECT) switchToMode(editor, HJEditorMode.NORMAL) },
+            HJAction("normal_mode") { cx -> switchToMode(cx.editor, HJEditorMode.NORMAL) },
+            HJAction("select_mode") { cx -> switchToMode(cx.editor, HJEditorMode.SELECT) },
+            HJAction("exit_select_mode") { cx -> if (HJState.mode == HJEditorMode.SELECT) switchToMode(cx.editor, HJEditorMode.NORMAL) },
             HJAction("goto_definition"),
             HJAction("goto_declaration"),
             HJAction("add_newline_above"),
@@ -256,12 +261,12 @@ object HJActions {
             HJAction("delete_word_forward"),
             HJAction("kill_to_line_start"),
             HJAction("kill_to_line_end"),
-            HJAction("undo") { editor -> executeIdeAction(editor, IdeActions.ACTION_UNDO) },
-            HJAction("redo") { editor -> executeIdeAction(editor, IdeActions.ACTION_REDO) },
+            HJAction("undo") { cx -> executeIdeAction(cx, IdeActions.ACTION_UNDO) },
+            HJAction("redo") { cx -> executeIdeAction(cx, IdeActions.ACTION_REDO) },
             HJAction("earlier"),
             HJAction("later"),
             HJAction("commit_undo_checkpoint"),
-            HJAction("yank") { editor -> extendSelection(editor); editor.selectionModel.copySelectionToClipboard() },
+            HJAction("yank") { cx -> extendSelection(cx.editor); cx.editor.selectionModel.copySelectionToClipboard() },
             HJAction("yank_to_clipboard"),
             HJAction("yank_joined"),
             HJAction("yank_joined_to_clipboard"),
@@ -285,7 +290,7 @@ object HJActions {
             HJAction("keep_primary_selection"),
             HJAction("remove_primary_selection"),
             HJAction("completion"),
-            HJAction("hover") { editor -> executeIdeAction(editor, "ShowHoverInfo") },
+            HJAction("hover") { cx -> executeIdeAction(cx, "ShowHoverInfo") },
             HJAction("toggle_comments"),
             HJAction("toggle_line_comments"),
             HJAction("toggle_block_comments"),
@@ -364,7 +369,7 @@ object HJActions {
             HJAction("goto_prev_tabstop"),
             HJAction("rotate_selections_first"),
             HJAction("rotate_selections_last"),
-            HJAction("debug") { editor -> editor.document.charsSequence.forEach { c: Char -> println(c.code)}}
+            HJAction("debug") { cx -> cx.editor.document.charsSequence.forEach { c: Char -> println(c.code)}}
         ))
         // @formatter:on
 
@@ -387,29 +392,28 @@ object HJActions {
 }
 
 fun moveImpl(
-    editor: Editor,
+    cx: HJActionContext,
     charMovement: HJCharMovementKind,
     direction: HJMovementDirection,
-    count: Int,
     extend: Boolean,
 ) {
-    val hjEditor = HJState.getHJEditor(editor)
+    val hjEditor = HJState.getHJEditor(cx.editor)
     var range = hjEditor.range
     range = when (charMovement) {
-        HJCharMovementKind.HORIZONTAL -> moveHorizontally(editor.document, range, direction, count, extend)
-        HJCharMovementKind.VERTICAL -> moveVertically(editor, range, direction, count, extend)
-        HJCharMovementKind.VERTICAL_VISUAL -> moveVerticallyVisual(editor, range, direction, count, extend)
+        HJCharMovementKind.HORIZONTAL -> moveHorizontally(cx.editor.document, range, direction, cx.count, extend)
+        HJCharMovementKind.VERTICAL -> moveVertically(cx.editor, range, direction, cx.count, extend)
+        HJCharMovementKind.VERTICAL_VISUAL -> moveVerticallyVisual(cx.editor, range, direction, cx.count, extend)
     }
     hjEditor.saveAndApply(range)
 }
 
-fun moveWordImpl(editor: Editor, target: HJWordMotionTarget, count: Int, extend: Boolean) {
-    val hjEditor = HJState.getHJEditor(editor)
+fun moveWordImpl(cx: HJActionContext, target: HJWordMotionTarget, extend: Boolean) {
+    val hjEditor = HJState.getHJEditor(cx.editor)
     var range = hjEditor.range
-    val newRange = wordMove(editor.document, range, target, count)
+    val newRange = wordMove(cx.editor.document, range, target, cx.count)
     range = if (extend) {
         val pos = newRange.cursor
-        range.putCursor(editor.document, pos, true)
+        range.putCursor(cx.editor.document, pos, true)
     } else {
         newRange
     }
@@ -443,12 +447,14 @@ private fun deleteSelection(editor: Editor) {
     }
 }
 
-fun executeIdeAction(editor: Editor, actionId: String) {
+fun executeIdeAction(cx: HJActionContext, actionId: String) {
     val action = ActionManager.getInstance().getAction(actionId) ?: return
-    ActionManager.getInstance().tryToExecute(action, null, editor.contentComponent, ActionPlaces.UNKNOWN, true)
+    repeat(cx.count) {
+        ActionManager.getInstance().tryToExecute(action, null, cx.editor.contentComponent, ActionPlaces.UNKNOWN, true)
+    }
 }
 
-fun findChar(editor: Editor, count: Int, direction: HJMovementDirection, inclusive: Boolean, extend: Boolean) {
+fun findChar(cx: HJActionContext, direction: HJMovementDirection, inclusive: Boolean, extend: Boolean) {
     HJInputHandler.onNextKey { key: HJInputKey ->
         val motion = when (key) {
             is HJInputKey.Enter, is HJInputKey.Tab, is HJInputKey.Character -> {
@@ -458,7 +464,7 @@ fun findChar(editor: Editor, count: Int, direction: HJMovementDirection, inclusi
                 { hjEditor: HJEditor ->
                     val range = hjEditor.range
                     val cursorAnchor = range.cursor
-                    val cursorHead = nextGraphemeBoundary(editor.document, cursorAnchor)
+                    val cursorHead = nextGraphemeBoundary(cx.editor.document, cursorAnchor)
 
                     // exclusive search skips the next char after cursor to enable repeated application
                     val searchStartPos = when (Pair(inclusive, direction)) {
@@ -473,7 +479,13 @@ fun findChar(editor: Editor, count: Int, direction: HJMovementDirection, inclusi
                     }
 
                     var pos =
-                        findNthChar(editor.document, HJCharMatcher.Character(ch), searchStartPos, count, direction)
+                        findNthChar(
+                            cx.editor.document,
+                            HJCharMatcher.Character(ch),
+                            searchStartPos,
+                            cx.count,
+                            direction
+                        )
                     if (pos != null) {
                         // exclusive search should stop on previous character
                         pos = when (Pair(inclusive, direction)) {
@@ -503,6 +515,6 @@ fun findChar(editor: Editor, count: Int, direction: HJMovementDirection, inclusi
             else -> null
         }
 
-        motion?.let { HJState.getHJEditor(editor).applyMotion(it) }
+        motion?.let { HJState.getHJEditor(cx.editor).applyMotion(it) }
     }
 }
