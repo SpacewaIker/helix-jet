@@ -113,6 +113,30 @@ class HJRange {
         }
     }
 
+    /**
+     * Check two ranges for overlap
+     */
+    fun overlaps(other: HJRange): Boolean {
+        return this.from == other.from || (this.to > other.from && other.to > this.from)
+    }
+
+    /**
+     * Returns a range that encompasses both input ranges
+     *
+     * This is like extend(), but tries to negotiate the anchor/head ordering between the two input ranges
+     */
+    fun merge(other: HJRange): HJRange {
+        return if (this.anchor > other.head && other.anchor > other.head) {
+            HJRange(max(this.anchor, other.anchor), min(this.head, other.head))
+        } else {
+            HJRange(min(this.from, other.from), max(this.to, other.to))
+        }
+    }
+
+    fun copy(): HJRange {
+        return HJRange(anchor, head, oldVisualPosition)
+    }
+
     companion object {
         fun point(head: Int) = HJRange(head, head)
     }
