@@ -6,12 +6,14 @@ import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.IdeActions
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.wm.WindowManager
 import spacewaiker.helixjet.input.HJInputHandler
 import spacewaiker.helixjet.input.HJInputKey
 import spacewaiker.helixjet.ui.HJStatusBarModeWidget
+import kotlin.math.min
 
 
 class HJAction {
@@ -35,8 +37,9 @@ class HJAction {
 }
 
 data class HJActionContext(
-    val editor: Editor,
+    val hjEditor: HJEditor,
     val count: Int = 1,
+    val register: HJRegister?,
 )
 
 object HJActions {
@@ -109,7 +112,7 @@ object HJActions {
             HJAction("find_prev_char") { cx -> findChar(cx,  HJMovementDirection.BACKWARD, true, false) },
             HJAction("extend_till_prev_char") { cx -> findChar(cx,  HJMovementDirection.BACKWARD, false, true) },
             HJAction("extend_prev_char") { cx -> findChar(cx,  HJMovementDirection.BACKWARD, true, true) },
-            HJAction("repeat_last_motion") { cx -> HJState.getHJEditor(cx.editor).repeatLastMotion(1) },
+            HJAction("repeat_last_motion") { cx -> cx.hjEditor.repeatLastMotion(1) },
             HJAction("replace") { cx -> replace(cx) },
             HJAction("switch_case"),
             HJAction("switch_to_uppercase"),
@@ -149,10 +152,10 @@ object HJActions {
             HJAction("delete_selection_noyank") { cx -> deleteSelectionImpl(cx, false, false) },
             HJAction("change_selection") { cx -> deleteSelectionImpl(cx, true, true) },
             HJAction("change_selection_noyank") { cx -> deleteSelectionImpl(cx, true, false) },
-            HJAction("collapse_selection") { cx -> collapseSelection(cx.editor) },
+            HJAction("collapse_selection") { cx -> collapseSelection(cx) },
             HJAction("flip_selections"),
             HJAction("ensure_selections_forward"),
-            HJAction("insert_mode") { cx -> switchToMode(cx.editor, HJEditorMode.INSERT) },
+            HJAction("insert_mode") { cx -> switchToMode(cx.hjEditor.editor, HJEditorMode.INSERT) },
             HJAction("append_mode"),
             HJAction("command_mode"),
             HJAction("file_picker"),
@@ -179,9 +182,9 @@ object HJActions {
             HJAction("insert_at_line_end"),
             HJAction("open_below"),
             HJAction("open_above"),
-            HJAction("normal_mode") { cx -> switchToMode(cx.editor, HJEditorMode.NORMAL) },
-            HJAction("select_mode") { cx -> switchToMode(cx.editor, HJEditorMode.SELECT) },
-            HJAction("exit_select_mode") { cx -> if (HJState.mode == HJEditorMode.SELECT) switchToMode(cx.editor, HJEditorMode.NORMAL) },
+            HJAction("normal_mode") { cx -> switchToMode(cx.hjEditor.editor, HJEditorMode.NORMAL) },
+            HJAction("select_mode") { cx -> switchToMode(cx.hjEditor.editor, HJEditorMode.SELECT) },
+            HJAction("exit_select_mode") { cx -> if (HJState.mode == HJEditorMode.SELECT) switchToMode(cx.hjEditor.editor, HJEditorMode.NORMAL) },
             HJAction("goto_definition"),
             HJAction("goto_declaration"),
             HJAction("add_newline_above"),
@@ -243,17 +246,17 @@ object HJActions {
             HJAction("earlier"),
             HJAction("later"),
             HJAction("commit_undo_checkpoint"),
-            HJAction("yank") { cx -> yankImpl(cx) },
-            HJAction("yank_to_clipboard"),
+            HJAction("yank") { cx -> yank(cx) },
+            HJAction("yank_to_clipboard") { cx -> yankImpl(cx.hjEditor.editor.document, cx.hjEditor.selection, HJRegister.Clipboard) },
             HJAction("yank_joined"),
             HJAction("yank_joined_to_clipboard"),
             HJAction("yank_main_selection_to_clipboard"),
             HJAction("replace_with_yanked"),
             HJAction("replace_selections_with_clipboard"),
-            HJAction("paste_after"),
-            HJAction("paste_before"),
-            HJAction("paste_clipboard_after"),
-            HJAction("paste_clipboard_before"),
+            HJAction("paste_after") { cx -> pasteImpl(cx, false) },
+            HJAction("paste_before") { cx -> pasteImpl(cx, true) },
+            HJAction("paste_clipboard_after") { cx -> pasteImpl(cx.copy(register = HJRegister.Clipboard), false) },
+            HJAction("paste_clipboard_before") { cx -> pasteImpl(cx.copy(register = HJRegister.Clipboard), true) },
             HJAction("paste_primary_clipboard_after"),
             HJAction("paste_primary_clipboard_before"),
             HJAction("indent"),
@@ -346,7 +349,7 @@ object HJActions {
             HJAction("goto_prev_tabstop"),
             HJAction("rotate_selections_first"),
             HJAction("rotate_selections_last"),
-            HJAction("debug") { cx -> cx.editor.document.charsSequence.forEach { c: Char -> println(c.code)}}
+            HJAction("debug") { cx -> cx.hjEditor.editor.document.charsSequence.forEach { c: Char -> println(c.code)}}
         ))
         // @formatter:on
 
@@ -374,29 +377,40 @@ private fun moveImpl(
     direction: HJMovementDirection,
     extend: Boolean,
 ) {
-    val hjEditor = HJState.getHJEditor(cx.editor)
-    val selection = hjEditor.selection.clone().transform { range ->
+    val selection = cx.hjEditor.selection.clone().transform { range ->
         when (charMovement) {
-            HJCharMovementKind.HORIZONTAL -> moveHorizontally(cx.editor.document, range, direction, cx.count, extend)
-            HJCharMovementKind.VERTICAL -> moveVertically(cx.editor, range, direction, cx.count, extend)
-            HJCharMovementKind.VERTICAL_VISUAL -> moveVerticallyVisual(cx.editor, range, direction, cx.count, extend)
+            HJCharMovementKind.HORIZONTAL -> moveHorizontally(
+                cx.hjEditor.editor.document,
+                range,
+                direction,
+                cx.count,
+                extend
+            )
+
+            HJCharMovementKind.VERTICAL -> moveVertically(cx.hjEditor.editor, range, direction, cx.count, extend)
+            HJCharMovementKind.VERTICAL_VISUAL -> moveVerticallyVisual(
+                cx.hjEditor.editor,
+                range,
+                direction,
+                cx.count,
+                extend
+            )
         }
     }
-    hjEditor.setNewSelection(selection)
+    cx.hjEditor.setNewSelection(selection)
 }
 
 private fun moveWordImpl(cx: HJActionContext, target: HJWordMotionTarget, extend: Boolean) {
-    val hjEditor = HJState.getHJEditor(cx.editor)
-    val selection = hjEditor.selection.clone().transform { range ->
-        val newRange = wordMove(cx.editor.document, range, target, cx.count)
+    val selection = cx.hjEditor.selection.clone().transform { range ->
+        val newRange = wordMove(cx.hjEditor.editor.document, range, target, cx.count)
         if (extend) {
             val pos = newRange.cursor
-            range.putCursor(cx.editor.document, pos, true)
+            range.putCursor(cx.hjEditor.editor.document, pos, true)
         } else {
             newRange
         }
     }
-    hjEditor.setNewSelection(selection)
+    cx.hjEditor.setNewSelection(selection)
 }
 
 fun switchToMode(editor: Editor, newMode: HJEditorMode) {
@@ -408,40 +422,56 @@ fun switchToMode(editor: Editor, newMode: HJEditorMode) {
     }
 }
 
-private fun collapseSelection(editor: Editor) {
-    TODO("fix")
-    editor.selectionModel.removeSelection()
+private fun collapseSelection(cx: HJActionContext) {
+    val selection = cx.hjEditor.selection.clone().transform { range ->
+        val pos = range.cursor
+        HJRange.point(pos)
+    }
+    cx.hjEditor.setNewSelection(selection)
 }
 
 private fun deleteSelectionImpl(cx: HJActionContext, change: Boolean, yank: Boolean) {
-    // TODO: correct implementation following helix
+    // TODO: correct implementation following helix -> if change and only_whole_lines then open ??
 
     if (yank) {
-        yankImpl(cx)
+        yank(cx)
     }
 
-    val hjEditor = HJState.getHJEditor(cx.editor)
-    val transaction = hjEditor.changeBySelection { HJChange.Delete(it.from, it.to) }
-    hjEditor.apply(transaction)
-    switchToMode(cx.editor, if (change) HJEditorMode.INSERT else HJEditorMode.NORMAL)
+    val transaction = cx.hjEditor.changeBySelection { range -> HJChange.Delete(range.from, range.to) }
+    cx.hjEditor.apply(transaction)
+    switchToMode(cx.hjEditor.editor, if (change) HJEditorMode.INSERT else HJEditorMode.NORMAL)
 }
 
-private fun yankImpl(cx: HJActionContext) {
-    // TODO: registers
+private fun yank(cx: HJActionContext) {
+    yankImpl(cx.hjEditor.editor.document, cx.hjEditor.selection, cx.register ?: HJRegister.LastYank)
+}
 
-    // hack to make single-char yanking in normal mode work while the yanking is not fully implemented
-    if (HJState.mode == HJEditorMode.NORMAL && !cx.editor.caretModel.primaryCaret.hasSelection()) {
-        val offset = cx.editor.caretModel.primaryCaret.offset
-        cx.editor.caretModel.primaryCaret.setSelection(offset, offset + 1)
+private fun yankImpl(doc: Document, selection: HJSelection, register: HJRegister) {
+    // TODO: full, correct implementation
+    HJState.copyToRegister(doc, selection, register)
+}
+
+private fun pasteImpl(cx: HJActionContext, pasteBefore: Boolean) {
+    // TODO: full, correct implementation
+    val registerContents = HJState.getRegisterContents(cx.register ?: HJRegister.LastYank)
+
+    if (registerContents == null) {
+        return
     }
 
-    cx.editor.selectionModel.copySelectionToClipboard()
+    val transaction = cx.hjEditor.changeBySelectionIndexed { idx, range ->
+        val pos = if (pasteBefore) range.from else range.to
+        val string = registerContents[min(idx, registerContents.size - 1)]
+        HJChange.Insert(pos, string)
+    }
+    cx.hjEditor.apply(transaction)
 }
 
 private fun executeIdeAction(cx: HJActionContext, actionId: String) {
     val action = ActionManager.getInstance().getAction(actionId) ?: return
     repeat(cx.count) {
-        ActionManager.getInstance().tryToExecute(action, null, cx.editor.contentComponent, ActionPlaces.UNKNOWN, true)
+        ActionManager.getInstance()
+            .tryToExecute(action, null, cx.hjEditor.editor.contentComponent, ActionPlaces.UNKNOWN, true)
     }
 }
 
@@ -455,7 +485,7 @@ private fun findChar(cx: HJActionContext, direction: HJMovementDirection, inclus
                 { hjEditor: HJEditor ->
                     val selection = hjEditor.selection.clone().transform { range ->
                         val cursorAnchor = range.cursor
-                        val cursorHead = nextGraphemeBoundary(cx.editor.document, cursorAnchor)
+                        val cursorHead = nextGraphemeBoundary(cx.hjEditor.editor.document, cursorAnchor)
 
                         // exclusive search skips the next char after cursor to enable repeated application
                         val searchStartPos = when (Pair(inclusive, direction)) {
@@ -470,7 +500,11 @@ private fun findChar(cx: HJActionContext, direction: HJMovementDirection, inclus
                         }
 
                         var pos = findNthChar(
-                            cx.editor.document, HJCharMatcher.Character(ch), searchStartPos, cx.count, direction
+                            cx.hjEditor.editor.document,
+                            HJCharMatcher.Character(ch),
+                            searchStartPos,
+                            cx.count,
+                            direction
                         )
                         if (pos != null) {
                             // exclusive search should stop on previous character
@@ -501,7 +535,7 @@ private fun findChar(cx: HJActionContext, direction: HJMovementDirection, inclus
             else -> null
         }
 
-        motion?.let { HJState.getHJEditor(cx.editor).applyMotion(it) }
+        motion?.let { cx.hjEditor.applyMotion(it) }
     }
 }
 
@@ -515,7 +549,7 @@ private fun replace(cx: HJActionContext) {
         }
 
         if (char != null) {
-            val hjEditor = HJState.getHJEditor(cx.editor)
+            val hjEditor = HJState.getHJEditor(cx.hjEditor.editor)
             val transaction = hjEditor.changeBySelection { range ->
                 if (range.isEmpty) {
                     // no change
@@ -526,7 +560,7 @@ private fun replace(cx: HJActionContext) {
                 }
             }
             hjEditor.apply(transaction)
-            switchToMode(cx.editor, HJEditorMode.NORMAL)
+            switchToMode(cx.hjEditor.editor, HJEditorMode.NORMAL)
         }
     }
 }

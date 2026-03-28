@@ -62,6 +62,14 @@ class HJStatusBarLogoWidget(private val project: Project) : StatusBarWidget, Sta
                     }
                 }
             })
+            add(object : AnAction("Print Register Contents") {
+                override fun actionPerformed(e: AnActionEvent) {
+                    println("Registers contents:")
+                    for ((register, contents) in HJState.allRegisterContents) {
+                        println("[$register] = $contents")
+                    }
+                }
+            })
             addSeparator()
             add(object : AnAction("Reload Config") {
                 override fun actionPerformed(e: AnActionEvent) {

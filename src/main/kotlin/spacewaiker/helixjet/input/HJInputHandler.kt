@@ -134,7 +134,8 @@ object HJInputHandler {
         if (action == null) {
             logger.info("Could not find an action corresponding to $key in mode ${HJState.mode}")
         } else {
-            val cx = HJActionContext(editor, count)
+            val hjEditor = HJState.getHJEditor(editor)
+            val cx = HJActionContext(hjEditor, count, null)
             action.execute(cx)
         }
 

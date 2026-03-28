@@ -64,7 +64,11 @@ class HJEditor {
      * Generate an HJTransaction with a change per selection range
      */
     fun changeBySelection(f: (HJRange) -> HJChange?): HJTransaction {
-        val changes = selection.ranges.mapNotNull { f(it) }
+        return changeBySelectionIndexed { _, range -> f(range) }
+    }
+    
+    fun changeBySelectionIndexed(f: (Int, HJRange) -> HJChange?): HJTransaction {
+        val changes = selection.ranges.mapIndexedNotNull(f)
         return HJTransaction(changes, selection)
     }
 

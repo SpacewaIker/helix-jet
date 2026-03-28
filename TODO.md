@@ -6,6 +6,7 @@
 
 - editor actions "slow actions" on EDT
 - Try to figure out if I need all of the logic within moveVertically & VerticallyVisual
+- Might actually need "views" into an editor, otherwise if you have the same doc opened twice, it might conflict
 
 test:
 
