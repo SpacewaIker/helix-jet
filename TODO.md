@@ -2,10 +2,6 @@
 
 # Short-term todos
 
-- Word movement functions
-- Refactor and reorganize code
-- Get rid of unused stuff
-
 # Fixes
 
 - editor actions "slow actions" on EDT

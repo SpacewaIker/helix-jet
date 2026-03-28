@@ -2,13 +2,12 @@
 
 import com.akuleshov7.ktoml.Toml
 import com.akuleshov7.ktoml.TomlInputConfig
-import spacewaiker.helixjet.input.HJInputKey
 import com.akuleshov7.ktoml.tree.nodes.TomlFile
 import com.akuleshov7.ktoml.tree.nodes.TomlKeyValuePrimitive
 import com.akuleshov7.ktoml.tree.nodes.TomlNode
 import com.intellij.openapi.diagnostic.Logger
+import spacewaiker.helixjet.input.HJInputKey
 import java.io.File
-import kotlin.collections.get
 
 class HJConfiguration {
     var mapping: MutableMap<Pair<HJEditorMode, HJInputKey>, HJAction> = defaultMappingParsed()
@@ -71,16 +70,18 @@ class HJConfiguration {
         for (child in keys.children) {
             when (child) {
                 is TomlKeyValuePrimitive -> {
-                    val key = child.key.toString()[0]
+                    val key = HJInputKey.fromString(child.key.toString())
                     var action = (child.value.content as? String)?.let { HJActions.getAction(it) }
-                    if (key.isLetter()) {
+                    if (key == null) {
+                        logger.warn("Unknown key ${child.key} in mapping configuration. Skipping")
+                    } else {
                         if (action == null) {
                             logger.warn("Missing action ${child.value.content} for key $key defined in user config. Mapping to no_op.")
                             action = HJActions.getAction("no_op")!!
                         } else {
                             logger.debug("Remapping $key to ${child.value.content} as defined in user config")
                         }
-                        mapping[Pair(mode, HJInputKey.Character(key))] = action
+                        mapping[Pair(mode, key)] = action
                     }
                 }
 

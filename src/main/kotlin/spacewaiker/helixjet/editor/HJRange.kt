@@ -98,6 +98,21 @@ class HJRange {
         }
     }
 
+    /**
+     * Compute a possibly new range from this range, attempting to ensure a minimum range width of 1 char by shifting
+     * the head in the forward direction as needed.
+     *
+     * This method will never shift the anchor, and will only shift the head in the forward direction. Therefore, this
+     * method can fail at ensuring the minimum width if and only if the passed range is both zero-width and at the end of the Document.
+     */
+    fun minWidth1(doc: Document): HJRange {
+        return if (anchor == head) {
+            HJRange(anchor, nextGraphemeBoundary(doc, head), oldVisualPosition)
+        } else {
+            this
+        }
+    }
+
     companion object {
         fun point(head: Int) = HJRange(head, head)
     }

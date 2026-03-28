@@ -111,7 +111,7 @@ object HJActions {
             HJAction("extend_till_prev_char") { cx -> findChar(cx,  HJMovementDirection.BACKWARD, false, true) },
             HJAction("extend_prev_char") { cx -> findChar(cx,  HJMovementDirection.BACKWARD, true, true) },
             HJAction("repeat_last_motion") { cx -> HJState.getHJEditor(cx.editor).repeatLastMotion(1) },
-            HJAction("replace"),
+            HJAction("replace") { cx -> replace(cx) },
             HJAction("switch_case"),
             HJAction("switch_to_uppercase"),
             HJAction("switch_to_lowercase"),
@@ -391,7 +391,7 @@ object HJActions {
     }
 }
 
-fun moveImpl(
+private fun moveImpl(
     cx: HJActionContext,
     charMovement: HJCharMovementKind,
     direction: HJMovementDirection,
@@ -407,7 +407,7 @@ fun moveImpl(
     hjEditor.saveAndApply(range)
 }
 
-fun moveWordImpl(cx: HJActionContext, target: HJWordMotionTarget, extend: Boolean) {
+private fun moveWordImpl(cx: HJActionContext, target: HJWordMotionTarget, extend: Boolean) {
     val hjEditor = HJState.getHJEditor(cx.editor)
     var range = hjEditor.range
     val newRange = wordMove(cx.editor.document, range, target, cx.count)
@@ -447,14 +447,14 @@ private fun deleteSelection(editor: Editor) {
     }
 }
 
-fun executeIdeAction(cx: HJActionContext, actionId: String) {
+private fun executeIdeAction(cx: HJActionContext, actionId: String) {
     val action = ActionManager.getInstance().getAction(actionId) ?: return
     repeat(cx.count) {
         ActionManager.getInstance().tryToExecute(action, null, cx.editor.contentComponent, ActionPlaces.UNKNOWN, true)
     }
 }
 
-fun findChar(cx: HJActionContext, direction: HJMovementDirection, inclusive: Boolean, extend: Boolean) {
+private fun findChar(cx: HJActionContext, direction: HJMovementDirection, inclusive: Boolean, extend: Boolean) {
     HJInputHandler.onNextKey { key: HJInputKey ->
         val motion = when (key) {
             is HJInputKey.Enter, is HJInputKey.Tab, is HJInputKey.Character -> {
@@ -516,5 +516,29 @@ fun findChar(cx: HJActionContext, direction: HJMovementDirection, inclusive: Boo
         }
 
         motion?.let { HJState.getHJEditor(cx.editor).applyMotion(it) }
+    }
+}
+
+private fun replace(cx: HJActionContext) {
+    HJInputHandler.onNextKey { key: HJInputKey ->
+        val char = when (key) {
+            is HJInputKey.Character -> key.c
+            is HJInputKey.Enter -> '\n'
+            is HJInputKey.Tab -> '\t'
+            else -> null
+        }
+
+        if (char != null) {
+            val range = HJState.getHJEditor(cx.editor).range
+            val start = range.from
+            val end = range.to
+            val new = char.toString().repeat(range.len)
+
+            WriteCommandAction.runWriteCommandAction(cx.editor.project) {
+                cx.editor.document.replaceString(start, end, new)
+            }
+        }
+
+        switchToMode(cx.editor, HJEditorMode.NORMAL)
     }
 }
