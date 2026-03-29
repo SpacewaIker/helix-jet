@@ -34,17 +34,28 @@ class HJEditor {
 
         editor.caretModel.removeSecondaryCarets()
         val oldPrimary = editor.caretModel.primaryCaret
+        var reusedOldPrimary = false
 
         for ((idx, range) in this.selection.ranges.withIndex()) {
-            val pos = editor.offsetToLogicalPosition(range.cursor)
-            val caret = editor.caretModel.addCaret(pos, idx == this.selection.primaryIndex)
+            val caret = if (range.cursor == oldPrimary.offset) {
+                // have to reuse old primary caret
+                reusedOldPrimary = true
+                oldPrimary
+            } else {
+                val pos = editor.offsetToLogicalPosition(range.cursor)
+                editor.caretModel.addCaret(pos, idx == this.selection.primaryIndex)
+            }
 
-            if (caret != null && (range.len > 1 || HJState.mode != HJEditorMode.NORMAL)) {
+            if (caret != null) {
                 // in normal mode, don't show 1-width selections underneath the blinking block cursor
-                caret.setSelection(range.from, range.to)
+                if (range.len <= 1 && HJState.mode != HJEditorMode.NORMAL) {
+                    caret.removeSelection()
+                } else {
+                    caret.setSelection(range.from, range.to)
+                }
             }
         }
-        editor.caretModel.removeCaret(oldPrimary)
+        if (!reusedOldPrimary) editor.caretModel.removeCaret(oldPrimary)
     }
 
     fun applyMotion(motion: (HJEditor) -> Unit) {
@@ -66,7 +77,7 @@ class HJEditor {
     fun changeBySelection(f: (HJRange) -> HJChange?): HJTransaction {
         return changeBySelectionIndexed { _, range -> f(range) }
     }
-    
+
     fun changeBySelectionIndexed(f: (Int, HJRange) -> HJChange?): HJTransaction {
         val changes = selection.ranges.mapIndexedNotNull(f)
         return HJTransaction(changes, selection)
