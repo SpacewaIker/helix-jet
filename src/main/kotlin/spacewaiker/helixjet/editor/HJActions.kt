@@ -7,12 +7,13 @@ import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.IdeActions
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Document
-import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorFactory
+import com.intellij.openapi.editor.VisualPosition
 import com.intellij.openapi.wm.WindowManager
 import spacewaiker.helixjet.input.HJInputHandler
 import spacewaiker.helixjet.input.HJInputKey
 import spacewaiker.helixjet.ui.HJStatusBarModeWidget
+import kotlin.math.max
 import kotlin.math.min
 
 
@@ -39,7 +40,7 @@ class HJAction {
 data class HJActionContext(
     val hjEditor: HJEditor,
     val count: Int = 1,
-    val register: HJRegister?,
+    val register: HJRegister? = null,
 )
 
 object HJActions {
@@ -74,8 +75,8 @@ object HJActions {
             HJAction("extend_line_down") { cx -> moveImpl(cx, HJCharMovementKind.VERTICAL, HJMovementDirection.FORWARD, true) },
             HJAction("extend_visual_line_up") { cx -> moveImpl(cx, HJCharMovementKind.VERTICAL_VISUAL, HJMovementDirection.BACKWARD, true) },
             HJAction("extend_visual_line_down") { cx -> moveImpl(cx, HJCharMovementKind.VERTICAL_VISUAL, HJMovementDirection.FORWARD, true) },
-            HJAction("copy_selection_on_next_line"),
-            HJAction("copy_selection_on_prev_line"),
+            HJAction("copy_selection_on_next_line") { cx -> copySelectionOnLine(cx, HJMovementDirection.FORWARD) },
+            HJAction("copy_selection_on_prev_line") { cx -> copySelectionOnLine(cx, HJMovementDirection.BACKWARD) },
             HJAction("move_next_word_start") { cx -> moveWordImpl(cx, HJWordMotionTarget.NEXT_WORD_START, false) },
             HJAction("move_prev_word_start") { cx -> moveWordImpl(cx, HJWordMotionTarget.PREV_WORD_START, false) },
             HJAction("move_next_word_end") { cx -> moveWordImpl(cx, HJWordMotionTarget.NEXT_WORD_END, false) },
@@ -155,7 +156,7 @@ object HJActions {
             HJAction("collapse_selection") { cx -> collapseSelection(cx) },
             HJAction("flip_selections"),
             HJAction("ensure_selections_forward"),
-            HJAction("insert_mode") { cx -> switchToMode(cx.hjEditor.editor, HJEditorMode.INSERT) },
+            HJAction("insert_mode") { cx -> switchToMode(cx, HJEditorMode.INSERT) },
             HJAction("append_mode"),
             HJAction("command_mode"),
             HJAction("file_picker"),
@@ -182,9 +183,9 @@ object HJActions {
             HJAction("insert_at_line_end"),
             HJAction("open_below"),
             HJAction("open_above"),
-            HJAction("normal_mode") { cx -> switchToMode(cx.hjEditor.editor, HJEditorMode.NORMAL) },
-            HJAction("select_mode") { cx -> switchToMode(cx.hjEditor.editor, HJEditorMode.SELECT) },
-            HJAction("exit_select_mode") { cx -> if (HJState.mode == HJEditorMode.SELECT) switchToMode(cx.hjEditor.editor, HJEditorMode.NORMAL) },
+            HJAction("normal_mode") { cx -> switchToMode(cx, HJEditorMode.NORMAL) },
+            HJAction("select_mode") { cx -> switchToMode(cx, HJEditorMode.SELECT) },
+            HJAction("exit_select_mode") { cx -> if (HJState.mode == HJEditorMode.SELECT) switchToMode(cx, HJEditorMode.NORMAL) },
             HJAction("goto_definition"),
             HJAction("goto_declaration"),
             HJAction("add_newline_above"),
@@ -267,7 +268,7 @@ object HJActions {
             HJAction("keep_selections"),
             HJAction("remove_selections"),
             HJAction("align_selections"),
-            HJAction("keep_primary_selection"),
+            HJAction("keep_primary_selection") { cx -> keepPrimarySelection(cx) },
             HJAction("remove_primary_selection"),
             HJAction("completion"),
             HJAction("hover") { cx -> executeIdeAction(cx, "ShowHoverInfo") },
@@ -413,11 +414,16 @@ private fun moveWordImpl(cx: HJActionContext, target: HJWordMotionTarget, extend
     cx.hjEditor.setNewSelection(selection)
 }
 
-fun switchToMode(editor: Editor, newMode: HJEditorMode) {
+fun switchToMode(cx: HJActionContext, newMode: HJEditorMode) {
     if (HJState.mode == newMode) return
     HJState.mode = newMode
-    EditorFactory.getInstance().allEditors.forEach { it.settings.isBlockCursor = newMode != HJEditorMode.INSERT }
-    editor.project?.let {
+
+    if (newMode == HJEditorMode.INSERT)
+        collapseSelection(cx)
+
+    EditorFactory.getInstance().allEditors.forEach { HJState.getHJEditor(it).reloadCaretShapes() }
+
+    cx.hjEditor.editor.project?.let {
         WindowManager.getInstance().getStatusBar(it)?.updateWidget(HJStatusBarModeWidget.ID)
     }
 }
@@ -439,7 +445,7 @@ private fun deleteSelectionImpl(cx: HJActionContext, change: Boolean, yank: Bool
 
     val transaction = cx.hjEditor.changeBySelection { range -> HJChange.Delete(range.from, range.to) }
     cx.hjEditor.apply(transaction)
-    switchToMode(cx.hjEditor.editor, if (change) HJEditorMode.INSERT else HJEditorMode.NORMAL)
+    switchToMode(cx, if (change) HJEditorMode.INSERT else HJEditorMode.NORMAL)
 }
 
 private fun yank(cx: HJActionContext) {
@@ -560,7 +566,83 @@ private fun replace(cx: HJActionContext) {
                 }
             }
             hjEditor.apply(transaction)
-            switchToMode(cx.hjEditor.editor, HJEditorMode.NORMAL)
+            switchToMode(cx, HJEditorMode.NORMAL)
         }
     }
+}
+
+private fun copySelectionOnLine(cx: HJActionContext, direction: HJMovementDirection) {
+    val editor = cx.hjEditor.editor
+    val doc = cx.hjEditor.editor.document
+
+    val selection = cx.hjEditor.selection
+    val ranges = selection.ranges.toMutableList()
+    var primaryIndex = 0
+
+    for (range in selection.ranges) {
+        val isPrimary = range == selection.primary
+
+        // the range is always head exclusive
+        val (head, anchor) = if (range.anchor < range.head)
+            Pair(range.head - 1, range.anchor)
+        else
+            Pair(range.head, max(0, range.anchor - 1))
+
+        val headPos = editor.offsetToVisualPosition(head)
+        val anchorPos = editor.offsetToVisualPosition(anchor)
+
+        val height = max(headPos.line, anchorPos.line) - min(headPos.line, anchorPos.line) + 1
+
+        if (isPrimary) {
+            primaryIndex = ranges.size
+        }
+
+        ranges.add(range)
+
+        var sels = 0
+        var i = 0
+        while (sels < cx.count) {
+            val offset = (i + 1) * height
+
+            val anchorRow = when (direction) {
+                HJMovementDirection.FORWARD -> anchorPos.line + offset
+                HJMovementDirection.BACKWARD -> max(0, anchorPos.line - offset)
+            }
+            val headRow = when (direction) {
+                HJMovementDirection.FORWARD -> headPos.line + offset
+                HJMovementDirection.BACKWARD -> max(0, headPos.line - offset)
+            }
+
+            if (anchorRow >= doc.lineCount || headRow >= doc.lineCount)
+                break
+
+            // skip lines that are too short
+            try {
+                val anchor = editor.visualPositionToOffset(VisualPosition(anchorRow, anchorPos.column))
+                val head = editor.visualPositionToOffset(VisualPosition(headRow, headPos.column))
+
+                if (isPrimary) {
+                    primaryIndex = ranges.size
+                }
+
+                ranges.add(HJRange.point(anchor).putCursor(doc, head, true))
+                sels++
+            } catch (_: IllegalArgumentException) {
+                // ignore
+            }
+
+            if (anchorRow == 0 && headRow == 0)
+                break
+
+            i++
+        }
+    }
+
+    val newSelection = HJSelection(ranges, primaryIndex)
+    cx.hjEditor.setNewSelection(newSelection)
+}
+
+private fun keepPrimarySelection(cx: HJActionContext) {
+    val range = cx.hjEditor.selection.primary
+    cx.hjEditor.setNewSelection(HJSelection(range))
 }

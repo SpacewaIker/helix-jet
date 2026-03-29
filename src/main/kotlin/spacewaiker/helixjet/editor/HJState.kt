@@ -11,7 +11,7 @@ enum class HJEditorMode {
 
 object HJState {
     var mode: HJEditorMode = HJEditorMode.NORMAL
-    val config: HJConfiguration = HJConfiguration()
+    var config: HJConfiguration = HJConfiguration()
     private val editors: MutableMap<Editor, HJEditor> = mutableMapOf()
     private val registers: MutableMap<HJRegister, List<String>> = mutableMapOf()
     val allRegisterContents get() = registers.toList()

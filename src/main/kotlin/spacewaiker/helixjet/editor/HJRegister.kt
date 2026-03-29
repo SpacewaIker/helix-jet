@@ -44,7 +44,7 @@ sealed class HJRegister {
                 }
 
                 is LastSearch, is LastCmd, is LastMacro -> {
-                    val primaryRange = selection.ranges[selection.primaryIndex]
+                    val primaryRange = selection.primary
                     val primaryString = doc.getText(TextRange(primaryRange.from, primaryRange.to))
                     listOf(primaryString)
                 }

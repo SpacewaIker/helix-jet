@@ -10,6 +10,7 @@ class HJSelection {
     val ranges: MutableList<HJRange> = mutableListOf()
     var primaryIndex: Int
     val len get() = ranges.size
+    val primary get() = ranges[primaryIndex]
 
     constructor(ranges: List<HJRange>, primaryIndex: Int) {
         this.ranges.addAll(ranges.map { it.copy() })
@@ -48,6 +49,7 @@ class HJSelection {
                     primary = newRange
                 }
                 ranges[i - 1] = newRange
+                ranges.removeAt(i)
             } else {
                 i++
             }

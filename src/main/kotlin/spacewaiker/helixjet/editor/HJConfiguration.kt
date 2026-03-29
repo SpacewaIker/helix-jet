@@ -6,24 +6,25 @@ import com.akuleshov7.ktoml.tree.nodes.TomlFile
 import com.akuleshov7.ktoml.tree.nodes.TomlKeyValuePrimitive
 import com.akuleshov7.ktoml.tree.nodes.TomlNode
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.editor.colors.EditorColors
+import com.intellij.openapi.editor.colors.EditorColorsManager
+import com.intellij.ui.JBColor
 import spacewaiker.helixjet.input.HJInputKey
+import java.awt.Color
 import java.io.File
 
 class HJConfiguration {
-    var mapping: MutableMap<Pair<HJEditorMode, HJInputKey>, HJAction> = defaultMappingParsed()
+    val mapping: MutableMap<Pair<HJEditorMode, HJInputKey>, HJAction> = defaultMappingParsed()
+
+    val primaryCursorColor: Color
+    val otherCursorsColor: Color
 
     constructor() {
-        applyConfigKeymap()
-    }
+        val colorScheme = EditorColorsManager.getInstance().globalScheme
+        primaryCursorColor = colorScheme.getColor(EditorColors.CARET_COLOR) ?: JBColor.LIGHT_GRAY
+        otherCursorsColor = colorScheme.getColor(EditorColors.SELECTED_TEARLINE_COLOR) ?: JBColor.GRAY
 
-    /**
-     * Reload configuration file.
-     *
-     * Resets mapping to default, overridden with configuration file.
-     */
-    fun reloadConfiguration() {
-        mapping = defaultMappingParsed()
-        applyConfigKeymap()
+        applyConfig()
     }
 
     private fun loadConfiguration(): TomlFile? {
@@ -55,14 +56,18 @@ class HJConfiguration {
     /**
      * Overload default keymap configuration with user defined config file, if one exists.
      */
-    private fun applyConfigKeymap() {
-        val keys = loadConfiguration()?.children?.find { node -> node.name == "keys" } ?: return
+    private fun applyConfig() {
+        val config = loadConfiguration() ?: return
 
-        keys.children.find { node -> node.name == "normal" }?.let {
-            applyConfigKeymapForMode(HJEditorMode.NORMAL, it)
-        }
-        keys.children.find { node -> node.name == "select" }?.let {
-            applyConfigKeymapForMode(HJEditorMode.SELECT, it)
+        // keymap
+        val keys = config.children.find { node -> node.name == "keys" }
+        if (keys != null) {
+            keys.children.find { node -> node.name == "normal" }?.let {
+                applyConfigKeymapForMode(HJEditorMode.NORMAL, it)
+            }
+            keys.children.find { node -> node.name == "select" }?.let {
+                applyConfigKeymapForMode(HJEditorMode.SELECT, it)
+            }
         }
     }
 

@@ -2,6 +2,7 @@
 
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.editor.CaretVisualAttributes
 import com.intellij.openapi.editor.Editor
 
 sealed class HJChange {
@@ -37,18 +38,23 @@ class HJEditor {
         var reusedOldPrimary = false
 
         for ((idx, range) in this.selection.ranges.withIndex()) {
+            val isPrimary = idx == this.selection.primaryIndex
+
             val caret = if (range.cursor == oldPrimary.offset) {
                 // have to reuse old primary caret
                 reusedOldPrimary = true
                 oldPrimary
             } else {
                 val pos = editor.offsetToLogicalPosition(range.cursor)
-                editor.caretModel.addCaret(pos, idx == this.selection.primaryIndex)
+                editor.caretModel.addCaret(pos, isPrimary)
             }
 
             if (caret != null) {
+                val color = if (isPrimary) HJState.config.primaryCursorColor else HJState.config.otherCursorsColor
+                caret.visualAttributes = CaretVisualAttributes(color, CaretVisualAttributes.Weight.NORMAL)
+
                 // in normal mode, don't show 1-width selections underneath the blinking block cursor
-                if (range.len <= 1 && HJState.mode != HJEditorMode.NORMAL) {
+                if (range.len <= 1 && HJState.mode == HJEditorMode.NORMAL) {
                     caret.removeSelection()
                 } else {
                     caret.setSelection(range.from, range.to)
@@ -56,6 +62,7 @@ class HJEditor {
             }
         }
         if (!reusedOldPrimary) editor.caretModel.removeCaret(oldPrimary)
+        reloadCaretShapes()
     }
 
     fun applyMotion(motion: (HJEditor) -> Unit) {
@@ -102,5 +109,9 @@ class HJEditor {
             }
         }
         selection.ensureInvariants(editor.document)
+    }
+
+    fun reloadCaretShapes() {
+        editor.settings.isBlockCursor = HJState.mode != HJEditorMode.INSERT
     }
 }
