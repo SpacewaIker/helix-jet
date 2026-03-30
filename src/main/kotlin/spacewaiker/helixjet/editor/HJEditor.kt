@@ -4,6 +4,7 @@ import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.CaretVisualAttributes
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.ScrollType
 
 sealed class HJChange {
     data class Insert(val at: Int, val str: String) : HJChange()
@@ -25,6 +26,8 @@ class HJEditor {
     constructor(editor: Editor) {
         this.editor = editor
         this.selection = HJSelection(HJRange(editor))
+
+        editor.settings.verticalScrollOffset = HJState.config.scrolloff
     }
 
     /**
@@ -62,6 +65,7 @@ class HJEditor {
         }
 
         reloadCaretShapes()
+        setCorrectScroll()
     }
 
     fun applyMotion(motion: (HJEditor) -> Unit) {
@@ -112,5 +116,9 @@ class HJEditor {
 
     fun reloadCaretShapes() {
         editor.settings.isBlockCursor = HJState.mode != HJEditorMode.INSERT
+    }
+
+    fun setCorrectScroll() {
+        editor.scrollingModel.scrollToCaret(ScrollType.RELATIVE)
     }
 }

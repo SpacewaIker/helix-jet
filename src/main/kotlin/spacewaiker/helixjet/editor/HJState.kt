@@ -30,4 +30,8 @@ object HJState {
 
     fun getRegisterContents(register: HJRegister) =
         if (register == HJRegister.Clipboard) listOf(CopyPasteManager.getInstance().contents.toString()) else registers[register]
+
+    fun forAllEditors(f: (HJEditor) -> Unit) {
+        editors.values.forEach(f)
+    }
 }

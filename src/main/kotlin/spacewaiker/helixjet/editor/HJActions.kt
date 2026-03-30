@@ -7,11 +7,13 @@ import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.IdeActions
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Document
-import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.editor.VisualPosition
+import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.wm.WindowManager
 import spacewaiker.helixjet.input.HJInputHandler
 import spacewaiker.helixjet.input.HJInputKey
+import spacewaiker.helixjet.ui.HJPrompt
+import spacewaiker.helixjet.ui.HJPromptEvent
 import spacewaiker.helixjet.ui.HJStatusBarModeWidget
 import kotlin.math.max
 import kotlin.math.min
@@ -115,20 +117,20 @@ object HJActions {
             HJAction("extend_prev_char") { cx -> findChar(cx,  HJMovementDirection.BACKWARD, true, true) },
             HJAction("repeat_last_motion") { cx -> cx.hjEditor.repeatLastMotion(1) },
             HJAction("replace") { cx -> replace(cx) },
-            HJAction("switch_case"),
-            HJAction("switch_to_uppercase"),
-            HJAction("switch_to_lowercase"),
-            HJAction("page_up"),
-            HJAction("page_down"),
-            HJAction("half_page_up"),
-            HJAction("half_page_down"),
+            HJAction("switch_case") { cx -> switchCaseImpl(cx) { s -> s.map { c -> if (c.isLowerCase()) {c.uppercase()} else if (c.isUpperCase()) {c.lowercase()} else {c} }.joinToString(separator = "") } },
+            HJAction("switch_to_uppercase") { cx -> switchCaseImpl(cx) { s -> s.uppercase() } },
+            HJAction("switch_to_lowercase") { cx -> switchCaseImpl(cx) { s -> s.lowercase() } },
+            HJAction("page_up") { cx -> scrollPageImpl(cx, 1.0f, HJMovementDirection.BACKWARD) },
+            HJAction("page_down") { cx -> scrollPageImpl(cx, 1.0f, HJMovementDirection.FORWARD) },
+            HJAction("half_page_up") { cx -> scrollPageImpl(cx, 0.5f, HJMovementDirection.BACKWARD) },
+            HJAction("half_page_down") { cx -> scrollPageImpl(cx, 0.5f, HJMovementDirection.FORWARD) },
             HJAction("page_cursor_up"),
             HJAction("page_cursor_down"),
             HJAction("page_cursor_half_up"),
             HJAction("page_cursor_half_down"),
-            HJAction("select_all"),
-            HJAction("select_regex"),
-            HJAction("split_selection"),
+            HJAction("select_all") { cx -> selectAll(cx) },
+            HJAction("select_regex") { cx -> selectRegex(cx) },
+            HJAction("split_selection") { cx -> splitSelection(cx) },
             HJAction("split_selection_on_newline"),
             HJAction("merge_selections"),
             HJAction("merge_consecutive_selections"),
@@ -156,9 +158,9 @@ object HJActions {
             HJAction("collapse_selection") { cx -> collapseSelection(cx) },
             HJAction("flip_selections"),
             HJAction("ensure_selections_forward"),
-            HJAction("insert_mode") { cx -> switchToMode(cx, HJEditorMode.INSERT) },
-            HJAction("append_mode"),
-            HJAction("command_mode"),
+            HJAction("insert_mode") { cx -> insertMode(cx, false) },
+            HJAction("append_mode") { cx -> insertMode(cx, true) },
+            HJAction("command_mode") { cx -> commandMode(cx) },
             HJAction("file_picker"),
             HJAction("file_picker_in_current_buffer_directory"),
             HJAction("file_picker_in_current_directory"),
@@ -421,11 +423,26 @@ fun switchToMode(cx: HJActionContext, newMode: HJEditorMode) {
     if (newMode == HJEditorMode.INSERT)
         collapseSelection(cx)
 
-    EditorFactory.getInstance().allEditors.forEach { HJState.getHJEditor(it).reloadCaretShapes() }
+    HJState.forAllEditors { it.reloadCaretShapes() }
 
     cx.hjEditor.editor.project?.let {
         WindowManager.getInstance().getStatusBar(it)?.updateWidget(HJStatusBarModeWidget.ID)
     }
+}
+
+private fun insertMode(cx: HJActionContext, append: Boolean) {
+    collapseSelection(cx)
+    if (append) {
+        val selection = cx.hjEditor.selection.clone().transform(HJRange::flip)
+        cx.hjEditor.setNewSelection(selection)
+    }
+    switchToMode(cx, HJEditorMode.INSERT)
+}
+
+private fun commandMode(cx: HJActionContext) {
+    val onEvent = { e: HJPromptEvent, s: String? -> if (e == HJPromptEvent.Validate) println(s) }
+    val commandBar = HJPrompt(cx.hjEditor.editor, onEvent, historyRegister = HJRegister.LastCmd)
+    commandBar.show()
 }
 
 private fun collapseSelection(cx: HJActionContext) {
@@ -645,4 +662,83 @@ private fun copySelectionOnLine(cx: HJActionContext, direction: HJMovementDirect
 private fun keepPrimarySelection(cx: HJActionContext) {
     val range = cx.hjEditor.selection.primary
     cx.hjEditor.setNewSelection(HJSelection(range))
+}
+
+private fun switchCaseImpl(cx: HJActionContext, switchFun: (String) -> String) {
+    val doc = cx.hjEditor.editor.document
+    val transaction = cx.hjEditor.changeBySelection { range ->
+        val text = doc.getText(TextRange(range.from, range.to))
+        val newText = switchFun(text)
+        HJChange.Replace(range.from, range.to, newText)
+    }
+    cx.hjEditor.apply(transaction)
+    switchToMode(cx, HJEditorMode.NORMAL)
+}
+
+private fun scrollPageImpl(cx: HJActionContext, multiplier: Float, direction: HJMovementDirection) {
+    val scrollModel = cx.hjEditor.editor.scrollingModel
+    val area = scrollModel.visibleArea
+    val deltaOffset = (area.height * multiplier).toInt()
+    val newOffset = scrollModel.verticalScrollOffset + deltaOffset * direction.value
+    scrollModel.scrollVertically(newOffset)
+}
+
+private fun selectAll(cx: HJActionContext) {
+    val last = cx.hjEditor.editor.document.textLength
+    cx.hjEditor.setNewSelection(HJSelection(HJRange(0, last)))
+}
+
+private fun selectRegex(cx: HJActionContext) {
+    val snapshot = cx.hjEditor.selection.clone()
+    val onEvent = { e: HJPromptEvent, regex: String? ->
+        when (e) {
+            HJPromptEvent.Abort -> {
+                cx.hjEditor.setNewSelection(snapshot)
+            }
+
+            else if regex != null -> {
+                if (regex.isEmpty()) {
+                    cx.hjEditor.setNewSelection(snapshot)
+                } else {
+                    val doc = cx.hjEditor.editor.document
+                    val selection = HJSelection.selectOnMatches(doc, snapshot, regex)
+                    if (selection != null) {
+                        cx.hjEditor.setNewSelection(selection)
+                    } else if (e == HJPromptEvent.Validate) {
+                        // TODO: User facing warning
+                        HJActions.logger.debug("selectRegex - nothing is selected")
+                    }
+                }
+            }
+
+            else -> {}
+        }
+    }
+    val commandBar = HJPrompt(cx.hjEditor.editor, onEvent, "select:", HJRegister.LastSearch)
+    commandBar.show()
+}
+
+private fun splitSelection(cx: HJActionContext) {
+    val snapshot = cx.hjEditor.selection.clone()
+    val onEvent = { e: HJPromptEvent, regex: String? ->
+        when (e) {
+            HJPromptEvent.Abort -> {
+                cx.hjEditor.setNewSelection(snapshot)
+            }
+
+            else if regex != null -> {
+                if (regex.isEmpty()) {
+                    cx.hjEditor.setNewSelection(snapshot)
+                } else {
+                    val doc = cx.hjEditor.editor.document
+                    val selection = HJSelection.splitOnMatches(doc, snapshot, regex)
+                    cx.hjEditor.setNewSelection(selection)
+                }
+            }
+
+            else -> {}
+        }
+    }
+    val commandBar = HJPrompt(cx.hjEditor.editor, onEvent, "split:", HJRegister.LastSearch)
+    commandBar.show()
 }

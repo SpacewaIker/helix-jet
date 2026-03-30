@@ -18,6 +18,8 @@ class HJConfiguration {
 
     val primaryCursorColor: Color
     val otherCursorsColor: Color
+    var scrolloff: Int = 5
+        private set
 
     constructor() {
         val colorScheme = EditorColorsManager.getInstance().globalScheme
@@ -59,13 +61,22 @@ class HJConfiguration {
     private fun applyConfig() {
         val config = loadConfiguration() ?: return
 
+        val editor = config.children.find { it.name == "editor" }
+        if (editor != null) {
+            val scrolloff = editor.children.find { it.name == "scrolloff" }
+            if (scrolloff != null && scrolloff is TomlKeyValuePrimitive) (scrolloff.value.content as? Int)?.let { scrolloff ->
+                this.scrolloff = scrolloff
+                HJState.forAllEditors { it.editor.settings.verticalScrollOffset = scrolloff }
+            }
+        }
+
         // keymap
-        val keys = config.children.find { node -> node.name == "keys" }
+        val keys = config.children.find { it.name == "keys" }
         if (keys != null) {
-            keys.children.find { node -> node.name == "normal" }?.let {
+            keys.children.find { it.name == "normal" }?.let {
                 applyConfigKeymapForMode(HJEditorMode.NORMAL, it)
             }
-            keys.children.find { node -> node.name == "select" }?.let {
+            keys.children.find { it.name == "select" }?.let {
                 applyConfigKeymapForMode(HJEditorMode.SELECT, it)
             }
         }

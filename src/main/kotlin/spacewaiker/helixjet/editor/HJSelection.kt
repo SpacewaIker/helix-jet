@@ -1,6 +1,7 @@
 ﻿package spacewaiker.helixjet.editor
 
 import com.intellij.openapi.editor.Document
+import com.intellij.openapi.util.TextRange
 
 /**
  * A selection consists of one or more selection ranges.
@@ -81,5 +82,62 @@ class HJSelection {
         return this.transform { r ->
             r.minWidth1(doc)
         }.normalize()
+    }
+
+    companion object {
+        fun selectOnMatches(doc: Document, selection: HJSelection, pattern: String): HJSelection? {
+            val result = mutableListOf<HJRange>()
+            val regex = Regex(pattern)
+
+            for (sel in selection.ranges) {
+                for (mat in regex.findAll(doc.getText(TextRange(sel.from, sel.to)))) {
+                    val start = mat.range.first + sel.from
+                    val end = mat.range.last + sel.from + 1
+
+                    val range = HJRange(start, end)
+                    // make sure the match is not right outside of the selection.
+                    // these invalid matches can come from using regex anchors like ^, $
+                    if (range != HJRange.point(sel.to)) {
+                        result.add(range)
+                    }
+                }
+            }
+
+            return if (!result.isEmpty()) {
+                HJSelection(result, 0)
+            } else {
+                null
+            }
+        }
+
+        fun splitOnMatches(doc: Document, selection: HJSelection, pattern: String): HJSelection {
+            if (pattern.isEmpty()) return selection.clone()
+
+            val result = mutableListOf<HJRange>()
+            val regex = Regex(pattern)
+
+            for (sel in selection.ranges) {
+                // special case: zero-width selection
+                if (sel.from == sel.to) {
+                    result.add(sel)
+                }
+
+                val selStart = sel.from
+                val selEnd = sel.to
+                var start = selStart
+
+                for (mat in regex.findAll(doc.getText(TextRange(selStart, selEnd)))) {
+                    val end = mat.range.first + selStart
+                    result.add(HJRange(start, end))
+                    start = mat.range.last + selStart + 1
+                }
+
+                if (start < selEnd) {
+                    result.add(HJRange(start, selEnd))
+                }
+            }
+
+            return HJSelection(result, 0)
+        }
     }
 }
