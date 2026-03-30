@@ -88,8 +88,8 @@ class HJRange {
                 this.anchor
             }
 
-            if (anchor < charIdx) {
-                HJRange(anchor, min(charIdx + 1, doc.textLength))
+            if (anchor <= charIdx) {
+                HJRange(anchor, nextGraphemeBoundary(doc, charIdx))
             } else {
                 HJRange(anchor, charIdx)
             }

@@ -34,19 +34,18 @@ class HJEditor {
         this.selection = selection.ensureInvariants(editor.document)
 
         editor.caretModel.removeSecondaryCarets()
-        val oldPrimary = editor.caretModel.primaryCaret
-        var reusedOldPrimary = false
+        val primaryCaret = editor.caretModel.primaryCaret
 
         for ((idx, range) in this.selection.ranges.withIndex()) {
             val isPrimary = idx == this.selection.primaryIndex
 
-            val caret = if (range.cursor == oldPrimary.offset) {
+            val pos = editor.offsetToLogicalPosition(range.cursor)
+            val caret = if (isPrimary) {
                 // have to reuse old primary caret
-                reusedOldPrimary = true
-                oldPrimary
+                primaryCaret.moveToLogicalPosition(pos)
+                primaryCaret
             } else {
-                val pos = editor.offsetToLogicalPosition(range.cursor)
-                editor.caretModel.addCaret(pos, isPrimary)
+                editor.caretModel.addCaret(pos, false)
             }
 
             if (caret != null) {
@@ -61,7 +60,7 @@ class HJEditor {
                 }
             }
         }
-        if (!reusedOldPrimary) editor.caretModel.removeCaret(oldPrimary)
+
         reloadCaretShapes()
     }
 
