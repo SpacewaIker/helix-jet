@@ -10,6 +10,7 @@ import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.VisualPosition
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.wm.WindowManager
+import spacewaiker.helixjet.editor.HJKeyAction.HJAction
 import spacewaiker.helixjet.input.HJInputHandler
 import spacewaiker.helixjet.input.HJInputKey
 import spacewaiker.helixjet.ui.HJPrompt
@@ -17,33 +18,6 @@ import spacewaiker.helixjet.ui.HJPromptEvent
 import spacewaiker.helixjet.ui.HJStatusBarModeWidget
 import kotlin.math.max
 import kotlin.math.min
-
-
-class HJAction {
-    constructor(name: String, action: ((HJActionContext) -> Unit)? = null) {
-        this.name = name
-        this.action = action
-    }
-
-    fun execute(cx: HJActionContext) {
-        if (action == null) {
-            HJActions.logger.warn("Action $name is not yet defined")
-        } else {
-            HJActions.logger.debug("Executing action $name")
-            action(cx)
-        }
-    }
-
-    val name: String
-
-    private val action: ((HJActionContext) -> Unit)?
-}
-
-data class HJActionContext(
-    val hjEditor: HJEditor,
-    val count: Int = 1,
-    val register: HJRegister? = null,
-)
 
 object HJActions {
     val logger = Logger.getInstance(this::class.java)

@@ -48,12 +48,8 @@ class HJStatusBarLogoWidget(private val project: Project) : StatusBarWidget, Sta
             addSeparator()
             add(object : AnAction("Print All Mappings") {
                 override fun actionPerformed(e: AnActionEvent) {
-                    val mapping = HJState.config.mapping.map { entry ->
-                        Triple(
-                            entry.key.first,
-                            entry.key.second,
-                            entry.value
-                        )
+                    val mapping = HJState.config.mapping.flatMap { (mode, map) ->
+                        map.map { (key, action) -> Triple(mode, key, action) }
                     }
                     mapping.naturalSorted().forEach { triple ->
                         val mode = triple.first.toString()

@@ -6,6 +6,7 @@ import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.wm.WindowManager
 import spacewaiker.helixjet.editor.HJActionContext
 import spacewaiker.helixjet.editor.HJEditorMode
+import spacewaiker.helixjet.editor.HJKeyAction
 import spacewaiker.helixjet.editor.HJState
 import spacewaiker.helixjet.ui.HJStatusBarInputWidget
 
@@ -84,7 +85,12 @@ object HJInputHandler {
     private var onNextKeyCallback: ((HJInputKey) -> Unit)? = null
     private var lastKey: HJInputKey? = null
     var pendingActionKey: String? = null
-    private var actionCount: String = ""
+        private set
+    var actionCount: String = ""
+        private set
+    var minorModeName: String? = null
+        private set
+    private var minorModeMapping: Map<HJInputKey, HJKeyAction>? = null
 
     /**
      * Handle the given input key.
@@ -101,7 +107,8 @@ object HJInputHandler {
         if (onNextKeyCallback != null) {
             onNextKeyCallback?.invoke(key)
             onNextKeyCallback = null
-            updatePendingActionKey(null)
+            pendingActionKey = null
+            updateInputWidget()
             return true
         }
 
@@ -113,7 +120,7 @@ object HJInputHandler {
         // if the key is a number, we're inputting an action count
         if (key is HJInputKey.Character && key.c.isDigit()) {
             actionCount += key.c
-            updatePendingActionKey(actionCount)
+            updateInputWidget()
             return true
         }
         var count = 1
@@ -121,22 +128,44 @@ object HJInputHandler {
             // not a number, and action count is not empty, so we've finished entering our action count
             count = actionCount.toInt()
             actionCount = ""
-            updatePendingActionKey(null)
+            updateInputWidget()
         }
 
-        var action = HJState.config.mapping[Pair(HJState.mode, key)]
+        var usingMinorMode = false
+        val getKeyAction: (HJInputKey) -> HJKeyAction? = minorModeMapping?.let {
+            usingMinorMode = true
+            { inputKey -> it[inputKey] }
+        } ?: { inputKey -> HJState.config.mapping[HJState.mode]!![inputKey] }
+        when (val keyAction = getKeyAction(key)) {
+            null -> {
+                if (usingMinorMode) {
+                    // any key not mapped in said minor mode will exit mode
+                    minorModeMapping = null
+                    pendingActionKey = null
+                    minorModeName = null
+                    updateInputWidget()
+                } else {
+                    logger.info("Could not find an action corresponding to $key in mode ${HJState.mode}")
+                }
+            }
 
-        // try to fall back to normal mode if no action is found for select mode
-        if (action == null && HJState.mode == HJEditorMode.SELECT) {
-            action = HJState.config.mapping[Pair(HJEditorMode.NORMAL, key)]
-        }
+            is HJKeyAction.HJAction -> {
+                minorModeMapping = null
+                pendingActionKey = null
+                minorModeName = null
+                updateInputWidget()
 
-        if (action == null) {
-            logger.info("Could not find an action corresponding to $key in mode ${HJState.mode}")
-        } else {
-            val hjEditor = HJState.getHJEditor(editor)
-            val cx = HJActionContext(hjEditor, count, null)
-            action.execute(cx)
+                val hjEditor = HJState.getHJEditor(editor)
+                val cx = HJActionContext(hjEditor, count, null)
+                keyAction.execute(cx)
+            }
+
+            is HJKeyAction.HJMinorMode -> {
+                pendingActionKey = if (pendingActionKey == null) lastKey.toString() else pendingActionKey + lastKey
+                minorModeName = keyAction.name
+                updateInputWidget()
+                minorModeMapping = keyAction.mapping
+            }
         }
 
         return true
@@ -152,11 +181,13 @@ object HJInputHandler {
 
         onNextKeyCallback = callback
 
-        lastKey?.let { updatePendingActionKey(it.toString()) }
+        lastKey?.let {
+            pendingActionKey = it.toString()
+            updateInputWidget()
+        }
     }
 
-    private fun updatePendingActionKey(newKey: String?) {
-        pendingActionKey = newKey
+    private fun updateInputWidget() {
         EditorFactory.getInstance().editorList.first().project?.let {
             WindowManager.getInstance().getStatusBar(it)?.updateWidget(HJStatusBarInputWidget.ID)
         }

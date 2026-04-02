@@ -6,12 +6,10 @@ import com.intellij.openapi.editor.actionSystem.ActionPlan
 import com.intellij.openapi.editor.actionSystem.TypedActionHandler
 import com.intellij.openapi.editor.actionSystem.TypedActionHandlerEx
 
-class HJTypedHandler : TypedActionHandlerEx {
-    private var originalHandler: TypedActionHandler? = null
-
+class HJTypedHandler(private val originalHandler: TypedActionHandler?) : TypedActionHandlerEx {
     override fun beforeExecute(
         editor: Editor, c: Char,
-        context: DataContext, plan: ActionPlan
+        context: DataContext, plan: ActionPlan,
     ) {
         // nothing needed
     }
@@ -20,9 +18,5 @@ class HJTypedHandler : TypedActionHandlerEx {
         if (!HJInputHandler.handle(editor, HJInputKey.Character(c))) {
             originalHandler?.execute(editor, c, context)
         }
-    }
-
-    fun setOriginalHandler(handler: TypedActionHandler?) {
-        originalHandler = handler
     }
 }
