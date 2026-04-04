@@ -105,7 +105,7 @@ object HJActions {
             HJAction("select_all") { cx -> selectAll(cx) },
             HJAction("select_regex") { cx -> selectRegex(cx) },
             HJAction("split_selection") { cx -> splitSelection(cx) },
-            HJAction("split_selection_on_newline"),
+            HJAction("split_selection_on_newline") { cx -> splitSelectionOnNewline(cx) },
             HJAction("merge_selections"),
             HJAction("merge_consecutive_selections"),
             HJAction("search"),
@@ -118,9 +118,9 @@ object HJActions {
             HJAction("search_selection_detect_word_boundaries"),
             HJAction("make_search_word_bounded"),
             HJAction("global_search"),
-            HJAction("extend_line"),
-            HJAction("extend_line_below"),
-            HJAction("extend_line_above"),
+            HJAction("extend_line") { cx -> extendLine(cx) },
+            HJAction("extend_line_below") { cx -> extendImpl(cx, true) },
+            HJAction("extend_line_above") { cx -> extendImpl(cx, false) },
             HJAction("select_line_above"),
             HJAction("select_line_below"),
             HJAction("extend_to_line_bounds"),
@@ -168,10 +168,10 @@ object HJActions {
             HJAction("add_newline_below"),
             HJAction("goto_type_definition"),
             HJAction("goto_implementation"),
-            HJAction("goto_file_start"),
-            HJAction("goto_file_end"),
-            HJAction("extend_to_file_start"),
-            HJAction("extend_to_file_end"),
+            HJAction("goto_file_start") { cx -> gotoFileStartImpl(cx, false) },
+            HJAction("goto_file_end") { cx -> gotoFileEndImpl(cx, false) },
+            HJAction("extend_to_file_start") { cx -> gotoFileStartImpl(cx, true) },
+            HJAction("extend_to_file_end") { cx -> gotoFileEndImpl(cx, true) },
             HJAction("goto_file"),
             HJAction("goto_file_hsplit"),
             HJAction("goto_file_vsplit"),
@@ -182,9 +182,9 @@ object HJActions {
             HJAction("goto_last_accessed_file"),
             HJAction("goto_last_modified_file"),
             HJAction("goto_last_modification"),
-            HJAction("goto_line"),
-            HJAction("goto_last_line"),
-            HJAction("extend_to_last_line"),
+            HJAction("goto_line") { cx -> gotoLineImpl(cx, false) },
+            HJAction("goto_last_line") { cx -> gotoLastLineImpl(cx, false) },
+            HJAction("extend_to_last_line") { cx -> gotoLastLineImpl(cx, true) },
             HJAction("goto_first_diag"),
             HJAction("goto_last_diag"),
             HJAction("goto_next_diag"),
@@ -193,19 +193,19 @@ object HJActions {
             HJAction("goto_prev_change"),
             HJAction("goto_first_change"),
             HJAction("goto_last_change"),
-            HJAction("goto_line_start"),
-            HJAction("goto_line_end"),
+            HJAction("goto_line_start") { cx -> gotoLineStartEnd(cx, true) },
+            HJAction("goto_line_end") { cx -> gotoLineStartEnd(cx, false) },
             HJAction("goto_column"),
             HJAction("extend_to_column"),
             HJAction("goto_next_buffer"),
             HJAction("goto_previous_buffer"),
-            HJAction("goto_line_end_newline"),
-            HJAction("goto_first_nonwhitespace"),
+            HJAction("goto_line_end_newline") { cx -> gotoLineEndNewline(cx) },
+            HJAction("goto_first_nonwhitespace") { cx -> gotoFirstNonWhitespace(cx) },
             HJAction("trim_selections"),
-            HJAction("extend_to_line_start"),
-            HJAction("extend_to_first_nonwhitespace"),
-            HJAction("extend_to_line_end"),
-            HJAction("extend_to_line_end_newline"),
+            HJAction("extend_to_line_start") { cx -> gotoLineStartEndImpl(cx, true, true) },
+            HJAction("extend_to_first_nonwhitespace") { cx -> gotoFirstNonWhitespaceImpl(cx, true) },
+            HJAction("extend_to_line_end") { cx -> gotoLineStartEndImpl(cx, false, true) },
+            HJAction("extend_to_line_end_newline") { cx -> gotoLineEndNewlineImpl(cx, true) },
             HJAction("signature_help"),
             HJAction("smart_tab"),
             HJAction("insert_tab"),
@@ -405,11 +405,11 @@ fun switchToMode(cx: HJActionContext, newMode: HJEditorMode) {
 }
 
 private fun insertMode(cx: HJActionContext, append: Boolean) {
-    collapseSelection(cx)
-    if (append) {
-        val selection = cx.hjEditor.selection.clone().transform(HJRange::flip)
-        cx.hjEditor.setNewSelection(selection)
+    val selection = cx.hjEditor.selection.clone().transform {
+        val cursor = if (append) it.to else it.from
+        HJRange.point(cursor)
     }
+    cx.hjEditor.setNewSelection(selection)
     switchToMode(cx, HJEditorMode.INSERT)
 }
 
@@ -715,4 +715,129 @@ private fun splitSelection(cx: HJActionContext) {
     }
     val commandBar = HJPrompt(cx.hjEditor.editor, onEvent, "split:", HJRegister.LastSearch)
     commandBar.show()
+}
+
+private fun splitSelectionOnNewline(cx: HJActionContext) {
+    val selection = HJSelection.splitOnNewline(cx.hjEditor.editor.document, cx.hjEditor.selection)
+    cx.hjEditor.setNewSelection(selection)
+}
+
+private fun extendLine(cx: HJActionContext) {
+    val below = cx.hjEditor.selection.primary.direction == HJMovementDirection.FORWARD
+    extendImpl(cx, below)
+}
+
+private fun extendImpl(cx: HJActionContext, below: Boolean) {
+    val lastLine = max(0, cx.doc.lineCount - 1)
+
+    val selection = cx.hjEditor.selection.clone().transform { range ->
+        val (startLine, endLine) = range.lineRange(cx.doc)
+
+        val start = cx.doc.getLineStartOffset(startLine)
+        val end = 1 + cx.doc.getLineEndOffset(min(endLine, lastLine))
+
+        val (anchor, head) = if (range.from == start && range.to == end) {
+            if (below) {
+                Pair(start, 1 + cx.doc.getLineEndOffset(min(endLine + cx.count, lastLine)))
+            } else {
+                Pair(end, cx.doc.getLineStartOffset(max(0, startLine - cx.count)))
+            }
+        } else {
+            if (below) {
+                Pair(start, 1 + cx.doc.getLineEndOffset(min(endLine + cx.count - 1, lastLine)))
+            } else {
+                Pair(end, cx.doc.getLineStartOffset(max(0, startLine - (cx.count - 1))))
+            }
+        }
+
+        // helix handles the above only with "lineStartOffset". If we do this here, we can't select the last line of a file
+        // so instead we opt for line start and line end + 1. That means we need to check that we're not trying to select
+        // past the very last character
+        val lastOffset = cx.doc.textLength // last caret position is last char + 1
+        HJRange(anchor, min(lastOffset, head))
+    }
+    cx.hjEditor.setNewSelection(selection)
+}
+
+private fun gotoLineImpl(cx: HJActionContext, extend: Boolean) {
+    if (cx.rawCount != null) {
+        val maxLine =
+            if (cx.doc.getLineEndOffset(cx.doc.lineCount - 1) == cx.doc.getLineStartOffset(cx.doc.lineCount - 1)) {
+                // if the last line is blank, don't jump to it
+                max(0, cx.doc.lineCount - 2)
+            } else cx.doc.lineCount - 1
+
+        val lineIdx = min(cx.count - 1, maxLine)
+        val pos = cx.doc.getLineStartOffset(lineIdx)
+        val selection = cx.hjEditor.selection.clone().transform { it.putCursor(cx.doc, pos, extend) }
+        cx.hjEditor.setNewSelection(selection)
+    }
+}
+
+private fun gotoFileStartImpl(cx: HJActionContext, extend: Boolean) {
+    if (cx.rawCount != null) {
+        gotoLineImpl(cx, extend)
+    } else {
+        val selection = cx.hjEditor.selection.clone().transform { it.putCursor(cx.doc, 0, extend) }
+        cx.hjEditor.setNewSelection(selection)
+    }
+}
+
+private fun gotoFileEndImpl(cx: HJActionContext, extend: Boolean) {
+    val end = cx.doc.textLength
+    val selection = cx.hjEditor.selection.clone().transform { it.putCursor(cx.doc, end, extend) }
+    cx.hjEditor.setNewSelection(selection)
+}
+
+private fun gotoLastLineImpl(cx: HJActionContext, extend: Boolean) {
+    val lastLine = cx.doc.lineCount
+    gotoLineImpl(cx.copy(rawCount = lastLine), extend)
+}
+
+private fun gotoLineStartEndImpl(cx: HJActionContext, start: Boolean, extend: Boolean) {
+    val selection = cx.hjEditor.selection.clone().transform { range ->
+        val line = cx.doc.getLineNumber(range.cursor)
+        // adjust to start/end of the line
+        val lineStart = cx.doc.getLineStartOffset(line)
+        val pos = if (start) lineStart else {
+            max(lineStart, prevGraphemeBoundary(cx.doc.getLineEndOffset(line)))
+        }
+        range.putCursor(cx.doc, pos, extend)
+    }
+    cx.hjEditor.setNewSelection(selection)
+}
+
+private fun gotoLineStartEnd(cx: HJActionContext, start: Boolean) {
+    gotoLineStartEndImpl(cx, start, HJState.mode == HJEditorMode.SELECT)
+}
+
+private fun gotoFirstNonWhitespaceImpl(cx: HJActionContext, extend: Boolean) {
+    val selection = cx.hjEditor.selection.clone().transform { range ->
+        val line = cx.doc.getLineNumber(range.cursor)
+        val pos = firstNonWhitespaceChar(getLine(cx.doc, line)!!, cx.doc.getLineStartOffset(line))
+        if (pos == null) {
+            range
+        } else {
+            range.putCursor(cx.doc, pos, extend)
+        }
+    }
+    cx.hjEditor.setNewSelection(selection)
+}
+
+private fun gotoFirstNonWhitespace(cx: HJActionContext) {
+    gotoFirstNonWhitespaceImpl(cx, HJState.mode == HJEditorMode.SELECT)
+}
+
+private fun gotoLineEndNewlineImpl(cx: HJActionContext, extend: Boolean) {
+    val selection = cx.hjEditor.selection.clone().transform { range ->
+        val line = cx.doc.getLineNumber(range.cursor)
+        val pos = cx.doc.getLineEndOffset(line)
+
+        range.putCursor(cx.doc, pos, extend)
+    }
+    cx.hjEditor.setNewSelection(selection)
+}
+
+private fun gotoLineEndNewline(cx: HJActionContext) {
+    gotoLineEndNewlineImpl(cx, HJState.mode == HJEditorMode.SELECT)
 }

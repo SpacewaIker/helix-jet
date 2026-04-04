@@ -120,6 +120,7 @@ class HJSelection {
                 // special case: zero-width selection
                 if (sel.from == sel.to) {
                     result.add(sel)
+                    continue
                 }
 
                 val selStart = sel.from
@@ -130,6 +131,35 @@ class HJSelection {
                     val end = mat.range.first + selStart
                     result.add(HJRange(start, end))
                     start = mat.range.last + selStart + 1
+                }
+
+                if (start < selEnd) {
+                    result.add(HJRange(start, selEnd))
+                }
+            }
+
+            return HJSelection(result, 0)
+        }
+
+        fun splitOnNewline(doc: Document, selection: HJSelection): HJSelection {
+            val result = mutableListOf<HJRange>()
+
+            for (sel in selection.ranges) {
+                // special case: zero-width selection
+                if (sel.from == sel.to) {
+                    result.add(sel)
+                    continue
+                }
+
+                val selStart = sel.from
+                val selEnd = sel.to
+                var start = selStart
+
+                val lines = doc.getText(TextRange(selStart, selEnd)).lines()
+                for (line in lines) {
+                    val lineEnd = start + line.length
+                    result.add(HJRange(start, lineEnd)) // - 1 for \n char
+                    start = lineEnd + 1
                 }
 
                 if (start < selEnd) {

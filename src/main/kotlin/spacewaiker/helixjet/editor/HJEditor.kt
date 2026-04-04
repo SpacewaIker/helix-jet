@@ -55,8 +55,8 @@ class HJEditor {
                 val color = if (isPrimary) HJState.config.primaryCursorColor else HJState.config.otherCursorsColor
                 caret.visualAttributes = CaretVisualAttributes(color, CaretVisualAttributes.Weight.NORMAL)
 
-                // in normal mode, don't show 1-width selections underneath the blinking block cursor
-                if (range.len <= 1 && HJState.mode == HJEditorMode.NORMAL) {
+                // in normal/insert mode, don't show 1-width selections underneath the blinking block cursor
+                if (range.len <= 1 && HJState.mode != HJEditorMode.SELECT) {
                     caret.removeSelection()
                 } else {
                     caret.setSelection(range.from, range.to)

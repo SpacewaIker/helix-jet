@@ -9,6 +9,7 @@ import spacewaiker.helixjet.editor.HJEditorMode
 import spacewaiker.helixjet.editor.HJKeyAction
 import spacewaiker.helixjet.editor.HJState
 import spacewaiker.helixjet.ui.HJStatusBarInputWidget
+import kotlin.math.max
 
 sealed class HJInputKey {
     object Escape : HJInputKey()
@@ -123,10 +124,10 @@ object HJInputHandler {
             updateInputWidget()
             return true
         }
-        var count = 1
+        var count: Int? = null
         if (!actionCount.isEmpty()) {
             // not a number, and action count is not empty, so we've finished entering our action count
-            count = actionCount.toInt()
+            count = max(1, actionCount.toInt())
             actionCount = ""
             updateInputWidget()
         }

@@ -34,6 +34,9 @@ sealed class HJKeyAction(val name: String) {
 
 data class HJActionContext(
     val hjEditor: HJEditor,
-    val count: Int = 1,
+    val rawCount: Int? = null,
     val register: HJRegister? = null,
-)
+) {
+    val count get() = rawCount ?: 1
+    val doc get() = hjEditor.editor.document
+}
