@@ -37,8 +37,7 @@ internal class HJPromptTextField(
     override fun processKeyEvent(e: KeyEvent) {
         when (e.keyCode) {
             KeyEvent.VK_ENTER -> {
-                val command = text.removePrefix(":")
-                onEvent(HJPromptEvent.Validate, command)
+                onEvent(HJPromptEvent.Validate, text)
             }
 
             KeyEvent.VK_ESCAPE -> {

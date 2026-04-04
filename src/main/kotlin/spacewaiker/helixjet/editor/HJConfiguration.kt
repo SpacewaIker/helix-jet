@@ -176,11 +176,36 @@ class HJConfiguration {
                 val mapping =
                     node.children.mapNotNull(::parseKeyActionDefinition).toMap().toMutableMap()
                 logger.debug("Defining minor mode $inputKey as defined in user config")
-                Pair(inputKey, HJKeyAction.HJMinorMode(inputKey.toString(), mapping))
+                Pair(inputKey, HJKeyAction.HJMinorMode(inputKey.toString(), "Minor mode $inputKey", mapping))
             }
 
             else -> null
         }
+    }
+
+    fun allActionsWithBindings(mode: HJEditorMode): List<Pair<HJKeyAction.HJAction, List<List<HJInputKey>>>> {
+        val actions = HJActions.allActions.associate { action ->
+            Pair(
+                action.name,
+                Pair(action, mutableListOf<List<HJInputKey>>())
+            )
+        }
+
+        val toProcess = mapping[mode]!!.map { Triple(it.key, it.value, listOf<HJInputKey>()) }.toMutableList()
+        while (toProcess.isNotEmpty()) {
+            val (key, action, prefix) = toProcess.removeLast()
+            when (action) {
+                is HJKeyAction.HJAction -> {
+                    actions[action.name]!!.second.add(prefix + key)
+                }
+
+                is HJKeyAction.HJMinorMode -> {
+                    toProcess.addAll(action.mapping.map { Triple(it.key, it.value, prefix + key) })
+                }
+            }
+        }
+
+        return actions.values.toList()
     }
 
     companion object {
@@ -238,7 +263,7 @@ class HJConfiguration {
                         else null
                     }.toMap().toMutableMap()
 
-                    Pair(inputKey, HJKeyAction.HJMinorMode(name, mapping))
+                    Pair(inputKey, HJKeyAction.HJMinorMode(name, name, mapping))
                 }
 
                 else -> null

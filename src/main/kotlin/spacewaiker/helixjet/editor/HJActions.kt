@@ -13,9 +13,11 @@ import com.intellij.openapi.wm.WindowManager
 import spacewaiker.helixjet.editor.HJKeyAction.HJAction
 import spacewaiker.helixjet.input.HJInputHandler
 import spacewaiker.helixjet.input.HJInputKey
+import spacewaiker.helixjet.ui.HJPicker
 import spacewaiker.helixjet.ui.HJPrompt
 import spacewaiker.helixjet.ui.HJPromptEvent
 import spacewaiker.helixjet.ui.HJStatusBarModeWidget
+import javax.swing.table.AbstractTableModel
 import kotlin.math.max
 import kotlin.math.min
 
@@ -23,11 +25,13 @@ object HJActions {
     val logger = Logger.getInstance(this::class.java)
 
     private val actions: MutableMap<String, HJAction> = createActionsMap()
+    val allActions get() = actions.values.toList()
 
     fun getAction(name: String): HJAction? {
         val ideAction = name.removeSurrounding("<", ">")
         if (ideAction != name) {
-            actions[name] = HJAction(name) { cx: HJActionContext -> executeIdeAction(cx, ideAction) }
+            actions[name] =
+                HJAction(name, "IDE Action $ideAction") { cx: HJActionContext -> executeIdeAction(cx, ideAction) }
         }
 
         return actions[name]
@@ -38,8 +42,8 @@ object HJActions {
 
         // @formatter:off
         defActions(map, arrayOf(
-            HJAction("no_op") { _ -> },
-            HJAction("move_char_left") { cx -> moveImpl(cx, HJCharMovementKind.HORIZONTAL, HJMovementDirection.BACKWARD, false) },
+            HJAction("no_op", "Do nothing") { _ -> },
+            HJAction("move_char_left", "Move left") { moveImpl(it, HJCharMovementKind.HORIZONTAL, HJMovementDirection.BACKWARD, false) },
             HJAction("move_char_right") { cx -> moveImpl(cx, HJCharMovementKind.HORIZONTAL, HJMovementDirection.FORWARD, false) },
             HJAction("move_line_up") { cx -> moveImpl(cx, HJCharMovementKind.VERTICAL, HJMovementDirection.BACKWARD, false) },
             HJAction("move_line_down") { cx -> moveImpl(cx, HJCharMovementKind.VERTICAL, HJMovementDirection.FORWARD, false) },
@@ -319,7 +323,7 @@ object HJActions {
             HJAction("decrement"),
             HJAction("record_macro"),
             HJAction("replay_macro"),
-            HJAction("command_palette"),
+            HJAction("command_palette") { cx -> commandPalette(cx) },
             HJAction("goto_word"),
             HJAction("extend_to_word"),
             HJAction("goto_next_tabstop"),
@@ -458,7 +462,7 @@ private fun pasteImpl(cx: HJActionContext, pasteBefore: Boolean) {
 
     val transaction = cx.hjEditor.changeBySelectionIndexed { idx, range ->
         val pos = if (pasteBefore) range.from else range.to
-        val string = registerContents[min(idx, registerContents.size - 1)]
+        val string = registerContents[idx.coerceAtMost(registerContents.size - 1)]
         HJChange.Insert(pos, string)
     }
     cx.hjEditor.apply(transaction)
@@ -577,7 +581,7 @@ private fun copySelectionOnLine(cx: HJActionContext, direction: HJMovementDirect
         val (head, anchor) = if (range.anchor < range.head)
             Pair(range.head - 1, range.anchor)
         else
-            Pair(range.head, max(0, range.anchor - 1))
+            Pair(range.head, (range.anchor - 1).coerceAtLeast(0))
 
         val headPos = editor.offsetToVisualPosition(head)
         val anchorPos = editor.offsetToVisualPosition(anchor)
@@ -597,11 +601,11 @@ private fun copySelectionOnLine(cx: HJActionContext, direction: HJMovementDirect
 
             val anchorRow = when (direction) {
                 HJMovementDirection.FORWARD -> anchorPos.line + offset
-                HJMovementDirection.BACKWARD -> max(0, anchorPos.line - offset)
+                HJMovementDirection.BACKWARD -> (anchorPos.line - offset).coerceAtLeast(0)
             }
             val headRow = when (direction) {
                 HJMovementDirection.FORWARD -> headPos.line + offset
-                HJMovementDirection.BACKWARD -> max(0, headPos.line - offset)
+                HJMovementDirection.BACKWARD -> (headPos.line - offset).coerceAtLeast(0)
             }
 
             if (anchorRow >= doc.lineCount || headRow >= doc.lineCount)
@@ -728,25 +732,25 @@ private fun extendLine(cx: HJActionContext) {
 }
 
 private fun extendImpl(cx: HJActionContext, below: Boolean) {
-    val lastLine = max(0, cx.doc.lineCount - 1)
+    val lastLine = (cx.doc.lineCount - 1).coerceAtLeast(0)
 
     val selection = cx.hjEditor.selection.clone().transform { range ->
         val (startLine, endLine) = range.lineRange(cx.doc)
 
         val start = cx.doc.getLineStartOffset(startLine)
-        val end = 1 + cx.doc.getLineEndOffset(min(endLine, lastLine))
+        val end = 1 + cx.doc.getLineEndOffset(endLine.coerceAtMost(lastLine))
 
         val (anchor, head) = if (range.from == start && range.to == end) {
             if (below) {
-                Pair(start, 1 + cx.doc.getLineEndOffset(min(endLine + cx.count, lastLine)))
+                Pair(start, 1 + cx.doc.getLineEndOffset((endLine + cx.count).coerceAtMost(lastLine)))
             } else {
-                Pair(end, cx.doc.getLineStartOffset(max(0, startLine - cx.count)))
+                Pair(end, cx.doc.getLineStartOffset((startLine - cx.count).coerceAtLeast(0)))
             }
         } else {
             if (below) {
-                Pair(start, 1 + cx.doc.getLineEndOffset(min(endLine + cx.count - 1, lastLine)))
+                Pair(start, 1 + cx.doc.getLineEndOffset((endLine + cx.count - 1).coerceAtMost(lastLine)))
             } else {
-                Pair(end, cx.doc.getLineStartOffset(max(0, startLine - (cx.count - 1))))
+                Pair(end, cx.doc.getLineStartOffset((startLine - (cx.count - 1)).coerceAtLeast(0)))
             }
         }
 
@@ -754,7 +758,7 @@ private fun extendImpl(cx: HJActionContext, below: Boolean) {
         // so instead we opt for line start and line end + 1. That means we need to check that we're not trying to select
         // past the very last character
         val lastOffset = cx.doc.textLength // last caret position is last char + 1
-        HJRange(anchor, min(lastOffset, head))
+        HJRange(anchor, head.coerceAtMost(lastOffset))
     }
     cx.hjEditor.setNewSelection(selection)
 }
@@ -764,10 +768,10 @@ private fun gotoLineImpl(cx: HJActionContext, extend: Boolean) {
         val maxLine =
             if (cx.doc.getLineEndOffset(cx.doc.lineCount - 1) == cx.doc.getLineStartOffset(cx.doc.lineCount - 1)) {
                 // if the last line is blank, don't jump to it
-                max(0, cx.doc.lineCount - 2)
+                (cx.doc.lineCount - 2).coerceAtLeast(0)
             } else cx.doc.lineCount - 1
 
-        val lineIdx = min(cx.count - 1, maxLine)
+        val lineIdx = (cx.count - 1).coerceAtMost(maxLine)
         val pos = cx.doc.getLineStartOffset(lineIdx)
         val selection = cx.hjEditor.selection.clone().transform { it.putCursor(cx.doc, pos, extend) }
         cx.hjEditor.setNewSelection(selection)
@@ -800,7 +804,7 @@ private fun gotoLineStartEndImpl(cx: HJActionContext, start: Boolean, extend: Bo
         // adjust to start/end of the line
         val lineStart = cx.doc.getLineStartOffset(line)
         val pos = if (start) lineStart else {
-            max(lineStart, prevGraphemeBoundary(cx.doc.getLineEndOffset(line)))
+            prevGraphemeBoundary(cx.doc.getLineEndOffset(line)).coerceAtLeast(lineStart)
         }
         range.putCursor(cx.doc, pos, extend)
     }
@@ -840,4 +844,32 @@ private fun gotoLineEndNewlineImpl(cx: HJActionContext, extend: Boolean) {
 
 private fun gotoLineEndNewline(cx: HJActionContext) {
     gotoLineEndNewlineImpl(cx, HJState.mode == HJEditorMode.SELECT)
+}
+
+private fun commandPalette(cx: HJActionContext) {
+    val data = HJState.config.allActionsWithBindings(HJState.mode).filterNot { (action, _) -> action.name == "no_op" }
+
+    val model = object : AbstractTableModel() {
+        override fun getRowCount() = data.size
+        override fun getColumnCount() = 3
+
+        override fun getValueAt(rowIndex: Int, columnIndex: Int) = when (columnIndex) {
+            0 -> data[rowIndex].first.name
+            1 -> data[rowIndex].second.joinToString(" ") { keys -> keys.joinToString("") }
+            2 -> data[rowIndex].first.doc
+            else -> ""
+        }
+
+        override fun getColumnName(column: Int) = when (column) {
+            0 -> "Name"
+            1 -> "Bindings"
+            2 -> "Doc"
+            else -> ""
+        }
+    }
+
+    HJPicker("HelixJet Commands", model) { rowIdx ->
+        val action = data[rowIdx].first
+        action.execute(cx)
+    }.show(cx.hjEditor.editor.project!!)
 }

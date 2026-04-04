@@ -2,11 +2,18 @@
 
 import spacewaiker.helixjet.input.HJInputKey
 
-sealed class HJKeyAction(val name: String) {
+/**
+ * Represents an editor action triggered by a key. Either an outright HJAction, or a Minor Mode
+ *
+ * @property name The name of the key action
+ * @property doc A documentation string for the key action
+ */
+sealed class HJKeyAction(val name: String, val doc: String) {
     class HJAction(
         name: String,
+        doc: String = "",
         private val action: ((HJActionContext) -> Unit)? = null,
-    ) : HJKeyAction(name) {
+    ) : HJKeyAction(name, doc) {
         fun execute(cx: HJActionContext) {
             if (action == null) {
                 HJActions.logger.warn("Action $name is not yet defined")
@@ -19,8 +26,9 @@ sealed class HJKeyAction(val name: String) {
 
     class HJMinorMode(
         name: String,
+        doc: String,
         val mapping: MutableMap<HJInputKey, HJKeyAction>,
-    ) : HJKeyAction(name) {
+    ) : HJKeyAction(name, doc) {
 
     }
 

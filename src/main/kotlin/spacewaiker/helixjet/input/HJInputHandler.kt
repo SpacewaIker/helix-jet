@@ -35,49 +35,50 @@ sealed class HJInputKey {
     companion object {
         private val logger = Logger.getInstance(this::class.java)
 
-        fun fromString(s: String): HJInputKey? {
-            return when (s) {
-                "esc" -> Escape
-                "up" -> Up
-                "down" -> Down
-                "left" -> Left
-                "right" -> Right
-                "home" -> Home
-                "end" -> End
-                "pageup" -> PageUp
-                "pagedown" -> PageDown
-                "space" -> Space
-                "backspace" -> Backspace
-                "tab" -> Tab
-                "del" -> Del
-                "ret" -> Enter
-                else if s.length == 1 -> Character(s[0])
-                else -> {
-                    logger.warn("Unknown character $s")
-                    null
-                }
+        fun fromCharacter(c: Char) = when (c) {
+            ' ' -> Space
+            else -> Character(c)
+        }
+
+        fun fromString(s: String) = when (s) {
+            "esc" -> Escape
+            "up" -> Up
+            "down" -> Down
+            "left" -> Left
+            "right" -> Right
+            "home" -> Home
+            "end" -> End
+            "pageup" -> PageUp
+            "pagedown" -> PageDown
+            "space" -> Space
+            "backspace" -> Backspace
+            "tab" -> Tab
+            "del" -> Del
+            "ret" -> Enter
+            else if s.length == 1 -> Character(s[0])
+            else -> {
+                logger.warn("Unknown character $s")
+                null
             }
         }
     }
 
-    override fun toString(): String {
-        return when (this) {
-            Escape -> "Escape"
-            Up -> "Up"
-            Down -> "Down"
-            Left -> "Left"
-            Right -> "Right"
-            Home -> "Home"
-            End -> "End"
-            PageUp -> "PageUp"
-            PageDown -> "PageDown"
-            Space -> "Space"
-            Backspace -> "Backspace"
-            Tab -> "Tab"
-            Del -> "Del"
-            Enter -> "Return"
-            else -> ""
-        }
+    override fun toString() = when (this) {
+        Escape -> "<esc>"
+        Up -> "<up>"
+        Down -> "<down>"
+        Left -> "<left>"
+        Right -> "<right>"
+        Home -> "<home>"
+        End -> "<end>"
+        PageUp -> "<pageup>"
+        PageDown -> "<pagedown>"
+        Space -> "<space>"
+        Backspace -> "<backspace>"
+        Tab -> "<tab>"
+        Del -> "<del>"
+        Enter -> "<ret>"
+        else -> ""
     }
 }
 

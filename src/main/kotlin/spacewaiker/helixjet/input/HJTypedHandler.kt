@@ -15,7 +15,7 @@ class HJTypedHandler(private val originalHandler: TypedActionHandler?) : TypedAc
     }
 
     override fun execute(editor: Editor, c: Char, context: DataContext) {
-        if (!HJInputHandler.handle(editor, HJInputKey.Character(c))) {
+        if (!HJInputHandler.handle(editor, HJInputKey.fromCharacter(c))) {
             originalHandler?.execute(editor, c, context)
         }
     }
