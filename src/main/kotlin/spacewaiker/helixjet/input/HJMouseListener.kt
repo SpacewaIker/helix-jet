@@ -2,7 +2,12 @@
 
 import com.intellij.openapi.editor.event.EditorMouseEvent
 import com.intellij.openapi.editor.event.EditorMouseListener
-import spacewaiker.helixjet.editor.*
+import spacewaiker.helixjet.actions.HJActionContext
+import spacewaiker.helixjet.actions.switchToMode
+import spacewaiker.helixjet.editor.HJEditorMode
+import spacewaiker.helixjet.editor.HJRange
+import spacewaiker.helixjet.editor.HJSelection
+import spacewaiker.helixjet.editor.HJState
 
 class HJMouseListener : EditorMouseListener {
     var anchor: Int = 0

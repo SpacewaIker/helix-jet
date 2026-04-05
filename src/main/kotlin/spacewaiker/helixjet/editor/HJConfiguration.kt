@@ -10,6 +10,8 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.colors.EditorColors
 import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.ui.JBColor
+import spacewaiker.helixjet.actions.HJActions
+import spacewaiker.helixjet.actions.HJKeyAction
 import spacewaiker.helixjet.input.HJInputKey
 import java.awt.Color
 import java.io.File

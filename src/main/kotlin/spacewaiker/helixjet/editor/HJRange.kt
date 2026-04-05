@@ -2,6 +2,9 @@
 
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.Editor
+import spacewaiker.helixjet.actions.HJMovementDirection
+import spacewaiker.helixjet.actions.nextGraphemeBoundary
+import spacewaiker.helixjet.actions.prevGraphemeBoundary
 import kotlin.math.max
 import kotlin.math.min
 

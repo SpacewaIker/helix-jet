@@ -4,9 +4,9 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.wm.WindowManager
-import spacewaiker.helixjet.editor.HJActionContext
+import spacewaiker.helixjet.actions.HJActionContext
+import spacewaiker.helixjet.actions.HJKeyAction
 import spacewaiker.helixjet.editor.HJEditorMode
-import spacewaiker.helixjet.editor.HJKeyAction
 import spacewaiker.helixjet.editor.HJState
 import spacewaiker.helixjet.input.HJInputHandler.actionCount
 import spacewaiker.helixjet.input.HJInputHandler.lastKey
