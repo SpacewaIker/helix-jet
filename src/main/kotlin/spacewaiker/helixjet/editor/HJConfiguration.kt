@@ -112,8 +112,8 @@ class HJConfiguration {
      *
      * @return A list of entries. Each entry is composed of a list of input keys (e.g. ga<C-;>), and the action it triggers
      */
-    private fun getConfigKeymapOverrides(keys: TomlNode): List<Pair<List<HJInputKey>, HJKeyAction.HJAction>> {
-        val keymaps = mutableListOf<Pair<List<HJInputKey>, HJKeyAction.HJAction>>()
+    private fun getConfigKeymapOverrides(keys: TomlNode): List<Pair<List<HJInputKey>, HJKeyAction>> {
+        val keymaps = mutableListOf<Pair<List<HJInputKey>, HJKeyAction>>()
         val inputKeyStack = mutableListOf<Pair<List<HJInputKey>, TomlNode>>()
 
         inputKeyStack.addAll(keys.children.map { Pair(listOf(), it) })
@@ -131,9 +131,11 @@ class HJConfiguration {
 
             when (tomlNode) {
                 is TomlKeyValuePrimitive -> {
-                    var action = (tomlNode.value.content as? String)?.let { HJActions.getAction(it) }
+                    var action = (tomlNode.value.content as? String)?.let {
+                        if (it == "passthrough") HJKeyAction.HJPassthroughAction else HJActions.getAction(it)
+                    }
                     if (action == null) {
-                        logger.warn("Missing action ${tomlNode.value} for key $inputKey defined in user config. Mapping to no_op.")
+                        logger.warn("Missing action ${tomlNode.value.content} for key $inputKey defined in user config. Mapping to no_op.")
                         action = HJActions.getAction("no_op")!!
                     } else {
                         logger.debug("Remapping $inputKey to ${action.name} as defined in user config")
@@ -162,7 +164,7 @@ class HJConfiguration {
     private fun overrideMapping(
         map: MutableMap<HJInputKey, HJKeyAction>,
         keys: List<HJInputKey>,
-        action: HJKeyAction.HJAction,
+        action: HJKeyAction,
     ) {
         val key = keys.first()
         when (val keyAction = map[key]) {
