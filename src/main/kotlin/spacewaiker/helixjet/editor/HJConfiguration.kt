@@ -30,6 +30,9 @@ class HJConfiguration {
         applyConfig()
     }
 
+    /**
+     * Try to load configuration file
+     */
     private fun loadConfiguration(): TomlFile? {
         val userHome = System.getProperty("user.home")
         val configFile = "$userHome/.helixjet.toml"
@@ -62,6 +65,7 @@ class HJConfiguration {
     private fun applyConfig() {
         val config = loadConfiguration() ?: return
 
+        // editor settings
         val editor = config.children.find { it.name == "editor" }
         if (editor != null) {
             val scrolloff = editor.children.find { it.name == "scrolloff" }
@@ -72,6 +76,10 @@ class HJConfiguration {
         }
 
         // keymap
+        // here, we need to parse the user config into a flat structure. That is, instead of the tree of tables that the TOML
+        // config represents, we have each mapping as a list of input keys, and the action. This is needed because the user
+        // can override/add a single action in a minor mode. If we didn't flatten, we wouldn't be able to preserve minor
+        // modes from the default config.
         val keys = config.children.find { it.name == "keys" }
         if (keys != null) {
             val normalKeyOverrides = keys.children.find { it.name == "normal" }?.let {
@@ -97,6 +105,11 @@ class HJConfiguration {
         }
     }
 
+    /**
+     * Get entries in the user config for key mappings.
+     *
+     * @return A list of entries. Each entry is composed of a list of input keys (e.g. ga<C-;>), and the action it triggers
+     */
     private fun getConfigKeymapOverrides(keys: TomlNode): List<Pair<List<HJInputKey>, HJKeyAction.HJAction>> {
         val keymaps = mutableListOf<Pair<List<HJInputKey>, HJKeyAction.HJAction>>()
         val inputKeyStack = mutableListOf<Pair<List<HJInputKey>, TomlNode>>()
@@ -137,6 +150,13 @@ class HJConfiguration {
         return keymaps
     }
 
+    /**
+     * Override a mapping in key mapping.
+     *
+     * @param map Map to override. This should be the main HJConfiguration.mapping, or a minor mode table
+     * @param keys List of keys that trigger this action. E.g. ga<C-;>
+     * @param action The action that is triggered
+     */
     private fun overrideMapping(
         map: MutableMap<HJInputKey, HJKeyAction>,
         keys: List<HJInputKey>,
@@ -153,36 +173,9 @@ class HJConfiguration {
         }
     }
 
-    private fun parseKeyActionDefinition(node: TomlNode): Pair<HJInputKey, HJKeyAction>? {
-        val inputKey = HJInputKey.fromString(node.name)
-        if (inputKey == null) {
-            logger.warn("Unknown key ${node.name} in mapping configuration. Skipping")
-            return null
-        }
-
-        return when (node) {
-            is TomlKeyValuePrimitive -> {
-                var action = (node.value.content as? String)?.let { HJActions.getAction(it) }
-                if (action == null) {
-                    logger.warn("Missing action ${node.value.content} for key $inputKey defined in user config. Mapping to no_op.")
-                    action = HJActions.getAction("no_op")!!
-                } else {
-                    logger.debug("Remapping $inputKey to ${action.name} as defined in user config")
-                }
-                Pair(inputKey, action)
-            }
-
-            is TomlTable -> {
-                val mapping =
-                    node.children.mapNotNull(::parseKeyActionDefinition).toMap().toMutableMap()
-                logger.debug("Defining minor mode $inputKey as defined in user config")
-                Pair(inputKey, HJKeyAction.HJMinorMode(inputKey.toString(), "Minor mode $inputKey", mapping))
-            }
-
-            else -> null
-        }
-    }
-
+    /**
+     * Get a list of all HJKeyAction.HJAction's, with a list of bindings for that action
+     */
     fun allActionsWithBindings(mode: HJEditorMode): List<Pair<HJKeyAction.HJAction, List<List<HJInputKey>>>> {
         val actions = HJActions.allActions.associate { action ->
             Pair(
@@ -202,6 +195,8 @@ class HJConfiguration {
                 is HJKeyAction.HJMinorMode -> {
                     toProcess.addAll(action.mapping.map { Triple(it.key, it.value, prefix + key) })
                 }
+
+                is HJKeyAction.HJPassthroughAction -> {} // nothing to do
             }
         }
 
@@ -211,6 +206,9 @@ class HJConfiguration {
     companion object {
         private val logger = Logger.getInstance(this::class.java)
 
+        /**
+         * The default key mapping, parsed.
+         */
         private fun defaultMappingParsed(): Map<HJEditorMode, MutableMap<HJInputKey, HJKeyAction>> {
             val map: Map<HJEditorMode, MutableMap<HJInputKey, HJKeyAction>> = mapOf(
                 HJEditorMode.NORMAL to mutableMapOf(),

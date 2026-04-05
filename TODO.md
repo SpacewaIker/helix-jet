@@ -7,4 +7,5 @@
 - editor actions "slow actions" on EDT
 - Try to figure out if I need all of the logic within moveVertically & VerticallyVisual
 - Might actually need "views" into an editor, otherwise if you have the same doc opened twice, it might conflict
-- Overwriting keys in a minor mode replaces the entire minor mode
+- special cases of input keys <A-minus> for Alt+-, lt, gt, etc.
+- copy selection on line below is buggy

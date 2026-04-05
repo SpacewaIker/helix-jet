@@ -8,80 +8,23 @@ import spacewaiker.helixjet.editor.HJActionContext
 import spacewaiker.helixjet.editor.HJEditorMode
 import spacewaiker.helixjet.editor.HJKeyAction
 import spacewaiker.helixjet.editor.HJState
+import spacewaiker.helixjet.input.HJInputHandler.actionCount
+import spacewaiker.helixjet.input.HJInputHandler.lastKey
+import spacewaiker.helixjet.input.HJInputHandler.minorModeName
+import spacewaiker.helixjet.input.HJInputHandler.onNextKeyCallback
+import spacewaiker.helixjet.input.HJInputHandler.pendingActionKey
 import spacewaiker.helixjet.ui.HJStatusBarInputWidget
 import kotlin.math.max
 
-sealed class HJInputKey {
-    object Escape : HJInputKey()
-    object Up : HJInputKey()
-    object Down : HJInputKey()
-    object Left : HJInputKey()
-    object Right : HJInputKey()
-    object Home : HJInputKey()
-    object End : HJInputKey()
-    object PageUp : HJInputKey()
-    object PageDown : HJInputKey()
-    object Space : HJInputKey()
-    object Backspace : HJInputKey()
-    object Tab : HJInputKey()
-    object Del : HJInputKey()
-    object Enter : HJInputKey()
-    data class Character(val c: Char) : HJInputKey() {
-        override fun toString(): String {
-            return "$c"
-        }
-    }
-
-    companion object {
-        private val logger = Logger.getInstance(this::class.java)
-
-        fun fromCharacter(c: Char) = when (c) {
-            ' ' -> Space
-            else -> Character(c)
-        }
-
-        fun fromString(s: String) = when (s) {
-            "esc" -> Escape
-            "up" -> Up
-            "down" -> Down
-            "left" -> Left
-            "right" -> Right
-            "home" -> Home
-            "end" -> End
-            "pageup" -> PageUp
-            "pagedown" -> PageDown
-            "space" -> Space
-            "backspace" -> Backspace
-            "tab" -> Tab
-            "del" -> Del
-            "ret" -> Enter
-            else if s.length == 1 -> Character(s[0])
-            else -> {
-                logger.warn("Unknown character $s")
-                null
-            }
-        }
-    }
-
-    override fun toString() = when (this) {
-        Escape -> "<esc>"
-        Up -> "<up>"
-        Down -> "<down>"
-        Left -> "<left>"
-        Right -> "<right>"
-        Home -> "<home>"
-        End -> "<end>"
-        PageUp -> "<pageup>"
-        PageDown -> "<pagedown>"
-        Space -> "<space>"
-        Backspace -> "<backspace>"
-        Tab -> "<tab>"
-        Del -> "<del>"
-        Enter -> "<ret>"
-        else -> ""
-    }
-}
-
+/**
+ * Main input handler.
+ *
+ * @property onNextKeyCallback Action to be performed on next key press instead of the normal key handling.
+ * @property lastKey Last key that was pressed
+ * @property pendingActionKey Keys pressed so far when we have a pending action
+ * @property actionCount Numbers typed as part of the action count
+ * @property minorModeName Name of the currently "active" minor mode
+ */
 object HJInputHandler {
     private val logger = Logger.getInstance(this::class.java)
     private var onNextKeyCallback: ((HJInputKey) -> Unit)? = null
@@ -120,8 +63,8 @@ object HJInputHandler {
 
     private fun handleKeyNormalBehaviour(editor: Editor, key: HJInputKey): Boolean {
         // if the key is a number, we're inputting an action count
-        if (key is HJInputKey.Character && key.c.isDigit()) {
-            actionCount += key.c
+        if (key is HJInputKey.Character && key.char.isDigit()) {
+            actionCount += key.char
             updateInputWidget()
             return true
         }
@@ -167,6 +110,11 @@ object HJInputHandler {
                 minorModeName = keyAction.name
                 updateInputWidget()
                 minorModeMapping = keyAction.mapping
+            }
+
+            is HJKeyAction.HJPassthroughAction -> {
+                logger.debug("Passthrough action")
+                return false
             }
         }
 

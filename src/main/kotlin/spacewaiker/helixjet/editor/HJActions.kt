@@ -17,6 +17,7 @@ import spacewaiker.helixjet.ui.HJPicker
 import spacewaiker.helixjet.ui.HJPrompt
 import spacewaiker.helixjet.ui.HJPromptEvent
 import spacewaiker.helixjet.ui.HJStatusBarModeWidget
+import java.awt.event.KeyEvent
 import javax.swing.table.AbstractTableModel
 import kotlin.math.max
 import kotlin.math.min
@@ -423,8 +424,10 @@ fun switchToMode(cx: HJActionContext, newMode: HJEditorMode) {
     if (HJState.mode == newMode) return
     HJState.mode = newMode
 
-    if (newMode == HJEditorMode.INSERT)
+    if (newMode == HJEditorMode.INSERT) {
         collapseSelection(cx)
+        HJState.typedHandlerBlock = true
+    }
 
     HJState.forAllEditors { it.reloadCaretShapes() }
 
@@ -503,63 +506,66 @@ private fun executeIdeAction(cx: HJActionContext, actionId: String) {
 
 private fun findChar(cx: HJActionContext, direction: HJMovementDirection, inclusive: Boolean, extend: Boolean) {
     HJInputHandler.onNextKey { key: HJInputKey ->
-        val motion = when (key) {
-            is HJInputKey.Enter, is HJInputKey.Tab, is HJInputKey.Character -> {
-                // contrary to Helix, where newlines can be different characters, here we only have to deal with \n when
-                // reading from a Document.
-                val ch = if (key is HJInputKey.Character) key.c else if (key == HJInputKey.Enter) '\n' else '\t'
-                { hjEditor: HJEditor ->
-                    val selection = hjEditor.selection.clone().transform { range ->
-                        val cursorAnchor = range.cursor
-                        val cursorHead = nextGraphemeBoundary(cx.hjEditor.editor.document, cursorAnchor)
+        val motion = if (key is HJInputKey.Character || (
+                    key is HJInputKey.Other && (key.code == KeyEvent.VK_ENTER || key.code == KeyEvent.VK_TAB))
+        ) {
+            // contrary to Helix, where newlines can be different characters, here we only have to deal with \n when
+            // reading from a Document.
+            val ch = when (key) {
+                is HJInputKey.Character -> key.char
+                is HJInputKey.Other if key.code == KeyEvent.VK_ENTER -> '\n'
+                else -> '\t'
+            }
 
-                        // exclusive search skips the next char after cursor to enable repeated application
-                        val searchStartPos = when (Pair(inclusive, direction)) {
-                            Pair(true, HJMovementDirection.FORWARD) -> cursorHead
-                            Pair(true, HJMovementDirection.BACKWARD) -> cursorAnchor
-                            Pair(false, HJMovementDirection.FORWARD) -> cursorHead + 1
-                            Pair(false, HJMovementDirection.BACKWARD) -> cursorAnchor - 1
+            { hjEditor: HJEditor ->
+                val selection = hjEditor.selection.clone().transform { range ->
+                    val cursorAnchor = range.cursor
+                    val cursorHead = nextGraphemeBoundary(cx.hjEditor.editor.document, cursorAnchor)
+
+                    // exclusive search skips the next char after cursor to enable repeated application
+                    val searchStartPos = when (Pair(inclusive, direction)) {
+                        Pair(true, HJMovementDirection.FORWARD) -> cursorHead
+                        Pair(true, HJMovementDirection.BACKWARD) -> cursorAnchor
+                        Pair(false, HJMovementDirection.FORWARD) -> cursorHead + 1
+                        Pair(false, HJMovementDirection.BACKWARD) -> cursorAnchor - 1
+                        else -> { // Should never happen
+                            HJActions.logger.error("Impossible condition")
+                            0
+                        }
+                    }
+
+                    var pos = findNthChar(
+                        cx.hjEditor.editor.document,
+                        HJCharMatcher.Character(ch),
+                        searchStartPos,
+                        cx.count,
+                        direction
+                    )
+                    if (pos != null) {
+                        // exclusive search should stop on previous character
+                        pos = when (Pair(inclusive, direction)) {
+                            Pair(true, HJMovementDirection.FORWARD) -> pos
+                            Pair(true, HJMovementDirection.BACKWARD) -> pos
+                            Pair(false, HJMovementDirection.FORWARD) -> pos - 1
+                            Pair(false, HJMovementDirection.BACKWARD) -> pos + 1
                             else -> { // Should never happen
                                 HJActions.logger.error("Impossible condition")
                                 0
                             }
                         }
+                    }
 
-                        var pos = findNthChar(
-                            cx.hjEditor.editor.document,
-                            HJCharMatcher.Character(ch),
-                            searchStartPos,
-                            cx.count,
-                            direction
-                        )
-                        if (pos != null) {
-                            // exclusive search should stop on previous character
-                            pos = when (Pair(inclusive, direction)) {
-                                Pair(true, HJMovementDirection.FORWARD) -> pos
-                                Pair(true, HJMovementDirection.BACKWARD) -> pos
-                                Pair(false, HJMovementDirection.FORWARD) -> pos - 1
-                                Pair(false, HJMovementDirection.BACKWARD) -> pos + 1
-                                else -> { // Should never happen
-                                    HJActions.logger.error("Impossible condition")
-                                    0
-                                }
-                            }
-                        }
-
-                        if (pos == null) range else {
-                            if (extend) {
-                                range.putCursor(hjEditor.editor.document, pos, true)
-                            } else {
-                                HJRange.point(range.cursor).putCursor(hjEditor.editor.document, pos, true)
-                            }
+                    if (pos == null) range else {
+                        if (extend) {
+                            range.putCursor(hjEditor.editor.document, pos, true)
+                        } else {
+                            HJRange.point(range.cursor).putCursor(hjEditor.editor.document, pos, true)
                         }
                     }
-                    hjEditor.setNewSelection(selection)
                 }
+                hjEditor.setNewSelection(selection)
             }
-
-            else -> null
-        }
+        } else null
 
         motion?.let { cx.hjEditor.applyMotion(it) }
     }
@@ -568,9 +574,9 @@ private fun findChar(cx: HJActionContext, direction: HJMovementDirection, inclus
 private fun replace(cx: HJActionContext) {
     HJInputHandler.onNextKey { key: HJInputKey ->
         val char = when (key) {
-            is HJInputKey.Character -> key.c
-            is HJInputKey.Enter -> '\n'
-            is HJInputKey.Tab -> '\t'
+            is HJInputKey.Character -> key.char
+            is HJInputKey.Other if key.code == KeyEvent.VK_ENTER -> '\n'
+            is HJInputKey.Other if key.code == KeyEvent.VK_TAB -> '\t'
             else -> null
         }
 

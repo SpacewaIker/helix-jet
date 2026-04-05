@@ -5,8 +5,13 @@ import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.actionSystem.ActionPlan
 import com.intellij.openapi.editor.actionSystem.TypedActionHandler
 import com.intellij.openapi.editor.actionSystem.TypedActionHandlerEx
+import spacewaiker.helixjet.editor.HJEditorMode
+import spacewaiker.helixjet.editor.HJState
 
-class HJTypedHandler(private val originalHandler: TypedActionHandler?) : TypedActionHandlerEx {
+/**
+ * Handle typed keys. This is used only for user input in Insert mode.
+ */
+class HJTypedHandler(private val originalHandler: TypedActionHandler) : TypedActionHandlerEx {
     override fun beforeExecute(
         editor: Editor, c: Char,
         context: DataContext, plan: ActionPlan,
@@ -15,8 +20,7 @@ class HJTypedHandler(private val originalHandler: TypedActionHandler?) : TypedAc
     }
 
     override fun execute(editor: Editor, c: Char, context: DataContext) {
-        if (!HJInputHandler.handle(editor, HJInputKey.fromCharacter(c))) {
-            originalHandler?.execute(editor, c, context)
-        }
+        if (HJState.mode == HJEditorMode.INSERT && !HJState.typedHandlerBlock)
+            originalHandler.execute(editor, c, context)
     }
 }

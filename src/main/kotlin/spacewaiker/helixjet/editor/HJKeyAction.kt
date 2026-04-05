@@ -31,11 +31,14 @@ sealed class HJKeyAction(val name: String, val doc: String) {
     ) : HJKeyAction(name, doc) {
 
     }
+    
+    object HJPassthroughAction : HJKeyAction("Passthrough", "")
 
     override fun toString(): String {
         return when (this) {
             is HJAction -> "HJAction($name)"
             is HJMinorMode -> "HJMinorMode($name)"
+            is HJPassthroughAction -> "HJPassthroughAction"
         }
     }
 }
