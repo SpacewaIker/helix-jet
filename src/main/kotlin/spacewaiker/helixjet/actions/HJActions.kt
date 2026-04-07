@@ -112,8 +112,8 @@ object HJActions {
             HJAction("select_regex", "Select all regex matches inside selections") { selectRegex(it) },
             HJAction("split_selection", "Split selections on regex matches") { splitSelection(it) },
             HJAction("split_selection_on_newline", "Split selection on newlines") { splitSelectionOnNewline(it) },
-            HJAction("merge_selections", "Merge selections"),
-            HJAction("merge_consecutive_selections", "Merge consecutive selections"),
+            HJAction("merge_selections", "Merge selections") { cx -> mergeSelections(cx) },
+            HJAction("merge_consecutive_selections", "Merge consecutive selections") { cx -> mergeConsecutiveSelections(cx) },
             HJAction("search", "Search for regex pattern"),
             HJAction("rsearch", "Reverse search for regex pattern"),
             HJAction("search_next", "Select next search match"),
@@ -213,15 +213,15 @@ object HJActions {
             HJAction("extend_to_line_end", "Extend to line end") { gotoLineStartEndImpl(it, false, true) },
             HJAction("extend_to_line_end_newline", "Extend to line end") { gotoLineEndNewlineImpl(it, true) },
             HJAction("signature_help", "Show signature help"),
-            HJAction("smart_tab", "Insert tab if all cursors have all whitespace to their left; otherwise"),
+            HJAction("smart_tab", "Insert tab if all cursors have all whitespace to their left; otherwise") { cx -> executeIdeAction(cx, IdeActions.ACTION_EDITOR_TAB) },
             HJAction("insert_tab", "Insert tab char"),
-            HJAction("insert_newline", "Insert newline char"),
+            HJAction("insert_newline", "Insert newline char") { cx -> executeIdeAction(cx, IdeActions.ACTION_EDITOR_ENTER) },
             HJAction("insert_char_interactive", "Insert an interactively-chosen char"),
             HJAction("append_char_interactive", "Append an interactively-chosen char"),
-            HJAction("delete_char_backward", "Delete previous char"),
-            HJAction("delete_char_forward", "Delete next char"),
-            HJAction("delete_word_backward", "Delete previous word"),
-            HJAction("delete_word_forward", "Delete next word"),
+            HJAction("delete_char_backward", "Delete previous char") { cx -> executeIdeAction(cx, IdeActions.ACTION_EDITOR_BACKSPACE) },
+            HJAction("delete_char_forward", "Delete next char") { cx -> executeIdeAction(cx, IdeActions.ACTION_EDITOR_DELETE) },
+            HJAction("delete_word_backward", "Delete previous word") { cx -> executeIdeAction(cx, IdeActions.ACTION_EDITOR_DELETE_TO_WORD_START) },
+            HJAction("delete_word_forward", "Delete next word") { cx -> executeIdeAction(cx, IdeActions.ACTION_EDITOR_DELETE_TO_WORD_END) },
             HJAction("kill_to_line_start", "Delete till start of line"),
             HJAction("kill_to_line_end", "Delete till end of line"),
             HJAction("undo", "Undo change") { executeIdeAction(it, IdeActions.ACTION_UNDO) },
@@ -440,7 +440,7 @@ fun switchToMode(cx: HJActionContext, newMode: HJEditorMode) {
 private fun insertMode(cx: HJActionContext, append: Boolean) {
     val selection = cx.hjEditor.selection.clone().transform {
         val cursor = if (append) it.to else it.from
-        HJRange.Companion.point(cursor)
+        HJRange.point(cursor)
     }
     cx.hjEditor.setNewSelection(selection)
     switchToMode(cx, HJEditorMode.INSERT)
@@ -455,7 +455,7 @@ private fun commandMode(cx: HJActionContext) {
 private fun collapseSelection(cx: HJActionContext) {
     val selection = cx.hjEditor.selection.clone().transform { range ->
         val pos = range.cursor
-        HJRange.Companion.point(pos)
+        HJRange.point(pos)
     }
     cx.hjEditor.setNewSelection(selection)
 }
@@ -560,7 +560,7 @@ private fun findChar(cx: HJActionContext, direction: HJMovementDirection, inclus
                         if (extend) {
                             range.putCursor(hjEditor.editor.document, pos, true)
                         } else {
-                            HJRange.Companion.point(range.cursor).putCursor(hjEditor.editor.document, pos, true)
+                            HJRange.point(range.cursor).putCursor(hjEditor.editor.document, pos, true)
                         }
                     }
                 }
@@ -652,7 +652,7 @@ private fun copySelectionOnLine(cx: HJActionContext, direction: HJMovementDirect
                     primaryIndex = ranges.size
                 }
 
-                ranges.add(HJRange.Companion.point(anchor).putCursor(doc, head, true))
+                ranges.add(HJRange.point(anchor).putCursor(doc, head, true))
                 sels++
             } catch (_: IllegalArgumentException) {
                 // ignore
@@ -711,7 +711,7 @@ private fun selectRegex(cx: HJActionContext) {
                     cx.hjEditor.setNewSelection(snapshot)
                 } else {
                     val doc = cx.hjEditor.editor.document
-                    val selection = HJSelection.Companion.selectOnMatches(doc, snapshot, regex)
+                    val selection = HJSelection.selectOnMatches(doc, snapshot, regex)
                     if (selection != null) {
                         cx.hjEditor.setNewSelection(selection)
                     } else if (e == HJPromptEvent.Validate) {
@@ -741,7 +741,7 @@ private fun splitSelection(cx: HJActionContext) {
                     cx.hjEditor.setNewSelection(snapshot)
                 } else {
                     val doc = cx.hjEditor.editor.document
-                    val selection = HJSelection.Companion.splitOnMatches(doc, snapshot, regex)
+                    val selection = HJSelection.splitOnMatches(doc, snapshot, regex)
                     cx.hjEditor.setNewSelection(selection)
                 }
             }
@@ -754,7 +754,7 @@ private fun splitSelection(cx: HJActionContext) {
 }
 
 private fun splitSelectionOnNewline(cx: HJActionContext) {
-    val selection = HJSelection.Companion.splitOnNewline(cx.hjEditor.editor.document, cx.hjEditor.selection)
+    val selection = HJSelection.splitOnNewline(cx.hjEditor.editor.document, cx.hjEditor.selection)
     cx.hjEditor.setNewSelection(selection)
 }
 
@@ -904,4 +904,14 @@ private fun commandPalette(cx: HJActionContext) {
         val action = data[rowIdx].first
         action.execute(cx)
     }.show(cx.hjEditor.editor.project!!)
+}
+
+private fun mergeSelections(cx: HJActionContext) {
+    val selection = cx.hjEditor.selection.clone().mergeRanges()
+    cx.hjEditor.setNewSelection(selection)
+}
+
+private fun mergeConsecutiveSelections(cx: HJActionContext) {
+    val selection = cx.hjEditor.selection.clone().mergeConsecutiveRanges()
+    cx.hjEditor.setNewSelection(selection)
 }

@@ -39,8 +39,11 @@ class HJEditor {
         editor.caretModel.removeSecondaryCarets()
         val primaryCaret = editor.caretModel.primaryCaret
 
-        for ((idx, range) in this.selection.ranges.withIndex()) {
-            val isPrimary = idx == this.selection.primaryIndex
+        // need to process primary first because we can't delete the primaryCaret in the caretModel. Therefore we must
+        // reuse it, and that means processing it first. Otherwise, we might have to create a secondary caret at the position
+        // of the primary, which doesn't work.
+        for ((idx, range) in this.selection.rangesWithPrimaryFirst.withIndex()) {
+            val isPrimary = idx == 0 // rangesWithPrimaryFirst, so first element is primary
 
             val pos = editor.offsetToLogicalPosition(range.cursor)
             val caret = if (isPrimary) {

@@ -12,10 +12,19 @@ class HJSelection {
     var primaryIndex: Int
     val len get() = ranges.size
     val primary get() = ranges[primaryIndex]
+    val rangesWithPrimaryFirst: List<HJRange>
+        get() {
+            val ranges = this.ranges.toMutableList()
+            val rangeIndex0 = ranges[0]
+            ranges[0] = ranges[primaryIndex]
+            ranges[primaryIndex] = rangeIndex0
+            return ranges
+        }
 
     constructor(ranges: List<HJRange>, primaryIndex: Int) {
         this.ranges.addAll(ranges.map { it.copy() })
         this.primaryIndex = primaryIndex
+        normalize()
     }
 
     constructor(primaryRange: HJRange) {
@@ -38,21 +47,47 @@ class HJSelection {
         var primary = ranges[primaryIndex]
         ranges.sortBy { it.from }
 
-        // dedup
-        var i = 1
-        while (i < ranges.size) {
-            val currRange = ranges[i]
-            val prevRange = ranges[i - 1]
-
+        removeConsecutiveDuplicatesAndReplace(ranges) { currRange, prevRange ->
             if (prevRange.overlaps(currRange)) {
                 val newRange = currRange.merge(prevRange)
                 if (prevRange == primary || currRange == primary) {
                     primary = newRange
                 }
-                ranges[i - 1] = newRange
-                ranges.removeAt(i)
+                Pair(true, newRange)
             } else {
-                i++
+                Pair(false, null)
+            }
+        }
+
+        primaryIndex = ranges.indexOfFirst { it == primary }
+
+        return this
+    }
+
+    /**
+     * Replaces ranges with one spanning from first to last
+     */
+    fun mergeRanges(): HJSelection {
+        val first = ranges.first()
+        val last = ranges.last()
+        return HJSelection(first.merge(last))
+    }
+
+    /**
+     * Merges all ranges that are consecutive
+     */
+    fun mergeConsecutiveRanges(): HJSelection {
+        var primary = this.primary
+
+        removeConsecutiveDuplicatesAndReplace(ranges) { currRange, prevRange ->
+            if (prevRange.to == currRange.from) {
+                val newRange = currRange.merge(prevRange)
+                if (prevRange == primary || currRange == primary) {
+                    primary = newRange
+                }
+                Pair(true, newRange)
+            } else {
+                Pair(false, null)
             }
         }
 
@@ -170,4 +205,35 @@ class HJSelection {
             return HJSelection(result, 0)
         }
     }
+}
+
+/**
+ * Removes consecutive duplicate elements using the given entity relation.
+ */
+fun <E> removeConsecutiveDuplicates(list: MutableList<E>, sameBucket: (E, E) -> Boolean) {
+    removeConsecutiveDuplicatesAndReplace(list) { first, second -> Pair(sameBucket(first, second), null) }
+}
+
+/**
+ * Removes consecutive duplicate elements using the given entity relation and replaces the kept element with the given value.
+ */
+fun <E> removeConsecutiveDuplicatesAndReplace(list: MutableList<E>, sameBucket: (E, E) -> Pair<Boolean, E?>) {
+    if (list.size <= 1) return;
+
+    var write = 1
+    for (read in 1 until list.size) {
+        val elRead = list[read]
+        val elWriteMinus1 = list[write - 1]
+
+        val (isSameBucket, newWriteMinus1) = sameBucket(elRead, elWriteMinus1)
+        newWriteMinus1?.let { list[write - 1] = it }
+        if (!isSameBucket) {
+            if (read != write) {
+                list[write] = elRead
+            }
+            write++
+        }
+    }
+
+    list.dropLast(list.size - write)
 }

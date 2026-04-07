@@ -8,4 +8,4 @@
 - Try to figure out if I need all of the logic within moveVertically & VerticallyVisual
 - Might actually need "views" into an editor, otherwise if you have the same doc opened twice, it might conflict
 - special cases of input keys <A-minus> for Alt+-, lt, gt, etc.
-- copy selection on line below is buggy
+- moving with arrow keys in insert mode doesn't update the plugin's HJSelection
