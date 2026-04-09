@@ -23,6 +23,8 @@ class HJConfiguration {
     val otherCursorsColor: Color
     var scrolloff: Int = 5
         private set
+    var continueComments: Boolean = true
+        private set
 
     constructor() {
         val colorScheme = EditorColorsManager.getInstance().globalScheme
@@ -70,11 +72,11 @@ class HJConfiguration {
         // editor settings
         val editor = config.children.find { it.name == "editor" }
         if (editor != null) {
-            val scrolloff = editor.children.find { it.name == "scrolloff" }
-            if (scrolloff != null && scrolloff is TomlKeyValuePrimitive) (scrolloff.value.content as? Int)?.let { scrolloff ->
+            getTomlValue<Int>(editor, "scrolloff")?.let { scrolloff ->
                 this.scrolloff = scrolloff
                 HJState.forAllEditors { it.editor.settings.verticalScrollOffset = scrolloff }
             }
+            getTomlValue<Boolean>(editor, "continue-comments")?.let { continueComments = it }
         }
 
         // keymap
@@ -270,6 +272,15 @@ class HJConfiguration {
 
                 else -> null
             }
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        private fun <T> getTomlValue(parent: TomlNode, name: String): T? {
+            val child = parent.children.find { it.name == name }
+            if (child != null && child is TomlKeyValuePrimitive) {
+                return child.value.content as? T
+            }
+            return null
         }
     }
 }

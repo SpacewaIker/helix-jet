@@ -2,6 +2,7 @@
 
 package spacewaiker.helixjet.actions
 
+import com.intellij.lang.LanguageCommenters
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.IdeActions
@@ -163,8 +164,8 @@ object HJActions {
             HJAction("last_picker", "Open last picker"),
             HJAction("insert_at_line_start", "Insert at start of line"),
             HJAction("insert_at_line_end", "Insert at end of line"),
-            HJAction("open_below", "Open new line below selection"),
-            HJAction("open_above", "Open new line above selection"),
+            HJAction("open_below", "Open new line below selection") { cx -> open(cx, true, true) },
+            HJAction("open_above", "Open new line above selection") { cx -> open(cx, false, true) },
             HJAction("normal_mode", "Enter normal mode") { switchToMode(it, HJEditorMode.NORMAL) },
             HJAction("select_mode", "Enter selection extend mode") { switchToMode(it, HJEditorMode.SELECT) },
             HJAction("exit_select_mode", "Exit selection mode") { if (HJState.mode == HJEditorMode.SELECT) switchToMode(it, HJEditorMode.NORMAL) },
@@ -357,7 +358,7 @@ object HJActions {
             HJAction("rotate_selections_first", "Make the first selection your primary one"),
             HJAction("rotate_selections_last", "Make the last selection your primary one"),
             // non-helix action
-            HJAction("debug") { it.hjEditor.editor.document.charsSequence.forEach { c: Char -> println(c.code)}}
+            HJAction("debug") { println(it.doc.getLineEndOffset(it.doc.getLineNumber(it.hjEditor.selection.primary.cursor))) }
         ))
         // @formatter:on
 
@@ -461,7 +462,7 @@ private fun collapseSelection(cx: HJActionContext) {
 }
 
 private fun deleteSelectionImpl(cx: HJActionContext, change: Boolean, yank: Boolean) {
-    // TODO: correct implementation following helix -> if change and only_whole_lines then open ??
+    val onlyWholeLines = cx.hjEditor.selectionIsLinewise
 
     if (yank) {
         yank(cx)
@@ -469,7 +470,16 @@ private fun deleteSelectionImpl(cx: HJActionContext, change: Boolean, yank: Bool
 
     val transaction = cx.hjEditor.changeBySelection { range -> HJChange.Delete(range.from, range.to) }
     cx.hjEditor.apply(transaction)
-    switchToMode(cx, if (change) HJEditorMode.INSERT else HJEditorMode.NORMAL)
+
+    if (change) {
+        if (onlyWholeLines) {
+            open(cx, false, false)
+        } else {
+            insertMode(cx, false)
+        }
+    } else {
+        switchToMode(cx, HJEditorMode.NORMAL)
+    }
 }
 
 private fun yank(cx: HJActionContext) {
@@ -914,4 +924,82 @@ private fun mergeSelections(cx: HJActionContext) {
 private fun mergeConsecutiveSelections(cx: HJActionContext) {
     val selection = cx.hjEditor.selection.clone().mergeConsecutiveRanges()
     cx.hjEditor.setNewSelection(selection)
+}
+
+private fun open(cx: HJActionContext, openBelow: Boolean, commentContinuationEnabled: Boolean) {
+    insertMode(cx, false)
+
+    var offs = 0
+    val ranges = mutableListOf<HJRange>()
+
+    val continueCommentTokens = if (commentContinuationEnabled && HJState.config.continueComments) {
+        val language = cx.hjEditor.psiFile?.language
+        if (language != null) {
+            val commenter = LanguageCommenters.INSTANCE.forLanguage(language)
+            commenter?.lineCommentPrefixes
+        } else null
+    } else null
+
+    var transaction = cx.hjEditor.changeBySelection { range ->
+        // the line number, where the cursor is currently
+        val currLineNum = cx.doc.getLineNumber(if (openBelow) prevGraphemeBoundary(range.to) else range.from)
+        // the next line number, where the cursor will be, after finishing the transaction
+        val nextNewLineNum = if (openBelow) currLineNum + 1 else currLineNum
+        val aboveNextNewLineNum = (nextNewLineNum - 1).coerceAtLeast(0)
+
+        val continueCommentToken = continueCommentTokens?.let { getCommentToken(cx.doc, it, currLineNum) }
+
+        // index to insert newlines after, as well as the char width to use to compensate for those inserted newlines
+        val (aboveNextLineEndIndex, aboveNextLineEndWidth) = if (nextNewLineNum == 0) Pair(0, 0) else {
+            Pair(cx.doc.getLineEndOffset(aboveNextNewLineNum), 1)
+        }
+
+        val line = getLine(cx.doc, currLineNum)!!
+        val indent = when (val pos = firstNonWhitespaceChar(line)) {
+            is Int if continueCommentToken != null -> line.substring(0, pos)
+            else -> cx.hjEditor.codeStyleManager?.getLineIndent(cx.doc, cx.doc.getLineStartOffset(currLineNum)) ?: ""
+        }
+
+        var text = ""
+
+        if (!openBelow && nextNewLineNum == 0) {
+            text += indent
+            if (continueCommentToken != null) {
+                text += continueCommentToken
+                text += " "
+            }
+            text += "\n"
+        } else {
+            text += "\n"
+            text += indent
+            if (continueCommentToken != null) {
+                text += continueCommentToken
+                text += " "
+            }
+        }
+        text = text.repeat(cx.count)
+
+        // calculate new selection ranges
+        val pos = offs + aboveNextLineEndIndex + aboveNextLineEndWidth
+        val commentLen = continueCommentToken?.let { it.length + 1 } ?: 0 // + 1 for the extra space added
+        for (i in 0 until cx.count) {
+            // pos                     -> beginning of reference line,
+            // + (i * (line_ending_len + indent_len + comment_len)) -> beginning of i'th line from pos (possibly including comment token)
+            // + indent_len + comment_len ->        -> indent for i'th line
+            ranges.add(
+                HJRange.point(
+                    pos + (i * (1 + indent.length + commentLen))
+                            + indent.length + commentLen
+                )
+            )
+        }
+
+        // update the offset for the next range
+        offs += text.length
+
+        HJChange.Insert(aboveNextLineEndIndex, text)
+    }
+
+    transaction = transaction.copy(selection = HJSelection(ranges, cx.hjEditor.selection.primaryIndex))
+    cx.hjEditor.apply(transaction)
 }

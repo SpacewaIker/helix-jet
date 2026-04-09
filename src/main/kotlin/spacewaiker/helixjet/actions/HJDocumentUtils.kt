@@ -36,3 +36,15 @@ fun firstNonWhitespaceChar(line: String, startOffset: Int = 0): Int? {
     val idx = line.asSequence().indexOfFirst { !it.isWhitespace() }
     return if (idx == -1) null else startOffset + idx
 }
+
+/**
+ * Returns the longest matching comment token of the given line (if it exists)
+ */
+fun getCommentToken(doc: Document, tokens: List<String>, lineNum: Int): String? {
+    val line = getLine(doc, lineNum) ?: return null
+    val start = firstNonWhitespaceChar(line) ?: return null
+
+    return tokens
+        .filter { token -> line.substring(start).startsWith(token) }
+        .maxByOrNull { token -> token.length }
+}

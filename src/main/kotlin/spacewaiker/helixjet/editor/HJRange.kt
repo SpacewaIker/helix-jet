@@ -2,6 +2,7 @@
 
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.util.TextRange
 import spacewaiker.helixjet.actions.HJMovementDirection
 import spacewaiker.helixjet.actions.nextGraphemeBoundary
 import spacewaiker.helixjet.actions.prevGraphemeBoundary
@@ -149,6 +150,12 @@ class HJRange {
             max(prevGraphemeBoundary(this.to), from)
         }
         return Pair(doc.getLineNumber(from), doc.getLineNumber(to))
+    }
+
+    fun slice(doc: Document): String? {
+        return if (to < doc.textLength) {
+            doc.getText(TextRange(from, to))
+        } else null
     }
 
     companion object {

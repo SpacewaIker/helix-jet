@@ -5,6 +5,8 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.CaretVisualAttributes
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.ScrollType
+import com.intellij.psi.PsiDocumentManager
+import com.intellij.psi.codeStyle.CodeStyleManager
 
 sealed class HJChange {
     data class Insert(val at: Int, val str: String) : HJChange()
@@ -22,6 +24,16 @@ class HJEditor {
     val editor: Editor
     var selection: HJSelection
     var lastMotion: ((HJEditor) -> Unit)? = null
+    val psiFile get() = editor.project?.let { PsiDocumentManager.getInstance(it) }?.getPsiFile(editor.document)
+    val codeStyleManager get() = editor.project?.let { CodeStyleManager.getInstance(it) }
+
+    val selectionIsLinewise
+        get() = selection.ranges.all { range ->
+            val (fromLine, toLine) = range.lineRange(editor.document)
+            val start = editor.document.getLineStartOffset(fromLine)
+            val end = editor.document.getLineEndOffset(toLine) + 1 // to account for line ending
+            start == range.from && end == range.to
+        }
 
     constructor(editor: Editor) {
         this.editor = editor
@@ -114,7 +126,8 @@ class HJEditor {
                 }
             }
         }
-        selection.ensureInvariants(editor.document)
+        val selection = transaction.selection ?: this.selection
+        setNewSelection(selection)
     }
 
     fun reloadCaretShapes() {
