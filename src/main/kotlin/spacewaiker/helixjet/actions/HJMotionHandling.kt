@@ -14,7 +14,7 @@ object HJMotionHandling {
     val logger = Logger.getInstance(this::class.java)
 }
 
-enum class HJMovementDirection {
+enum class HJDirection {
     FORWARD, BACKWARD;
 
     val value
@@ -31,7 +31,7 @@ enum class HJCharMovementKind {
 fun moveHorizontally(
     doc: Document,
     range: HJRange,
-    direction: HJMovementDirection,
+    direction: HJDirection,
     count: Int,
     extend: Boolean,
 ): HJRange {
@@ -39,8 +39,8 @@ fun moveHorizontally(
 
     // compute the new position
     val newPos = when (direction) {
-        HJMovementDirection.FORWARD -> nthNextGraphemeBoundary(doc, pos, count)
-        HJMovementDirection.BACKWARD -> nthPrevGraphemeBoundary(pos, count)
+        HJDirection.FORWARD -> nthNextGraphemeBoundary(doc, pos, count)
+        HJDirection.BACKWARD -> nthPrevGraphemeBoundary(pos, count)
     }
 
     // compute the final new range
@@ -50,7 +50,7 @@ fun moveHorizontally(
 fun moveVerticallyVisual(
     editor: Editor,
     range: HJRange,
-    direction: HJMovementDirection,
+    direction: HJDirection,
     count: Int,
     extend: Boolean,
 ): HJRange {
@@ -80,7 +80,7 @@ fun moveVerticallyVisual(
 fun moveVertically(
     editor: Editor,
     range: HJRange,
-    direction: HJMovementDirection,
+    direction: HJDirection,
     count: Int,
     extend: Boolean,
 ): HJRange {
@@ -229,19 +229,19 @@ private fun reachedTarget(target: HJWordMotionTarget, prevChar: Char, nextChar: 
             isLongWordBoundary(prevChar, nextChar) && (!prevChar.isWhitespace() || charIsLineEnding(nextChar))
         }
         HJWordMotionTarget.NEXT_SUB_WORD_START -> {
-            isSubWordBoundary(prevChar, nextChar, HJMovementDirection.FORWARD)
+            isSubWordBoundary(prevChar, nextChar, HJDirection.FORWARD)
                     && (charIsLineEnding(nextChar) || !(nextChar.isWhitespace() || nextChar == '_'))
         }
         HJWordMotionTarget.PREV_SUB_WORD_END -> {
-            isSubWordBoundary(prevChar, nextChar, HJMovementDirection.BACKWARD)
+            isSubWordBoundary(prevChar, nextChar, HJDirection.BACKWARD)
                     && (charIsLineEnding(nextChar) || !(nextChar.isWhitespace() || nextChar == '_'))
         }
         HJWordMotionTarget.NEXT_SUB_WORD_END -> {
-            isSubWordBoundary(prevChar, nextChar, HJMovementDirection.FORWARD)
+            isSubWordBoundary(prevChar, nextChar, HJDirection.FORWARD)
                     && (!(prevChar.isWhitespace() || prevChar == '_') || charIsLineEnding(nextChar))
         }
         HJWordMotionTarget.PREV_SUB_WORD_START -> {
-            isSubWordBoundary(prevChar, nextChar, HJMovementDirection.BACKWARD)
+            isSubWordBoundary(prevChar, nextChar, HJDirection.BACKWARD)
                     && (!(prevChar.isWhitespace() || prevChar == '_') || charIsLineEnding(nextChar))
         }
     }
@@ -265,7 +265,7 @@ private fun isLongWordBoundary(a: Char, b: Char): Boolean {
     }
 }
 
-private fun isSubWordBoundary(a: Char, b: Char, direction: HJMovementDirection): Boolean {
+private fun isSubWordBoundary(a: Char, b: Char, direction: HJDirection): Boolean {
     val aCat = HJCharCategory.categorize(a)
     val bCat = HJCharCategory.categorize(b)
     return when (Pair(aCat, bCat)) {
@@ -275,8 +275,8 @@ private fun isSubWordBoundary(a: Char, b: Char, direction: HJMovementDirection):
             } else {
                 // subword boundaries are directional: in 'fooBar' there is a boundary between 'o' and 'B', but not between 'B' and 'a'.
                 when (direction) {
-                    HJMovementDirection.FORWARD -> a.isLowerCase() && b.isUpperCase()
-                    HJMovementDirection.BACKWARD -> a.isUpperCase() && b.isLowerCase()
+                    HJDirection.FORWARD -> a.isLowerCase() && b.isUpperCase()
+                    HJDirection.BACKWARD -> a.isUpperCase() && b.isLowerCase()
                 }
             }
         }
@@ -298,7 +298,7 @@ sealed class HJCharMatcher {
     }
 }
 
-fun findNthChar(doc: Document, charMatcher: HJCharMatcher, pos: Int, count: Int, direction: HJMovementDirection): Int? {
+fun findNthChar(doc: Document, charMatcher: HJCharMatcher, pos: Int, count: Int, direction: HJDirection): Int? {
     if (count == 0) return null
 
     val chars = doc.charsSequence.toList().listIterator()
@@ -308,7 +308,7 @@ fun findNthChar(doc: Document, charMatcher: HJCharMatcher, pos: Int, count: Int,
     var pos = pos
 
     when (direction) {
-        HJMovementDirection.FORWARD -> while (true) {
+        HJDirection.FORWARD -> while (true) {
             if (!chars.hasNext()) return null
             val c = chars.next()
             if (charMatcher.matches(c)) {
@@ -318,7 +318,7 @@ fun findNthChar(doc: Document, charMatcher: HJCharMatcher, pos: Int, count: Int,
             pos++
         }
 
-        HJMovementDirection.BACKWARD -> while (true) {
+        HJDirection.BACKWARD -> while (true) {
             if (!chars.hasPrevious()) return null
             val c = chars.previous()
             pos--

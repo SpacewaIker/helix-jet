@@ -5,18 +5,29 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.CaretVisualAttributes
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.ScrollType
+import com.intellij.psi.PlainTextTokenTypes
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.codeStyle.CodeStyleManager
 
 sealed class HJChange {
-    data class Insert(val at: Int, val str: String) : HJChange()
-    data class Replace(val from: Int, val to: Int, val replacement: String) : HJChange()
-    data class Delete(val from: Int, val to: Int) : HJChange()
+    abstract val rank: Int
+
+    data class Insert(val at: Int, val str: String) : HJChange() {
+        override val rank = at
+    }
+
+    data class Replace(val from: Int, val to: Int, val replacement: String) : HJChange() {
+        override val rank = to
+    }
+
+    data class Delete(val from: Int, val to: Int) : HJChange() {
+        override val rank = to
+    }
 }
 
 data class HJTransaction(
     val changes: List<HJChange>,
-    val selection: HJSelection?,
+    val selection: HJSelection? = null,
 )
 
 class HJEditor {
@@ -26,6 +37,7 @@ class HJEditor {
     var lastMotion: ((HJEditor) -> Unit)? = null
     val psiFile get() = editor.project?.let { PsiDocumentManager.getInstance(it) }?.getPsiFile(editor.document)
     val codeStyleManager get() = editor.project?.let { CodeStyleManager.getInstance(it) }
+    val ast get() = psiFile?.node?.let { if (it.elementType == PlainTextTokenTypes.PLAIN_TEXT_FILE) null else it }
 
     val selectionIsLinewise
         get() = selection.ranges.all { range ->
@@ -109,8 +121,11 @@ class HJEditor {
     }
 
     fun apply(transaction: HJTransaction) {
-        for (change in transaction.changes) {
-            WriteCommandAction.runWriteCommandAction(editor.project) {
+        // sort changes so that their indices remain accurate in between changes
+        val changes = transaction.changes.sortedByDescending { it.rank }
+
+        WriteCommandAction.runWriteCommandAction(editor.project) {
+            for (change in changes) {
                 when (change) {
                     is HJChange.Insert -> {
                         editor.document.insertString(change.at, change.str)

@@ -46,20 +46,20 @@ object HJActions {
         // @formatter:off
         defActions(map, arrayOf(
             HJAction("no_op", "Do nothing") { _ -> },
-            HJAction("move_char_left", "Move left") { moveImpl(it, HJCharMovementKind.HORIZONTAL, HJMovementDirection.BACKWARD, false) },
-            HJAction("move_char_right", "Move right") { moveImpl(it, HJCharMovementKind.HORIZONTAL, HJMovementDirection.FORWARD, false) },
-            HJAction("move_line_up", "Move up") { moveImpl(it, HJCharMovementKind.VERTICAL, HJMovementDirection.BACKWARD, false) },
-            HJAction("move_line_down", "Move down") { moveImpl(it, HJCharMovementKind.VERTICAL, HJMovementDirection.FORWARD, false) },
-            HJAction("move_visual_line_up", "Move up") { moveImpl(it, HJCharMovementKind.VERTICAL_VISUAL, HJMovementDirection.BACKWARD, false) },
-            HJAction("move_visual_line_down", "Move down") { moveImpl(it, HJCharMovementKind.VERTICAL_VISUAL, HJMovementDirection.FORWARD, false) },
-            HJAction("extend_char_left", "Extend left") { moveImpl(it, HJCharMovementKind.HORIZONTAL, HJMovementDirection.BACKWARD, true) },
-            HJAction("extend_char_right", "Extend right") { moveImpl(it, HJCharMovementKind.HORIZONTAL, HJMovementDirection.FORWARD, true) },
-            HJAction("extend_line_up", "Extend up") { moveImpl(it, HJCharMovementKind.VERTICAL, HJMovementDirection.BACKWARD, true) },
-            HJAction("extend_line_down", "Extend down") { moveImpl(it, HJCharMovementKind.VERTICAL, HJMovementDirection.FORWARD, true) },
-            HJAction("extend_visual_line_up", "Extend up") { moveImpl(it, HJCharMovementKind.VERTICAL_VISUAL, HJMovementDirection.BACKWARD, true) },
-            HJAction("extend_visual_line_down", "Extend down") { moveImpl(it, HJCharMovementKind.VERTICAL_VISUAL, HJMovementDirection.FORWARD, true) },
-            HJAction("copy_selection_on_next_line", "Copy selection on next line") { copySelectionOnLine(it, HJMovementDirection.FORWARD) },
-            HJAction("copy_selection_on_prev_line", "Copy selection on previous line") { copySelectionOnLine(it, HJMovementDirection.BACKWARD) },
+            HJAction("move_char_left", "Move left") { moveImpl(it, HJCharMovementKind.HORIZONTAL, HJDirection.BACKWARD, false) },
+            HJAction("move_char_right", "Move right") { moveImpl(it, HJCharMovementKind.HORIZONTAL, HJDirection.FORWARD, false) },
+            HJAction("move_line_up", "Move up") { moveImpl(it, HJCharMovementKind.VERTICAL, HJDirection.BACKWARD, false) },
+            HJAction("move_line_down", "Move down") { moveImpl(it, HJCharMovementKind.VERTICAL, HJDirection.FORWARD, false) },
+            HJAction("move_visual_line_up", "Move up") { moveImpl(it, HJCharMovementKind.VERTICAL_VISUAL, HJDirection.BACKWARD, false) },
+            HJAction("move_visual_line_down", "Move down") { moveImpl(it, HJCharMovementKind.VERTICAL_VISUAL, HJDirection.FORWARD, false) },
+            HJAction("extend_char_left", "Extend left") { moveImpl(it, HJCharMovementKind.HORIZONTAL, HJDirection.BACKWARD, true) },
+            HJAction("extend_char_right", "Extend right") { moveImpl(it, HJCharMovementKind.HORIZONTAL, HJDirection.FORWARD, true) },
+            HJAction("extend_line_up", "Extend up") { moveImpl(it, HJCharMovementKind.VERTICAL, HJDirection.BACKWARD, true) },
+            HJAction("extend_line_down", "Extend down") { moveImpl(it, HJCharMovementKind.VERTICAL, HJDirection.FORWARD, true) },
+            HJAction("extend_visual_line_up", "Extend up") { moveImpl(it, HJCharMovementKind.VERTICAL_VISUAL, HJDirection.BACKWARD, true) },
+            HJAction("extend_visual_line_down", "Extend down") { moveImpl(it, HJCharMovementKind.VERTICAL_VISUAL, HJDirection.FORWARD, true) },
+            HJAction("copy_selection_on_next_line", "Copy selection on next line") { copySelectionOnLine(it, HJDirection.FORWARD) },
+            HJAction("copy_selection_on_prev_line", "Copy selection on previous line") { copySelectionOnLine(it, HJDirection.BACKWARD) },
             HJAction("move_next_word_start", "Move to start of next word") { moveWordImpl(it, HJWordMotionTarget.NEXT_WORD_START, false) },
             HJAction("move_prev_word_start", "Move to start of previous word") { moveWordImpl(it, HJWordMotionTarget.PREV_WORD_START, false) },
             HJAction("move_next_word_end", "Move to end of next word") { moveWordImpl(it, HJWordMotionTarget.NEXT_WORD_END, false) },
@@ -88,23 +88,23 @@ object HJActions {
             HJAction("extend_prev_sub_word_end", "Extend to end of prev sub word") { moveWordImpl(it, HJWordMotionTarget.PREV_SUB_WORD_END, true) },
             HJAction("extend_parent_node_end", "Extend to end of the parent node"),
             HJAction("extend_parent_node_start", "Extend to beginning of the parent node"),
-            HJAction("find_till_char", "Move till next occurrence of char") { findChar(it,  HJMovementDirection.FORWARD, false, false) },
-            HJAction("find_next_char", "Move to next occurrence of char") { findChar(it,  HJMovementDirection.FORWARD, true, false) },
-            HJAction("extend_till_char", "Extend till next occurrence of char") { findChar(it,  HJMovementDirection.FORWARD, false, true) },
-            HJAction("extend_next_char", "Extend to next occurrence of char") { findChar(it,  HJMovementDirection.FORWARD, true, true) },
-            HJAction("till_prev_char", "Move till previous occurrence of char") { findChar(it,  HJMovementDirection.BACKWARD, false, false) },
-            HJAction("find_prev_char", "Move to previous occurrence of char") { findChar(it,  HJMovementDirection.BACKWARD, true, false) },
-            HJAction("extend_till_prev_char", "Extend till previous occurrence of char") { findChar(it,  HJMovementDirection.BACKWARD, false, true) },
-            HJAction("extend_prev_char", "Extend to previous occurrence of char") { findChar(it,  HJMovementDirection.BACKWARD, true, true) },
+            HJAction("find_till_char", "Move till next occurrence of char") { findChar(it,  HJDirection.FORWARD, false, false) },
+            HJAction("find_next_char", "Move to next occurrence of char") { findChar(it,  HJDirection.FORWARD, true, false) },
+            HJAction("extend_till_char", "Extend till next occurrence of char") { findChar(it,  HJDirection.FORWARD, false, true) },
+            HJAction("extend_next_char", "Extend to next occurrence of char") { findChar(it,  HJDirection.FORWARD, true, true) },
+            HJAction("till_prev_char", "Move till previous occurrence of char") { findChar(it,  HJDirection.BACKWARD, false, false) },
+            HJAction("find_prev_char", "Move to previous occurrence of char") { findChar(it,  HJDirection.BACKWARD, true, false) },
+            HJAction("extend_till_prev_char", "Extend till previous occurrence of char") { findChar(it,  HJDirection.BACKWARD, false, true) },
+            HJAction("extend_prev_char", "Extend to previous occurrence of char") { findChar(it,  HJDirection.BACKWARD, true, true) },
             HJAction("repeat_last_motion", "Repeat last motion") { it.hjEditor.repeatLastMotion(1) },
             HJAction("replace", "Replace with new char") { replace(it) },
             HJAction("switch_case", "Switch (toggle) case") { switchCaseImpl(it) { s -> s.map { c -> if (c.isLowerCase()) {c.uppercase()} else if (c.isUpperCase()) {c.lowercase()} else {c} }.joinToString(separator = "") } },
             HJAction("switch_to_uppercase", "Switch to uppercase") { switchCaseImpl(it) { s -> s.uppercase() } },
             HJAction("switch_to_lowercase", "Switch to lowercase") { switchCaseImpl(it) { s -> s.lowercase() } },
-            HJAction("page_up", "Move page up") { scrollPageImpl(it, 1.0f, HJMovementDirection.BACKWARD) },
-            HJAction("page_down", "Move page down") { scrollPageImpl(it, 1.0f, HJMovementDirection.FORWARD) },
-            HJAction("half_page_up", "Move half page up") { scrollPageImpl(it, 0.5f, HJMovementDirection.BACKWARD) },
-            HJAction("half_page_down", "Move half page down") { scrollPageImpl(it, 0.5f, HJMovementDirection.FORWARD) },
+            HJAction("page_up", "Move page up") { scrollPageImpl(it, 1.0f, HJDirection.BACKWARD) },
+            HJAction("page_down", "Move page down") { scrollPageImpl(it, 1.0f, HJDirection.FORWARD) },
+            HJAction("half_page_up", "Move half page up") { scrollPageImpl(it, 0.5f, HJDirection.BACKWARD) },
+            HJAction("half_page_down", "Move half page down") { scrollPageImpl(it, 0.5f, HJDirection.FORWARD) },
             HJAction("page_cursor_up", "Move page and cursor up"),
             HJAction("page_cursor_down", "Move page and cursor down"),
             HJAction("page_cursor_half_up", "Move page and cursor half up"),
@@ -236,35 +236,36 @@ object HJActions {
             HJAction("yank_joined", "Join and yank selections"),
             HJAction("yank_joined_to_clipboard", "Join and yank selections to clipboard"),
             HJAction("yank_main_selection_to_clipboard", "Yank main selection to clipboard"),
-            HJAction("yank_main_selection_to_primary_clipboard", "Join and yank selections to primary clipboard"),
-            HJAction("replace_with_yanked", "Yank main selection to primary clipboard"),
-            HJAction("replace_selections_with_clipboard", "Replace with yanked text"),
-            HJAction("replace_selections_with_primary_clipboard", "Replace selections by clipboard content"),
-            HJAction("paste_after", "Replace selections by primary clipboard") { pasteImpl(it, false) },
-            HJAction("paste_before", "Paste after selection") { pasteImpl(it, true) },
-            HJAction("paste_clipboard_after", "Paste before selection") { pasteImpl(it.copy(register = HJRegister.Clipboard), false) },
-            HJAction("paste_clipboard_before", "Paste clipboard after selections") { pasteImpl(it.copy(register = HJRegister.Clipboard), true) },
-            HJAction("paste_primary_clipboard_after", "Paste clipboard before selections"),
-            HJAction("paste_primary_clipboard_before", "Paste primary clipboard after selections"),
-            HJAction("indent", "Paste primary clipboard before selections"),
-            HJAction("unindent", "Indent selection"),
-            HJAction("format_selections", "Unindent selection"),
-            HJAction("join_selections", "Format selection"),
-            HJAction("join_selections_space", "Join lines inside selection"),
-            HJAction("keep_selections", "Join lines inside selection and select spaces"),
-            HJAction("remove_selections", "Keep selections matching regex"),
-            HJAction("align_selections", "Remove selections matching regex"),
-            HJAction("keep_primary_selection", "Align selections in column") { keepPrimarySelection(it) },
-            HJAction("remove_primary_selection", "Keep primary selection"),
-            HJAction("completion", "Remove primary selection"),
-            HJAction("hover", "Invoke completion popup") { executeIdeAction(it, "ShowHoverInfo") },
-            HJAction("toggle_comments", "Show docs for item under cursor"),
-            HJAction("toggle_line_comments", "Comment/uncomment selections"),
-            HJAction("toggle_block_comments", "Line comment/uncomment selections"),
-            HJAction("rotate_selections_forward", "Block comment/uncomment selections"),
-            HJAction("rotate_selections_backward", "Rotate selections forward"),
-            HJAction("rotate_selection_contents_forward", "Rotate selections backward"),
-            HJAction("rotate_selection_contents_backward", "Rotate selection contents forward"),
+            HJAction("yank_joined_to_primary_clipboard", "Join and yank selections to primary clipboard"),
+            HJAction("yank_main_selection_to_primary_clipboard", "Yank main selection to primary clipboard"),
+            HJAction("replace_with_yanked", "Replace with yanked text"),
+            HJAction("replace_selections_with_clipboard", "Replace selections by clipboard content"),
+            HJAction("replace_selections_with_primary_clipboard", "Replace selections by primary clipboard"),
+            HJAction("paste_after", "Paste after selection") { pasteImpl(it, false) },
+            HJAction("paste_before", "Paste before selection") { pasteImpl(it, true) },
+            HJAction("paste_clipboard_after", "Paste clipboard after selections") { pasteImpl(it.copy(register = HJRegister.Clipboard), false) },
+            HJAction("paste_clipboard_before", "Paste clipboard before selections") { pasteImpl(it.copy(register = HJRegister.Clipboard), true) },
+            HJAction("paste_primary_clipboard_after", "Paste primary clipboard after selections"),
+            HJAction("paste_primary_clipboard_before", "Paste primary clipboard before selections"),
+            HJAction("indent", "Indent selection") { executeIdeAction(it, IdeActions.ACTION_EDITOR_INDENT_SELECTION) },
+            HJAction("unindent", "Unindent selection") { executeIdeAction(it, IdeActions.ACTION_EDITOR_UNINDENT_SELECTION) },
+            HJAction("format_selections", "Format selection") { executeIdeAction(it, IdeActions.ACTION_EDITOR_REFORMAT)}, // TODO: only format selected?
+            HJAction("join_selections", "Join lines inside selection"),
+            HJAction("join_selections_space", "Join lines inside selection and select spaces"),
+            HJAction("keep_selections", "Keep selections matching regex"),
+            HJAction("remove_selections", "Remove selections matching regex"),
+            HJAction("align_selections", "Align selections in column"),
+            HJAction("keep_primary_selection", "Keep primary selection") { keepPrimarySelection(it) },
+            HJAction("remove_primary_selection", "Remove primary selection"),
+            HJAction("completion", "Invoke completion popup"),
+            HJAction("hover", "Show docs for item under cursor") { executeIdeAction(it, "ShowHoverInfo") },
+            HJAction("toggle_comments", "Comment/uncomment selections"),
+            HJAction("toggle_line_comments", "Line comment/uncomment selections"),
+            HJAction("toggle_block_comments", "Block comment/uncomment selections"),
+            HJAction("rotate_selections_forward", "Rotate selections forward"),
+            HJAction("rotate_selections_backward", "Rotate selections backward"),
+            HJAction("rotate_selection_contents_forward", "Rotate selection contents forward"),
+            HJAction("rotate_selection_contents_backward", "Rotate selection contents backward"),
             HJAction("reverse_selection_contents", "Reverse selections contents"),
             HJAction("expand_selection", "Expand selection to parent syntax node"),
             HJAction("shrink_selection", "Shrink selection to previously expanded syntax node"),
@@ -301,10 +302,10 @@ object HJActions {
             HJAction("align_view_bottom", "Align view bottom"),
             HJAction("scroll_up", "Scroll view up"),
             HJAction("scroll_down", "Scroll view down"),
-            HJAction("match_brackets", "Goto matching bracket"),
-            HJAction("surround_add", "Surround add"),
-            HJAction("surround_replace", "Surround replace"),
-            HJAction("surround_delete", "Surround delete"),
+            HJAction("match_brackets", "Goto matching bracket") { matchBrackets(it) },
+            HJAction("surround_add", "Surround add") { surroundAdd(it) },
+            HJAction("surround_replace", "Surround replace") { surroundReplace(it) },
+            HJAction("surround_delete", "Surround delete") { surroundDelete(it) },
             HJAction("select_textobject_around", "Select around object"),
             HJAction("select_textobject_inner", "Select inside object"),
             HJAction("goto_next_function", "Goto next function"),
@@ -383,7 +384,7 @@ object HJActions {
 private fun moveImpl(
     cx: HJActionContext,
     charMovement: HJCharMovementKind,
-    direction: HJMovementDirection,
+    direction: HJDirection,
     extend: Boolean,
 ) {
     val selection = cx.hjEditor.selection.clone().transform { range ->
@@ -515,7 +516,7 @@ private fun executeIdeAction(cx: HJActionContext, actionId: String) {
     }
 }
 
-private fun findChar(cx: HJActionContext, direction: HJMovementDirection, inclusive: Boolean, extend: Boolean) {
+private fun findChar(cx: HJActionContext, direction: HJDirection, inclusive: Boolean, extend: Boolean) {
     HJInputHandler.onNextKey { key: HJInputKey ->
         val motion = if (key is HJInputKey.Character || (
                     key is HJInputKey.Other && (key.code == KeyEvent.VK_ENTER || key.code == KeyEvent.VK_TAB))
@@ -535,10 +536,10 @@ private fun findChar(cx: HJActionContext, direction: HJMovementDirection, inclus
 
                     // exclusive search skips the next char after cursor to enable repeated application
                     val searchStartPos = when (Pair(inclusive, direction)) {
-                        Pair(true, HJMovementDirection.FORWARD) -> cursorHead
-                        Pair(true, HJMovementDirection.BACKWARD) -> cursorAnchor
-                        Pair(false, HJMovementDirection.FORWARD) -> cursorHead + 1
-                        Pair(false, HJMovementDirection.BACKWARD) -> cursorAnchor - 1
+                        Pair(true, HJDirection.FORWARD) -> cursorHead
+                        Pair(true, HJDirection.BACKWARD) -> cursorAnchor
+                        Pair(false, HJDirection.FORWARD) -> cursorHead + 1
+                        Pair(false, HJDirection.BACKWARD) -> cursorAnchor - 1
                         else -> { // Should never happen
                             HJActions.logger.error("Impossible condition")
                             0
@@ -555,10 +556,10 @@ private fun findChar(cx: HJActionContext, direction: HJMovementDirection, inclus
                     if (pos != null) {
                         // exclusive search should stop on previous character
                         pos = when (Pair(inclusive, direction)) {
-                            Pair(true, HJMovementDirection.FORWARD) -> pos
-                            Pair(true, HJMovementDirection.BACKWARD) -> pos
-                            Pair(false, HJMovementDirection.FORWARD) -> pos - 1
-                            Pair(false, HJMovementDirection.BACKWARD) -> pos + 1
+                            Pair(true, HJDirection.FORWARD) -> pos
+                            Pair(true, HJDirection.BACKWARD) -> pos
+                            Pair(false, HJDirection.FORWARD) -> pos - 1
+                            Pair(false, HJDirection.BACKWARD) -> pos + 1
                             else -> { // Should never happen
                                 HJActions.logger.error("Impossible condition")
                                 0
@@ -608,7 +609,7 @@ private fun replace(cx: HJActionContext) {
     }
 }
 
-private fun copySelectionOnLine(cx: HJActionContext, direction: HJMovementDirection) {
+private fun copySelectionOnLine(cx: HJActionContext, direction: HJDirection) {
     val editor = cx.hjEditor.editor
     val doc = cx.hjEditor.editor.document
 
@@ -642,12 +643,12 @@ private fun copySelectionOnLine(cx: HJActionContext, direction: HJMovementDirect
             val offset = (i + 1) * height
 
             val anchorRow = when (direction) {
-                HJMovementDirection.FORWARD -> anchorPos.line + offset
-                HJMovementDirection.BACKWARD -> (anchorPos.line - offset).coerceAtLeast(0)
+                HJDirection.FORWARD -> anchorPos.line + offset
+                HJDirection.BACKWARD -> (anchorPos.line - offset).coerceAtLeast(0)
             }
             val headRow = when (direction) {
-                HJMovementDirection.FORWARD -> headPos.line + offset
-                HJMovementDirection.BACKWARD -> (headPos.line - offset).coerceAtLeast(0)
+                HJDirection.FORWARD -> headPos.line + offset
+                HJDirection.BACKWARD -> (headPos.line - offset).coerceAtLeast(0)
             }
 
             if (anchorRow >= doc.lineCount || headRow >= doc.lineCount)
@@ -695,7 +696,7 @@ private fun switchCaseImpl(cx: HJActionContext, switchFun: (String) -> String) {
     switchToMode(cx, HJEditorMode.NORMAL)
 }
 
-private fun scrollPageImpl(cx: HJActionContext, multiplier: Float, direction: HJMovementDirection) {
+private fun scrollPageImpl(cx: HJActionContext, multiplier: Float, direction: HJDirection) {
     val scrollModel = cx.hjEditor.editor.scrollingModel
     val area = scrollModel.visibleArea
     val deltaOffset = (area.height * multiplier).toInt()
@@ -769,7 +770,7 @@ private fun splitSelectionOnNewline(cx: HJActionContext) {
 }
 
 private fun extendLine(cx: HJActionContext) {
-    val below = cx.hjEditor.selection.primary.direction == HJMovementDirection.FORWARD
+    val below = cx.hjEditor.selection.primary.direction == HJDirection.FORWARD
     extendImpl(cx, below)
 }
 
@@ -1002,4 +1003,120 @@ private fun open(cx: HJActionContext, openBelow: Boolean, commentContinuationEna
 
     transaction = transaction.copy(selection = HJSelection(ranges, cx.hjEditor.selection.primaryIndex))
     cx.hjEditor.apply(transaction)
+}
+
+private fun matchBrackets(cx: HJActionContext) {
+    val isSelection = HJState.mode == HJEditorMode.SELECT
+    val ast = cx.hjEditor.ast
+
+    val selection = cx.hjEditor.selection.clone().transform { range ->
+        val pos = range.cursor
+
+        val matchedPos = if (ast == null) HJMatchBrackets.findMatchingBracketPlaintext(cx.doc.text, pos)
+        else HJMatchBrackets.findMatchingBracketFuzzy(ast, cx.doc, pos)
+
+        if (matchedPos != null) range.putCursor(cx.doc, matchedPos, isSelection)
+        else range
+    }
+
+    cx.hjEditor.setNewSelection(selection)
+}
+
+private fun surroundAdd(cx: HJActionContext) {
+    HJInputHandler.onNextKey { inputKey ->
+        val (open, close, surroundLen) = when (inputKey) {
+            is HJInputKey.Character -> {
+                val (o, c) = HJMatchBrackets.getPair(inputKey.char)
+                Triple(o.toString(), c.toString(), 2)
+            }
+
+            is HJInputKey.Other if inputKey.code == KeyEvent.VK_ENTER -> Triple("\n", "\n", 2)
+            else -> return@onNextKey
+        }
+
+        val selection = cx.hjEditor.selection
+        val changes = mutableListOf<HJChange>()
+        val ranges = mutableListOf<HJRange>()
+        var offs = 0
+
+        for (range in selection.ranges) {
+            changes.add(HJChange.Insert(range.from, open))
+            changes.add(HJChange.Insert(range.to, close))
+
+            ranges.add(HJRange(offs + range.from, offs + range.to + surroundLen).withDirection(range.direction))
+
+            offs += surroundLen
+        }
+
+        val transaction = HJTransaction(changes, HJSelection(ranges, selection.primaryIndex))
+        cx.hjEditor.apply(transaction)
+        switchToMode(cx, HJEditorMode.NORMAL)
+    }
+}
+
+private fun surroundReplace(cx: HJActionContext) {
+    HJInputHandler.onNextKey { inputKey ->
+        val surroundCh = when (inputKey) {
+            is HJInputKey.Character if inputKey.char == 'm' -> null
+            is HJInputKey.Character -> inputKey.char
+            is HJInputKey.Other if inputKey.code == KeyEvent.VK_SPACE -> ' '
+            is HJInputKey.Other if inputKey.code == KeyEvent.VK_ENTER -> '\n'
+            else -> return@onNextKey
+        }
+        val ast = cx.hjEditor.ast
+
+        val changePos =
+            HJSurround.getSurroundPos(ast, cx.doc, cx.hjEditor.selection, surroundCh, cx.count) ?: return@onNextKey
+        val selection = cx.hjEditor.selection.clone()
+        val ranges = changePos.map { p -> HJRange.point(p) }
+        cx.hjEditor.setNewSelection(HJSelection(ranges, selection.primaryIndex * 2))
+
+        HJInputHandler.onNextKey { inputKey ->
+            val to = when (inputKey) {
+                is HJInputKey.Character -> inputKey.char
+                is HJInputKey.Other if inputKey.code == KeyEvent.VK_SPACE -> ' '
+                is HJInputKey.Other if inputKey.code == KeyEvent.VK_ENTER -> '\n'
+                else -> {
+                    cx.hjEditor.setNewSelection(selection)
+                    return@onNextKey
+                }
+            }
+            val (open, close) = HJMatchBrackets.getPair(to)
+
+            // the changeset has to be sorted to allow nested surrounds TODO: Is this needed? Since apply sorts anyway
+            val sortedPos = mutableListOf<Pair<Int, Char>>()
+            for (p in changePos.chunked(2)) {
+                sortedPos.add(Pair(p[0], open))
+                sortedPos.add(Pair(p[1], close))
+            }
+            sortedPos.sortBy { (i, _) -> i }
+
+            val transaction = HJTransaction(sortedPos.map { pos ->
+                HJChange.Replace(pos.first, pos.first + 1, pos.second.toString())
+            })
+            cx.hjEditor.setNewSelection(selection)
+            cx.hjEditor.apply(transaction)
+            switchToMode(cx, HJEditorMode.NORMAL)
+        }
+    }
+}
+
+private fun surroundDelete(cx: HJActionContext) {
+    HJInputHandler.onNextKey { inputKey ->
+        val surroundCh = when (inputKey) {
+            is HJInputKey.Character if inputKey.char == 'm' -> null
+            is HJInputKey.Character -> inputKey.char
+            is HJInputKey.Other if inputKey.code == KeyEvent.VK_SPACE -> ' '
+            is HJInputKey.Other if inputKey.code == KeyEvent.VK_ENTER -> '\n'
+            else -> return@onNextKey
+        }
+        val ast = cx.hjEditor.ast
+
+        val changePos =
+            HJSurround.getSurroundPos(ast, cx.doc, cx.hjEditor.selection, surroundCh, cx.count) ?: return@onNextKey
+
+        val transaction = HJTransaction(changePos.map { HJChange.Delete(it, it + 1) })
+        cx.hjEditor.apply(transaction)
+        switchToMode(cx, HJEditorMode.NORMAL)
+    }
 }

@@ -14,6 +14,7 @@ import spacewaiker.helixjet.input.HJInputHandler.minorModeName
 import spacewaiker.helixjet.input.HJInputHandler.onNextKeyCallback
 import spacewaiker.helixjet.input.HJInputHandler.pendingActionKey
 import spacewaiker.helixjet.ui.HJStatusBarInputWidget
+import java.util.*
 import kotlin.math.max
 
 /**
@@ -27,7 +28,7 @@ import kotlin.math.max
  */
 object HJInputHandler {
     private val logger = Logger.getInstance(this::class.java)
-    private var onNextKeyCallback: ((HJInputKey) -> Unit)? = null
+    private val onNextKeyCallback: Queue<((HJInputKey) -> Unit)> = LinkedList()
     private var lastKey: HJInputKey? = null
     var pendingActionKey: String? = null
         private set
@@ -49,10 +50,10 @@ object HJInputHandler {
         lastKey = key
 
         // if there is a callback set for the next key, execute it instead of normal key handling
-        if (onNextKeyCallback != null) {
-            onNextKeyCallback?.invoke(key)
-            onNextKeyCallback = null
+        if (onNextKeyCallback.isNotEmpty()) {
+            onNextKeyCallback.remove().invoke(key)
             pendingActionKey = null
+            minorModeName = null
             updateInputWidget()
             return true
         }
@@ -96,13 +97,17 @@ object HJInputHandler {
 
             is HJKeyAction.HJAction -> {
                 minorModeMapping = null
-                pendingActionKey = null
-                minorModeName = null
-                updateInputWidget()
 
                 val hjEditor = HJState.getHJEditor(editor)
                 val cx = HJActionContext(hjEditor, count, null)
                 keyAction.execute(cx)
+
+                // if action sets onNextKeyCallback, do not clear pending action key and minor mode name
+                if (onNextKeyCallback.isEmpty()) {
+                    pendingActionKey = null
+                    minorModeName = null
+                }
+                updateInputWidget()
             }
 
             is HJKeyAction.HJMinorMode -> {
@@ -126,13 +131,10 @@ object HJInputHandler {
      * Also sets last pressed key as "pending key" indicator in widget.
      */
     fun onNextKey(callback: (HJInputKey) -> Unit) {
-        if (onNextKeyCallback != null)
-            logger.warn("onNextKeyCallback already defined, replacing with new value")
-
-        onNextKeyCallback = callback
+        onNextKeyCallback.add(callback)
 
         lastKey?.let {
-            pendingActionKey = it.toString()
+            pendingActionKey += it.toString()
             updateInputWidget()
         }
     }

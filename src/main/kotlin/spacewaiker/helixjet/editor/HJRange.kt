@@ -3,7 +3,7 @@
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.util.TextRange
-import spacewaiker.helixjet.actions.HJMovementDirection
+import spacewaiker.helixjet.actions.HJDirection
 import spacewaiker.helixjet.actions.nextGraphemeBoundary
 import spacewaiker.helixjet.actions.prevGraphemeBoundary
 import kotlin.math.max
@@ -40,9 +40,9 @@ class HJRange {
 
     val direction
         get() = if (head < anchor) {
-            HJMovementDirection.BACKWARD
+            HJDirection.BACKWARD
         } else {
-            HJMovementDirection.FORWARD
+            HJDirection.FORWARD
         }
 
     /**
@@ -74,6 +74,11 @@ class HJRange {
     }
 
     fun flip() = HJRange(head, anchor, oldVisualPosition)
+
+    /**
+     * Returns the selection if it goes in the direction provided, flipping the selection otherwise
+     */
+    fun withDirection(direction: HJDirection) = if (this.direction == direction) this else this.flip()
 
     /**
      * Puts the left side of the block cursor at `char_idx`, optionally extending.
