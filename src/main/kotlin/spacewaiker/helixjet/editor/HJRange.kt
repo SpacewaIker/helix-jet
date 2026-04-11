@@ -1,7 +1,7 @@
 ﻿package spacewaiker.helixjet.editor
 
+import com.intellij.openapi.editor.Caret
 import com.intellij.openapi.editor.Document
-import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.util.TextRange
 import spacewaiker.helixjet.actions.HJDirection
 import spacewaiker.helixjet.actions.nextGraphemeBoundary
@@ -61,10 +61,10 @@ class HJRange {
         this.oldVisualPosition = oldVisualPosition
     }
 
-    constructor(editor: Editor) {
-        val selectionStart = editor.selectionModel.selectionStart
-        val selectionEnd = editor.selectionModel.selectionEnd
-        if (editor.caretModel.offset == selectionStart) {
+    constructor(caret: Caret) {
+        val selectionStart = caret.selectionStart
+        val selectionEnd = caret.selectionEnd
+        if (caret.offset == selectionStart) {
             this.head = selectionStart
             this.anchor = selectionEnd
         } else {

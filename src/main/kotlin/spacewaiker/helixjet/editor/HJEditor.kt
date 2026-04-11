@@ -49,7 +49,7 @@ class HJEditor {
 
     constructor(editor: Editor) {
         this.editor = editor
-        this.selection = HJSelection(HJRange(editor))
+        this.selection = HJSelection(editor.caretModel)
 
         editor.settings.verticalScrollOffset = HJState.config.scrolloff
     }
@@ -117,7 +117,7 @@ class HJEditor {
 
     fun changeBySelectionIndexed(f: (Int, HJRange) -> HJChange?): HJTransaction {
         val changes = selection.ranges.mapIndexedNotNull(f)
-        return HJTransaction(changes, selection)
+        return HJTransaction(changes)
     }
 
     fun apply(transaction: HJTransaction) {
@@ -141,7 +141,7 @@ class HJEditor {
                 }
             }
         }
-        val selection = transaction.selection ?: this.selection
+        val selection = transaction.selection ?: HJSelection(editor.caretModel)
         setNewSelection(selection)
     }
 

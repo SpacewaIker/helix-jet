@@ -27,6 +27,9 @@ sealed class HJInputKey(
 
     override fun toString(): String {
         val keyString = when (this) {
+            is Character if char == '-' -> "minus"
+            is Character if char == '<' -> "lt"
+            is Character if char == '>' -> "gt"
             is Character -> char.toString()
             is Other -> when (code) {
                 KeyEvent.VK_ESCAPE -> "esc"
@@ -53,7 +56,7 @@ sealed class HJInputKey(
             if (alt) string += "A-"
             if (shift) string += "S-"
             "$string$keyString>"
-        } else if (this is Other) {
+        } else if (keyString.length > 1) {
             "<$keyString>"
         } else {
             keyString
@@ -143,6 +146,9 @@ sealed class HJInputKey(
                 "tab" -> Other(KeyEvent.VK_TAB, shift, ctrl, alt)
                 "del" -> Other(KeyEvent.VK_DELETE, shift, ctrl, alt)
                 "ret" -> Other(KeyEvent.VK_ENTER, shift, ctrl, alt)
+                "minus" -> Character('-', ctrl, alt)
+                "gt" -> Character('>', ctrl, alt)
+                "lt" -> Character('<', ctrl, alt)
                 else if keyString.length == 1 -> Character(keyString[0], ctrl, alt)
                 else -> null
             }

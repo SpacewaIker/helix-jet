@@ -1,5 +1,6 @@
 ﻿package spacewaiker.helixjet.editor
 
+import com.intellij.openapi.editor.CaretModel
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.util.TextRange
 
@@ -30,6 +31,15 @@ class HJSelection {
     constructor(primaryRange: HJRange) {
         ranges.add(primaryRange)
         primaryIndex = 0
+    }
+
+    constructor(caretModel: CaretModel) {
+        this.primaryIndex = 0
+        this.ranges.addAll(caretModel.allCarets.withIndex().map { (i, caret) ->
+            if (caret == caretModel.primaryCaret) this.primaryIndex = i
+            HJRange(caret)
+        })
+        normalize()
     }
 
     fun clone(): HJSelection {
