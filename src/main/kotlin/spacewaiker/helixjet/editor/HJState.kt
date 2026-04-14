@@ -8,6 +8,7 @@ import spacewaiker.helixjet.editor.HJState.config
 import spacewaiker.helixjet.editor.HJState.focusedEditor
 import spacewaiker.helixjet.editor.HJState.mode
 import spacewaiker.helixjet.editor.HJState.typedHandlerBlock
+import spacewaiker.helixjet.ui.HJPrompt
 import java.awt.datatransfer.StringSelection
 
 enum class HJEditorMode {
@@ -27,9 +28,10 @@ object HJState {
     var mode: HJEditorMode = HJEditorMode.NORMAL
     var config: HJConfiguration = HJConfiguration()
     private val editors: MutableMap<Editor, HJEditor> = mutableMapOf()
-    private val registers: MutableMap<HJRegister, List<String>> = mutableMapOf()
+    private val registers: MutableMap<HJRegister, MutableList<String>> = mutableMapOf()
     val allRegisterContents get() = registers.toList()
     val allEditors get() = editors.keys
+    var activePrompt: HJPrompt? = null
 
     private var cachedFocusedEditor: Editor? = null
     val focusedEditor: Editor?
@@ -55,9 +57,13 @@ object HJState {
             if (register == HJRegister.Clipboard) {
                 CopyPasteManager.getInstance().setContents(StringSelection(it[0]))
             } else {
-                registers[register] = it
+                registers[register] = it.toMutableList()
             }
         }
+    }
+
+    fun pushRegister(register: HJRegister, value: String) {
+        registers[register]?.add(value)
     }
 
     fun getRegisterContents(register: HJRegister) =

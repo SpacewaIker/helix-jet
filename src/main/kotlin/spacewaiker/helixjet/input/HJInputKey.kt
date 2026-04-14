@@ -51,11 +51,11 @@ sealed class HJInputKey(
         }
 
         return if (shift || ctrl || alt) {
-            var string = "<"
-            if (ctrl) string += "C-"
-            if (alt) string += "A-"
-            if (shift) string += "S-"
-            "$string$keyString>"
+            val string = StringBuilder("<")
+            if (ctrl) string.append("C-")
+            if (alt) string.append("A-")
+            if (shift) string.append("S-")
+            string.append(keyString).append('>').toString()
         } else if (keyString.length > 1) {
             "<$keyString>"
         } else {

@@ -11,7 +11,7 @@ import spacewaiker.helixjet.input.HJInputKey
  * @property doc A documentation string for the key action
  */
 sealed class HJKeyAction(val name: String, val doc: String) {
-    class HJAction(
+    open class HJAction(
         name: String,
         doc: String = "",
         private val action: ((HJActionContext) -> Unit)? = null,

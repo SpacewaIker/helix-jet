@@ -44,6 +44,9 @@ class HJMouseListener : EditorMouseListener {
 
         val selection = HJSelection(HJRange(anchor, head))
         HJState.getHJEditor(editor).setNewSelection(selection)
+
+        // set focus back to HJPrompt, if applicable
+        HJState.activePrompt?.requestFocus()
     }
 
     override fun mouseEntered(event: EditorMouseEvent) {}

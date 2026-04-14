@@ -3,6 +3,8 @@
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.editor.colors.EditorFontType
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.ex.FileEditorManagerEx
 import spacewaiker.helixjet.editor.HJRegister
 import spacewaiker.helixjet.editor.HJState
 import java.awt.BorderLayout
@@ -63,6 +65,8 @@ class HJPrompt(
     prompt: String = ":",
     historyRegister: HJRegister? = null,
 ) {
+    private val editorsComponent = (FileEditorManager.getInstance(editor.project!!) as FileEditorManagerEx).splitters
+
     private val promptCmp = JLabel(prompt).apply {
         font = editor.colorsScheme.getFont(EditorFontType.PLAIN)
         border = BorderFactory.createEmptyBorder(2, 2, 2, 0)
@@ -85,17 +89,22 @@ class HJPrompt(
     }
 
     fun show() {
-        val editorComponent = editor.component
-        editorComponent.add(panel, BorderLayout.SOUTH)
-        editorComponent.revalidate()
+        editorsComponent.add(panel, BorderLayout.SOUTH)
+        editorsComponent.revalidate()
+        editorsComponent.repaint()
         textField.requestFocusInWindow()
+        HJState.activePrompt = this
     }
 
     fun hide() {
-        val editorComponent = editor.component
-        editorComponent.remove(panel)
-        editorComponent.revalidate()
-        editorComponent.repaint()
+        editorsComponent.remove(panel)
+        editorsComponent.revalidate()
+        editorsComponent.repaint()
         editor.contentComponent.requestFocusInWindow()
+        HJState.activePrompt = null
+    }
+
+    fun requestFocus() {
+        textField.requestFocusInWindow()
     }
 }
