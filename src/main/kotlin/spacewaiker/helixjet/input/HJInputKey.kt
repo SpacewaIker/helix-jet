@@ -25,7 +25,7 @@ sealed class HJInputKey(
      */
     class Other(val code: Int, shift: Boolean, ctrl: Boolean, alt: Boolean) : HJInputKey(shift, ctrl, alt)
 
-    override fun toString(): String {
+    fun toString(withBracket: Boolean): String {
         val keyString = when (this) {
             is Character if char == '-' -> "minus"
             is Character if char == '<' -> "lt"
@@ -51,17 +51,22 @@ sealed class HJInputKey(
         }
 
         return if (shift || ctrl || alt) {
-            val string = StringBuilder("<")
+            val string = StringBuilder()
+            if (withBracket) string.append("<")
             if (ctrl) string.append("C-")
             if (alt) string.append("A-")
             if (shift) string.append("S-")
-            string.append(keyString).append('>').toString()
-        } else if (keyString.length > 1) {
+            string.append(keyString)
+            if (withBracket) string.append('>')
+            string.toString()
+        } else if (keyString.length > 1 && withBracket) {
             "<$keyString>"
         } else {
             keyString
         }
     }
+
+    override fun toString() = toString(true)
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

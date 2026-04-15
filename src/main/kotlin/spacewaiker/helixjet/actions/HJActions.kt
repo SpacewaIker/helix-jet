@@ -369,8 +369,6 @@ private val actionsRaw = arrayOf(
     HJAction("goto_prev_tabstop", "Goto next snippet placeholder"),
     HJAction("rotate_selections_first", "Make the first selection your primary one"),
     HJAction("rotate_selections_last", "Make the last selection your primary one"),
-    // non-helix action
-    HJAction("debug") { println(it.doc.getLineEndOffset(it.doc.getLineNumber(it.hjEditor.selection.primary.cursor))) }
 )
 // @formatter:on
 

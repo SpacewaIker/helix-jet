@@ -76,7 +76,6 @@ class HJCommandPopup(val editor: Editor) {
         return lineCount * lineHeight + 16
     }
 
-
     private fun getRootLayeredPane(): JLayeredPane? {
         return SwingUtilities.getRootPane(editorsComponent)?.layeredPane
     }

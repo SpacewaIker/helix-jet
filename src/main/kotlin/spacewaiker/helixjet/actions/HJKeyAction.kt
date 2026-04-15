@@ -31,7 +31,16 @@ sealed class HJKeyAction(val name: String, val doc: String) {
         doc: String,
         val mapping: MutableMap<HJInputKey, HJKeyAction>,
     ) : HJKeyAction(name, doc) {
+        val groupedMapping: List<Pair<HJKeyAction, List<HJInputKey>>>
+            get() {
+                val list = mutableMapOf<HJKeyAction, MutableList<HJInputKey>>()
 
+                for ((key, action) in mapping) {
+                    list.getOrPut(action, { mutableListOf() }).add(key)
+                }
+
+                return list.toList()
+            }
     }
 
     object HJPassthroughAction : HJKeyAction("Passthrough", "")

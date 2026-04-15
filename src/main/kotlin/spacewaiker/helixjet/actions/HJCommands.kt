@@ -51,7 +51,7 @@ object HJCommands {
     }
 }
 
-private val commandsRaw = arrayOf(
+private val helixCommands = arrayOf(
     HJCommand("write", listOf("w"), "Save current file") { cx, _, _ ->
         executeIdeAction(cx, "SaveDocument")
     },
@@ -61,9 +61,10 @@ private val commandsRaw = arrayOf(
     HJCommand("config-reload", listOf(), "Reload user config") { _, _, _ ->
         HJState.config = HJConfiguration()
     },
+)
 
-    // non-helix commands
-    HJCommand("test", listOf("t"), "") { _, args, flags ->
+private val debugCommands = arrayOf(
+    HJCommand("test", listOf("t"), "Test command. Prints all args and flags given.") { _, args, flags ->
         println("Test:")
         for (arg in args) {
             println("Arg: $arg")
@@ -73,3 +74,6 @@ private val commandsRaw = arrayOf(
         }
     }
 )
+
+private val commandsRaw =
+    if (System.getProperty("idea.plugin.in.sandbox.mode") == "true") helixCommands + debugCommands else helixCommands

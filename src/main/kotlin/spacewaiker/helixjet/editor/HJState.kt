@@ -8,6 +8,7 @@ import spacewaiker.helixjet.editor.HJState.config
 import spacewaiker.helixjet.editor.HJState.focusedEditor
 import spacewaiker.helixjet.editor.HJState.mode
 import spacewaiker.helixjet.editor.HJState.typedHandlerBlock
+import spacewaiker.helixjet.ui.HJMinorModeWidget
 import spacewaiker.helixjet.ui.HJPrompt
 import java.awt.datatransfer.StringSelection
 
@@ -32,6 +33,7 @@ object HJState {
     val allRegisterContents get() = registers.toList()
     val allEditors get() = editors.keys
     var activePrompt: HJPrompt? = null
+    var minorModeWidget: HJMinorModeWidget? = null
 
     private var cachedFocusedEditor: Editor? = null
     val focusedEditor: Editor?
