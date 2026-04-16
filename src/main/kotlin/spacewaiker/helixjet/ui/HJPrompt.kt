@@ -18,44 +18,74 @@ enum class HJPromptEvent {
 internal class HJPromptTextField(
     editor: Editor,
     private val onEvent: (HJPromptEvent, String?) -> Unit,
-    historyRegister: HJRegister?,
+    private val historyRegister: HJRegister?,
 ) : JTextField() {
-    private var historyString = ""
+    private var registerIndex = historyRegister?.let { HJState.getRegisterContents(it)?.size } ?: 0
+    private val historyEntry
+        get() = historyRegister?.let { HJState.getRegisterContents(it)?.getOrNull(registerIndex) } ?: ""
+    private val hint = historyRegister?.let { HJState.getRegisterContents(it)?.lastOrNull() } ?: ""
+    private var isHintShown = false
 
     init {
         font = editor.colorsScheme.getFont(EditorFontType.PLAIN) // monospace
         border = BorderFactory.createEmptyBorder(2, 0, 2, 2)
         background = EditorColorsManager.getInstance().globalScheme.defaultBackground
-
-        if (historyRegister != null) {
-            val contents = HJState.getRegisterContents(historyRegister)
-            if (contents != null) {
-                historyString = contents[0]
-            }
-        }
-        text = historyString
+        resetHint()
+        if (isHintShown) onEvent(HJPromptEvent.Update, text)
     }
 
     override fun processKeyEvent(e: KeyEvent) {
+        // this needs to be handled in a special way because it only sends KeyReleased events
+        if (e.keyCode == KeyEvent.VK_BACK_SPACE) {
+            if (text.isEmpty()) {
+                resetHint()
+                // I believe helix wouldn't send an update here, but I don't see why not...
+            }
+            onEvent(HJPromptEvent.Update, text)
+            return
+        }
+
+        // below we also check for event ID because different keys use different key events. however, if we don't
+        // check for these at all, we get duplicate events and send onEvent twice for some keys...
         when (e.keyCode) {
-            KeyEvent.VK_ENTER -> {
+            KeyEvent.VK_ENTER if e.id == KeyEvent.KEY_PRESSED -> {
+                historyRegister?.let { HJState.pushRegister(it, text) }
                 onEvent(HJPromptEvent.Validate, text)
             }
 
-            KeyEvent.VK_ESCAPE -> {
+            KeyEvent.VK_ESCAPE if e.id == KeyEvent.KEY_PRESSED -> {
                 onEvent(HJPromptEvent.Abort, null)
             }
 
-            KeyEvent.VK_BACK_SPACE if text.isEmpty() -> {
-                text = historyString
-                onEvent(HJPromptEvent.Update, text)
+            KeyEvent.VK_UP if e.id == KeyEvent.KEY_PRESSED -> {
+                registerIndex = (registerIndex - 1).coerceAtLeast(0)
+                text = historyEntry
             }
 
-            else -> {
+            KeyEvent.VK_DOWN if e.id == KeyEvent.KEY_PRESSED -> {
+                registerIndex = (registerIndex + 1).coerceAtMost(historyEntry.length)
+                text = historyEntry
+            }
+
+            else if e.id == KeyEvent.KEY_TYPED -> {
+                // not key released because otherwise this triggers when the key used to create this prompt is released
+                if (isHintShown) {
+                    text = ""
+                    isHintShown = false
+                }
                 super.processKeyEvent(e)
                 onEvent(HJPromptEvent.Update, text)
             }
+
+            else -> {}
         }
+    }
+
+    fun resetHint() {
+        if (hint.isEmpty()) return
+        isHintShown = true
+        text = hint
+        caretPosition = 0
     }
 }
 
@@ -71,8 +101,7 @@ class HJPrompt(
         font = editor.colorsScheme.getFont(EditorFontType.PLAIN)
         border = BorderFactory.createEmptyBorder(2, 2, 2, 0)
     }
-    private val textField =
-        HJPromptTextField(editor, ::onEventInternal, historyRegister)
+    private val textField = HJPromptTextField(editor, ::onEventInternal, historyRegister)
 
     private val panel = JPanel(BorderLayout()).apply {
         add(promptCmp, BorderLayout.WEST)

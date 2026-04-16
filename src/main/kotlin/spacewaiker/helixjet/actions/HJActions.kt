@@ -225,15 +225,15 @@ private val actionsRaw = arrayOf(
     HJAction("extend_to_line_end", "Extend to line end") { gotoLineStartEndImpl(it, false, true) },
     HJAction("extend_to_line_end_newline", "Extend to line end") { gotoLineEndNewlineImpl(it, true) },
     HJAction("signature_help", "Show signature help"),
-    HJAction("smart_tab", "Insert tab if all cursors have all whitespace to their left; otherwise") { cx -> executeIdeAction(cx, IdeActions.ACTION_EDITOR_TAB) },
+    HJAction("smart_tab", "Insert tab if all cursors have all whitespace to their left; otherwise") { executeIdeAction(it, IdeActions.ACTION_EDITOR_TAB); it.hjEditor.setNewSelection(HJSelection(it.hjEditor.editor.caretModel)) },
     HJAction("insert_tab", "Insert tab char"),
-    HJAction("insert_newline", "Insert newline char") { cx -> executeIdeAction(cx, IdeActions.ACTION_EDITOR_ENTER) },
+    HJAction("insert_newline", "Insert newline char") { executeIdeAction(it, IdeActions.ACTION_EDITOR_ENTER); it.hjEditor.setNewSelection(HJSelection(it.hjEditor.editor.caretModel)) },
     HJAction("insert_char_interactive", "Insert an interactively-chosen char"),
     HJAction("append_char_interactive", "Append an interactively-chosen char"),
-    HJAction("delete_char_backward", "Delete previous char") { cx -> executeIdeAction(cx, IdeActions.ACTION_EDITOR_BACKSPACE) },
-    HJAction("delete_char_forward", "Delete next char") { cx -> executeIdeAction(cx, IdeActions.ACTION_EDITOR_DELETE) },
-    HJAction("delete_word_backward", "Delete previous word") { cx -> executeIdeAction(cx, IdeActions.ACTION_EDITOR_DELETE_TO_WORD_START) },
-    HJAction("delete_word_forward", "Delete next word") { cx -> executeIdeAction(cx, IdeActions.ACTION_EDITOR_DELETE_TO_WORD_END) },
+    HJAction("delete_char_backward", "Delete previous char") { executeIdeAction(it, IdeActions.ACTION_EDITOR_BACKSPACE); it.hjEditor.setNewSelection(HJSelection(it.hjEditor.editor.caretModel)) },
+    HJAction("delete_char_forward", "Delete next char") { executeIdeAction(it, IdeActions.ACTION_EDITOR_DELETE); it.hjEditor.setNewSelection(HJSelection(it.hjEditor.editor.caretModel)) },
+    HJAction("delete_word_backward", "Delete previous word") { executeIdeAction(it, IdeActions.ACTION_EDITOR_DELETE_TO_WORD_START); it.hjEditor.setNewSelection(HJSelection(it.hjEditor.editor.caretModel)) },
+    HJAction("delete_word_forward", "Delete next word") { executeIdeAction(it, IdeActions.ACTION_EDITOR_DELETE_TO_WORD_END); it.hjEditor.setNewSelection(HJSelection(it.hjEditor.editor.caretModel)) },
     HJAction("kill_to_line_start", "Delete till start of line"),
     HJAction("kill_to_line_end", "Delete till end of line"),
     HJAction("undo", "Undo change") { executeIdeAction(it, IdeActions.ACTION_UNDO); it.hjEditor.setNewSelection(HJSelection(it.hjEditor.editor.caretModel)) },
@@ -448,8 +448,6 @@ private fun commandMode(cx: HJActionContext) {
             val command = HJCommands.getCommand(commandName)
             popup.setNewCommand(command)
         } else if (e == HJPromptEvent.Validate && s != null) {
-            HJState.pushRegister(HJRegister.LastCmd, s)
-
             val words = s.split(Regex("\\s+"))
             val commandName = words.first()
 

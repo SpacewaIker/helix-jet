@@ -2,6 +2,7 @@
 
 import com.intellij.openapi.diagnostic.Logger
 import spacewaiker.helixjet.editor.HJConfiguration
+import spacewaiker.helixjet.editor.HJRegister
 import spacewaiker.helixjet.editor.HJState
 
 class HJCommand(
@@ -72,7 +73,20 @@ private val debugCommands = arrayOf(
         for (flag in flags) {
             println("Flag: $flag")
         }
-    }
+    },
+    HJCommand("pushRegister", listOf(), "Push values into specified register") { _, args, _ ->
+        val registerName = args.first()
+        val register = HJRegister.GeneralPurpose(registerName[0])
+        for (arg in args.drop(1)) {
+            HJState.pushRegister(register, arg)
+        }
+    },
+    HJCommand("printRegisters", listOf(), "Print all register contents") { _, _, _ ->
+        println("All registers:")
+        for ((register, contents) in HJState.allRegisterContents) {
+            println("$register: $contents")
+        }
+    },
 )
 
 private val commandsRaw =

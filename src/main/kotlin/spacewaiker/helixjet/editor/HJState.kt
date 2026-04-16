@@ -65,7 +65,7 @@ object HJState {
     }
 
     fun pushRegister(register: HJRegister, value: String) {
-        registers[register]?.add(value)
+        registers.getOrPut(register, ::mutableListOf).add(value)
     }
 
     fun getRegisterContents(register: HJRegister) =
