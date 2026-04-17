@@ -124,14 +124,14 @@ private val actionsRaw = arrayOf(
     HJAction("select_regex", "Select all regex matches inside selections") { selectRegex(it) },
     HJAction("split_selection", "Split selections on regex matches") { splitSelection(it) },
     HJAction("split_selection_on_newline", "Split selection on newlines") { splitSelectionOnNewline(it) },
-    HJAction("merge_selections", "Merge selections") { cx -> mergeSelections(cx) },
+    HJAction("merge_selections", "Merge selections") { mergeSelections(it) },
     HJAction("merge_consecutive_selections", "Merge consecutive selections") { cx -> mergeConsecutiveSelections(cx) },
-    HJAction("search", "Search for regex pattern"),
-    HJAction("rsearch", "Reverse search for regex pattern"),
-    HJAction("search_next", "Select next search match"),
-    HJAction("search_prev", "Select previous search match"),
-    HJAction("extend_search_next", "Add next search match to selection"),
-    HJAction("extend_search_prev", "Add previous search match to selection"),
+    HJAction("search", "Search for regex pattern") { searcher(it, HJDirection.FORWARD) },
+    HJAction("rsearch", "Reverse search for regex pattern") { searcher(it, HJDirection.BACKWARD) },
+    HJAction("search_next", "Select next search match") { searchNextOrPrevImpl(it, false, HJDirection.FORWARD) },
+    HJAction("search_prev", "Select previous search match") { searchNextOrPrevImpl(it, false, HJDirection.BACKWARD) },
+    HJAction("extend_search_next", "Add next search match to selection") { searchNextOrPrevImpl(it, true, HJDirection.FORWARD) },
+    HJAction("extend_search_prev", "Add previous search match to selection") { searchNextOrPrevImpl(it, true, HJDirection.BACKWARD) },
     HJAction("search_selection", "Use current selection as search pattern"),
     HJAction("search_selection_detect_word_boundaries", "Use current selection as the search pattern, automatically wrapping with `\\b` on word boundaries"),
     HJAction("make_search_word_bounded", "Modify current search to make it word bounded"),
@@ -215,8 +215,8 @@ private val actionsRaw = arrayOf(
     HJAction("goto_line_end", "Goto line end") { gotoLineStartEnd(it, false) },
     HJAction("goto_column", "Goto column"),
     HJAction("extend_to_column", "Extend to column"),
-    HJAction("goto_next_buffer", "Goto next buffer"),
-    HJAction("goto_previous_buffer", "Goto previous buffer"),
+    HJAction("goto_next_buffer", "Goto next buffer") { executeIdeAction(it, IdeActions.ACTION_NEXT_TAB) },
+    HJAction("goto_previous_buffer", "Goto previous buffer") { executeIdeAction(it, IdeActions.ACTION_PREVIOUS_TAB) },
     HJAction("goto_line_end_newline", "Goto newline at line end") { gotoLineEndNewline(it) },
     HJAction("goto_first_nonwhitespace", "Goto first non-blank in line") { gotoFirstNonWhitespace(it) },
     HJAction("trim_selections", "Trim whitespace from selections"),
@@ -741,7 +741,7 @@ private fun selectRegex(cx: HJActionContext) {
                 cx.hjEditor.setNewSelection(snapshot)
             }
 
-            else if regex != null -> {
+            HJPromptEvent.Update if regex != null -> {
                 if (regex.isEmpty()) {
                     cx.hjEditor.setNewSelection(snapshot)
                 } else {
@@ -771,7 +771,7 @@ private fun splitSelection(cx: HJActionContext) {
                 cx.hjEditor.setNewSelection(snapshot)
             }
 
-            else if regex != null -> {
+            HJPromptEvent.Update if regex != null -> {
                 if (regex.isEmpty()) {
                     cx.hjEditor.setNewSelection(snapshot)
                 } else {
@@ -928,7 +928,7 @@ private fun commandPalette(cx: HJActionContext) {
     }
     val rowGetDoc = { rowIdx: Int ->
         when (val act = data[rowIdx].first) {
-            is HJAction -> act.doc
+            is HJAction -> if (act.isImplemented) act.doc else "Not implemented"
             is HJCommand -> act.doc
             else -> ""
         }
@@ -1162,4 +1162,96 @@ private fun surroundDelete(cx: HJActionContext) {
         cx.hjEditor.apply(transaction)
         switchToMode(cx, HJEditorMode.NORMAL)
     }
+}
+
+private fun searchImpl(
+    cx: HJActionContext,
+    snapshot: HJSelection,
+    regex: Regex,
+    extend: Boolean,
+    direction: HJDirection,
+    showWarnings: Boolean,
+) {
+    val wrapAround = HJState.config.searchWrapAround
+    val doc = cx.doc.text
+
+    // get the right side of the primary block cursor for forward search, or the grapheme before the start of the selection for reverse
+    val start = when (direction) {
+        HJDirection.FORWARD -> snapshot.primary.to
+        HJDirection.BACKWARD -> snapshot.primary.from
+    }
+
+    var mat = when (direction) {
+        HJDirection.FORWARD -> regex.find(doc, start)
+        HJDirection.BACKWARD -> regex.findAll(doc.take(start)).lastOrNull()
+    }
+
+    if (mat == null) {
+        if (wrapAround) {
+            mat = when (direction) {
+                HJDirection.FORWARD -> regex.find(doc)
+                HJDirection.BACKWARD -> regex.findAll(doc, start).lastOrNull()
+            }
+        }
+        if (showWarnings) {
+            // TODO: Show user warnings
+        }
+    }
+
+    if (mat != null) {
+        val start = mat.range.first
+        val end = mat.range.last + 1
+
+        if (end == 0) {
+            // skip empty matches that don't make sense
+            return
+        }
+
+        // determine range direction based on the primary range
+        val primary = snapshot.primary
+        val range = HJRange(start, end).withDirection(primary.direction)
+
+        val selection = if (extend) {
+            snapshot.clone().push(range)
+        } else {
+            snapshot.clone().replace(snapshot.primaryIndex, range)
+        }
+
+        cx.hjEditor.setNewSelection(selection)
+    }
+}
+
+private fun searcher(cx: HJActionContext, direction: HJDirection) {
+    val extend = HJState.mode == HJEditorMode.SELECT
+    val snapshot = cx.hjEditor.selection.clone()
+
+    val onEvent = onEvent@{ e: HJPromptEvent, regex: String? ->
+        when (e) {
+            HJPromptEvent.Abort -> {
+                cx.hjEditor.setNewSelection(snapshot)
+            }
+
+            HJPromptEvent.Update if regex != null -> {
+                val regex = regex(regex)
+                searchImpl(cx, snapshot, regex, extend, direction, false)
+            }
+
+            else -> {}
+        }
+    }
+    val commandBar = HJPrompt(cx.hjEditor.editor, onEvent, "search:", HJRegister.LastSearch)
+    commandBar.show()
+}
+
+private fun searchNextOrPrevImpl(cx: HJActionContext, extend: Boolean, direction: HJDirection) {
+    val register = HJRegister.LastSearch
+
+    HJState.getRegisterContents(register)?.lastOrNull()?.let { pattern ->
+        val regex = regex(pattern)
+        repeat(cx.count) {
+            searchImpl(cx, cx.hjEditor.selection, regex, extend, direction, true)
+        }
+        return
+    }
+    // TODO: user warning
 }

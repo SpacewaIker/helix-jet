@@ -87,6 +87,13 @@ private val debugCommands = arrayOf(
             println("$register: $contents")
         }
     },
+    HJCommand("print-config", listOf(), "Print all config contents (not mappings)") { _, _, _ ->
+        println("Config:")
+        println("scrolloff: ${HJState.config.scrolloff}")
+        println("continueComments: ${HJState.config.continueComments}")
+        println("searchSmartCase: ${HJState.config.searchSmartCase}")
+        println("searchWrapAround: ${HJState.config.searchWrapAround}")
+    },
 )
 
 private val commandsRaw =

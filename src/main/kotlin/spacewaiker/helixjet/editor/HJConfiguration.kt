@@ -21,10 +21,17 @@ class HJConfiguration {
 
     val primaryCursorColor: Color
     val otherCursorsColor: Color
+
+    // ============================ User config fields ======================================
     var scrolloff: Int = 5
         private set
     var continueComments: Boolean = true
         private set
+    var searchSmartCase: Boolean = true
+        private set
+    var searchWrapAround: Boolean = true
+        private set
+    // ======================================================================================
 
     constructor() {
         val colorScheme = EditorColorsManager.getInstance().globalScheme
@@ -77,6 +84,13 @@ class HJConfiguration {
                 HJState.forAllEditors { it.editor.settings.verticalScrollOffset = scrolloff }
             }
             getTomlValue<Boolean>(editor, "continue-comments")?.let { continueComments = it }
+
+            // search
+            val search = editor.children.find { it.name == "search" }
+            if (search != null) {
+                getTomlValue<Boolean>(search, "smart-case")?.let { searchSmartCase = it }
+                getTomlValue<Boolean>(search, "wrap-around")?.let { searchWrapAround = it }
+            }
         }
 
         // keymap

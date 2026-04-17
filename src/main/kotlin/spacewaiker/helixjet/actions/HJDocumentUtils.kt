@@ -2,6 +2,7 @@
 
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.util.TextRange
+import spacewaiker.helixjet.editor.HJState
 
 fun nthPrevGraphemeBoundary(charIdx: Int, n: Int): Int {
     return (charIdx - n).coerceAtLeast(0)
@@ -47,4 +48,16 @@ fun getCommentToken(doc: Document, tokens: List<String>, lineNum: Int): String? 
     return tokens
         .filter { token -> line.substring(start).startsWith(token) }
         .maxByOrNull { token -> token.length }
+}
+
+/**
+ * Creates a Regex using settings from user config
+ */
+fun regex(pattern: String, smartCase: Boolean? = null, ignoreCase: Boolean? = null): Regex {
+    val smartCase = smartCase ?: HJState.config.searchSmartCase
+    val ignoreCase = ignoreCase ?: smartCase && !pattern.any { it.isUpperCase() }
+
+    val options = mutableSetOf<RegexOption>()
+    if (ignoreCase) options.add(RegexOption.IGNORE_CASE)
+    return Regex(pattern, options)
 }

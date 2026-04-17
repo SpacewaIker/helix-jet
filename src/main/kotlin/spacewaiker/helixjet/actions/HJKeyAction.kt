@@ -16,6 +16,8 @@ sealed class HJKeyAction(val name: String, val doc: String) {
         doc: String = "",
         private val action: ((HJActionContext) -> Unit)? = null,
     ) : HJKeyAction(name, doc) {
+        val isImplemented = action != null
+
         fun execute(cx: HJActionContext) {
             if (action == null) {
                 HJActions.logger.warn("Action $name is not yet defined")

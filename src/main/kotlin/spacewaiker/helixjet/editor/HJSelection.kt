@@ -3,6 +3,7 @@
 import com.intellij.openapi.editor.CaretModel
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.util.TextRange
+import spacewaiker.helixjet.actions.regex
 
 /**
  * A selection consists of one or more selection ranges.
@@ -44,6 +45,23 @@ class HJSelection {
 
     fun clone(): HJSelection {
         return HJSelection(ranges, primaryIndex)
+    }
+
+    /**
+     * Adds a new range to the selection and makes it the primary range
+     */
+    fun push(range: HJRange): HJSelection {
+        ranges.add(range)
+        primaryIndex = ranges.size - 1
+        return this
+    }
+
+    /**
+     * Replace a range in the selection with a new range
+     */
+    fun replace(index: Int, range: HJRange): HJSelection {
+        ranges[index] = range
+        return this.normalize()
     }
 
     /**
@@ -132,7 +150,7 @@ class HJSelection {
     companion object {
         fun selectOnMatches(doc: Document, selection: HJSelection, pattern: String): HJSelection? {
             val result = mutableListOf<HJRange>()
-            val regex = Regex(pattern)
+            val regex = regex(pattern)
 
             for (sel in selection.ranges) {
                 for (mat in regex.findAll(doc.getText(TextRange(sel.from, sel.to)))) {
@@ -159,7 +177,7 @@ class HJSelection {
             if (pattern.isEmpty()) return selection.clone()
 
             val result = mutableListOf<HJRange>()
-            val regex = Regex(pattern)
+            val regex = regex(pattern)
 
             for (sel in selection.ranges) {
                 // special case: zero-width selection
