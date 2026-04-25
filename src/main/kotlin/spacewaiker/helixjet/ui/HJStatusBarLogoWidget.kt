@@ -1,9 +1,7 @@
 ﻿package spacewaiker.helixjet.ui
 
 import com.intellij.ide.DataManager
-import com.intellij.openapi.actionSystem.AnAction
-import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.naturalSorted
@@ -43,6 +41,18 @@ class HJStatusBarLogoWidget(private val project: Project) : StatusBarWidget, Sta
                     Messages.showInfoMessage(
                         project, "HelixJet keybindings plugin v0.1", "About"
                     )
+                }
+            })
+            add(object : ToggleAction("Enabled") {
+                override fun isSelected(e: AnActionEvent) = HJState.keymappingEnabled
+
+                override fun setSelected(e: AnActionEvent, selected: Boolean) {
+                    HJState.keymappingEnabled = selected
+                    HJState.forAllEditors { it.reloadCaretShapes() }
+                }
+
+                override fun getActionUpdateThread(): ActionUpdateThread {
+                    return ActionUpdateThread.EDT
                 }
             })
             addSeparator()

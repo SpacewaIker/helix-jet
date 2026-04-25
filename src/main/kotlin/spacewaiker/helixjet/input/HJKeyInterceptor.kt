@@ -12,6 +12,7 @@ import java.awt.event.KeyEvent
  */
 class HJKeyInterceptor : IdeEventQueue.EventDispatcher {
     override fun dispatch(e: AWTEvent): Boolean {
+        if (!HJState.keymappingEnabled) return false
         if (e !is KeyEvent) return false
         if (e.id != KeyEvent.KEY_PRESSED) return false
         // get currently focused editor, or return if there are no currently focused editors

@@ -26,6 +26,7 @@ enum class HJEditorMode {
  * @property typedHandlerBlock If the typedHandler should be blocked from processing keys. Used during the transition to insert mode
  */
 object HJState {
+    var keymappingEnabled = true
     var mode: HJEditorMode = HJEditorMode.NORMAL
     var config: HJConfiguration = HJConfiguration()
     private val editors: MutableMap<Editor, HJEditor> = mutableMapOf()

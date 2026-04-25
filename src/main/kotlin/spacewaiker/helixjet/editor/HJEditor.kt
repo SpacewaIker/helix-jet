@@ -152,7 +152,7 @@ class HJEditor {
     }
 
     fun reloadCaretShapes() {
-        editor.settings.isBlockCursor = HJState.mode != HJEditorMode.INSERT
+        editor.settings.isBlockCursor = HJState.mode != HJEditorMode.INSERT && HJState.keymappingEnabled
     }
 
     fun setCorrectScroll() {
