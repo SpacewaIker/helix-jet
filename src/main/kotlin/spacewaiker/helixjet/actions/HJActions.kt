@@ -317,8 +317,8 @@ private val actionsRaw = arrayOf(
     HJAction("surround_add", "Surround add") { surroundAdd(it) },
     HJAction("surround_replace", "Surround replace") { surroundReplace(it) },
     HJAction("surround_delete", "Surround delete") { surroundDelete(it) },
-    HJAction("select_textobject_around", "Select around object"),
-    HJAction("select_textobject_inner", "Select inside object"),
+    HJAction("select_textobject_around", "Select around object") { selectTextObject(it, HJTextObject.TextObject.AROUND) },
+    HJAction("select_textobject_inner", "Select inside object") { selectTextObject(it, HJTextObject.TextObject.INSIDE) },
     HJAction("goto_next_function", "Goto next function"),
     HJAction("goto_prev_function", "Goto previous function"),
     HJAction("goto_next_class", "Goto next type definition"),
@@ -885,7 +885,7 @@ private fun gotoLineStartEnd(cx: HJActionContext, start: Boolean) {
 private fun gotoFirstNonWhitespaceImpl(cx: HJActionContext, extend: Boolean) {
     val selection = cx.hjEditor.selection.clone().transform { range ->
         val line = cx.doc.getLineNumber(range.cursor)
-        val pos = firstNonWhitespaceChar(getLine(cx.doc, line)!!, cx.doc.getLineStartOffset(line))
+        val pos = firstNonWhitespaceChar(cx.doc.getLine(line)!!, cx.doc.getLineStartOffset(line))
         if (pos == null) {
             range
         } else {
@@ -999,7 +999,7 @@ private fun open(cx: HJActionContext, openBelow: Boolean, commentContinuationEna
             Pair(cx.doc.getLineEndOffset(aboveNextNewLineNum), 1)
         }
 
-        val line = getLine(cx.doc, currLineNum)!!
+        val line = cx.doc.getLine(currLineNum)!!
         val indent = when (val pos = firstNonWhitespaceChar(line)) {
             is Int if continueCommentToken != null -> line.substring(0, pos)
             else -> cx.hjEditor.codeStyleManager?.getLineIndent(cx.doc, cx.doc.getLineStartOffset(currLineNum)) ?: ""
@@ -1254,4 +1254,43 @@ private fun searchNextOrPrevImpl(cx: HJActionContext, extend: Boolean, direction
         return
     }
     // TODO: user warning
+}
+
+private fun selectTextObject(cx: HJActionContext, objtype: HJTextObject.TextObject) {
+    HJInputHandler.onNextKey { inputKey ->
+        if (inputKey !is HJInputKey.Character) return@onNextKey
+        cx.hjEditor.applyMotion { hjEditor ->
+            val ast = hjEditor.ast
+            val syntax = hjEditor.syntax
+
+            val astTextObject = { range: HJRange, astObject: HJAstObject ->
+                if (ast == null || syntax == null) range
+                else HJTextObject.textObjectAst(range, objtype, astObject, ast, syntax)
+            }
+
+            val selection = hjEditor.selection.clone().transform { range ->
+                when (inputKey.char) {
+                    'w' -> HJTextObject.textObjectWord(cx.doc, range, objtype, false)
+                    'W' -> HJTextObject.textObjectWord(cx.doc, range, objtype, true)
+                    't' -> astTextObject(range, HJAstObject.TYPE_DEF)
+                    'f' -> astTextObject(range, HJAstObject.FUNCTION)
+                    'a' -> astTextObject(range, HJAstObject.ARGUMENT)
+                    'c' -> astTextObject(range, HJAstObject.COMMENT)
+                    'e' -> astTextObject(range, HJAstObject.ENTRY)
+                    'x' -> astTextObject(range, HJAstObject.XML_ELEMENT)
+                    'p' -> HJTextObject.textObjectParagraph(cx.doc, range, objtype, cx.count)
+                    'm' -> HJTextObject.textObjectPairSurroundClosest(ast, cx.doc, range, objtype, cx.count)
+                    'g' -> TODO("change")
+                    else if !inputKey.char.isLetterOrDigit() -> HJTextObject.textObjectPairSurround(
+                        ast, cx.doc, range, objtype, inputKey.char, cx.count
+                    )
+
+                    else -> range
+                }
+            }
+
+            hjEditor.setNewSelection(selection)
+        }
+    }
+    // TODO: modify minor mode widget to allow for on-the-fly windows such as here (and in surround)
 }

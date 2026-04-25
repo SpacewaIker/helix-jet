@@ -1,13 +1,16 @@
 ﻿package spacewaiker.helixjet.actions
 
+import com.intellij.lang.ASTNode
+import com.intellij.lang.tree.util.children
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.psi.PsiElement
 import spacewaiker.helixjet.editor.HJConfiguration
 import spacewaiker.helixjet.editor.HJRegister
 import spacewaiker.helixjet.editor.HJState
 
 class HJCommand(
     val name: String,
-    val aliases: List<String>,
+    val aliases: List<String> = listOf(),
     val doc: String = "",
     val flagsDoc: List<String> = listOf(),
     private val action: ((HJActionContext, List<String>, List<String>) -> Unit)? = null,
@@ -93,6 +96,46 @@ private val debugCommands = arrayOf(
         println("continueComments: ${HJState.config.continueComments}")
         println("searchSmartCase: ${HJState.config.searchSmartCase}")
         println("searchWrapAround: ${HJState.config.searchWrapAround}")
+    },
+    HJCommand("print-psi-dot", doc = "Print DOT representation of PsiElement tree") { cx, _, _ ->
+        val psi = cx.hjEditor.psiFile ?: return@HJCommand
+        val decl = StringBuilder()
+        val edges = StringBuilder()
+
+        var counter = 0
+        val stack = mutableListOf(Pair("root", psi as PsiElement))
+        while (stack.isNotEmpty()) {
+            val (parentId, node) = stack.removeLast()
+            val nodeId = "node_${counter++}"
+            val nodeName = node.toString()
+            val nodeBody = node.text.take(25).map { if (it == '\n') ' ' else it }.joinToString(separator = "")
+            decl.appendLine("$nodeId [label=\"$nodeName\\n$nodeBody\"];")
+            edges.appendLine("$parentId -> $nodeId;")
+            stack.addAll(node.children.map { Pair(nodeId, it) }.asReversed())
+        }
+
+        println("digraph Psi {\n$decl$edges}")
+    },
+    HJCommand("print-ast-dot", doc = "Print DOT representation of ASTNode tree") { cx, _, _ ->
+        val ast = cx.hjEditor.psiFile?.node ?: return@HJCommand
+        val decl = StringBuilder()
+        val edges = StringBuilder()
+
+        var counter = 0
+        val stack = mutableListOf(Pair("root", ast as ASTNode))
+        while (stack.isNotEmpty()) {
+            val (parentId, node) = stack.removeLast()
+            val nodeId = "node_${counter++}"
+            val nodeName = node.toString()
+            val nodeType = node.elementType.toString()
+            val nodeBody = node.text.take(25)
+            val label = "$nodeName\\n$nodeType\\n$nodeBody".replace('\n', ' ').replace("\"", "\\\"")
+            decl.appendLine("$nodeId [label=\"$label\"];")
+            edges.appendLine("$parentId -> $nodeId;")
+            stack.addAll(node.children().map { Pair(nodeId, it) }.toList().asReversed())
+        }
+
+        println("digraph AST {\n$decl$edges}")
     },
 )
 

@@ -108,6 +108,11 @@ class HJRange {
     }
 
     /**
+     * The line number that the cursor is on
+     */
+    fun cursorLine(doc: Document) = doc.getLineNumber(this.cursor)
+
+    /**
      * Compute a possibly new range from this range, attempting to ensure a minimum range width of 1 char by shifting
      * the head in the forward direction as needed.
      *

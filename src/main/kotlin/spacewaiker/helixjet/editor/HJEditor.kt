@@ -8,6 +8,7 @@ import com.intellij.openapi.editor.ScrollType
 import com.intellij.psi.PlainTextTokenTypes
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.codeStyle.CodeStyleManager
+import com.intellij.psi.util.elementType
 
 sealed class HJChange {
     abstract val rank: Int
@@ -35,9 +36,14 @@ class HJEditor {
     val editor: Editor
     var selection: HJSelection
     var lastMotion: ((HJEditor) -> Unit)? = null
-    val psiFile get() = editor.project?.let { PsiDocumentManager.getInstance(it) }?.getPsiFile(editor.document)
+    val psiFile
+        get() = editor.project?.let { PsiDocumentManager.getInstance(it) }?.getPsiFile(editor.document)?.let {
+            if (it.elementType == PlainTextTokenTypes.PLAIN_TEXT_FILE || it.elementType?.toString() == "TextMate") null else it
+        }
     val codeStyleManager get() = editor.project?.let { CodeStyleManager.getInstance(it) }
     val ast get() = psiFile?.node?.let { if (it.elementType == PlainTextTokenTypes.PLAIN_TEXT_FILE) null else it }
+    val syntax
+        get() = psiFile?.language?.id?.lowercase()?.let { HJLanguageSyntaxProvider.syntaxes.getOrDefault(it, null) }
 
     val selectionIsLinewise
         get() = selection.ranges.all { range ->

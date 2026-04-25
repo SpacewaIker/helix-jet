@@ -23,9 +23,9 @@ fun nextGraphemeBoundary(doc: Document, charIdx: Int): Int {
 /**
  * Get line content at line `line`. Checks that the line number is valid
  */
-fun getLine(doc: Document, line: Int): String? {
-    return if (line > doc.lineCount - 1) null else {
-        doc.getText(TextRange(doc.getLineStartOffset(line), doc.getLineEndOffset(line)))
+fun Document.getLine(line: Int): String? {
+    return if (line > this.lineCount - 1) null else {
+        this.getText(TextRange(this.getLineStartOffset(line), this.getLineEndOffset(line)))
     }
 }
 
@@ -42,7 +42,7 @@ fun firstNonWhitespaceChar(line: String, startOffset: Int = 0): Int? {
  * Returns the longest matching comment token of the given line (if it exists)
  */
 fun getCommentToken(doc: Document, tokens: List<String>, lineNum: Int): String? {
-    val line = getLine(doc, lineNum) ?: return null
+    val line = doc.getLine(lineNum) ?: return null
     val start = firstNonWhitespaceChar(line) ?: return null
 
     return tokens

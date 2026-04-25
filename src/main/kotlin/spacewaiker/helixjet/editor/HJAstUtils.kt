@@ -1,6 +1,7 @@
 ﻿package spacewaiker.helixjet.editor
 
 import com.intellij.lang.ASTNode
+import com.intellij.lang.tree.util.children
 import com.intellij.lang.tree.util.parents
 import com.intellij.lang.tree.util.siblings
 
@@ -32,6 +33,21 @@ fun ASTNode.namedDescendantForRange(start: Int, end: Int): ASTNode? {
     return this
 }
 
+/**
+ * Get the first descendant that matches the predicate
+ */
+fun ASTNode.findDescendant(predicate: (ASTNode) -> Boolean): ASTNode? {
+    val queue = ArrayDeque<ASTNode>()
+    queue.add(this)
+
+    while (!queue.isEmpty()) {
+        val node = queue.removeFirst()
+        if (predicate(node)) return node
+        queue.addAll(node.children())
+    }
+    return null
+}
+
 val ASTNode.isNamed get() = firstChildNode != null
 
 val ASTNode.nextSibling get() = siblings(true, false).firstOrNull()
@@ -39,3 +55,5 @@ val ASTNode.nextSibling get() = siblings(true, false).firstOrNull()
 val ASTNode.prevSibling get() = siblings(false, false).firstOrNull()
 
 val ASTNode.parent get() = parents(false).firstOrNull()
+
+val ASTNode.endOffset get() = startOffset + textLength
