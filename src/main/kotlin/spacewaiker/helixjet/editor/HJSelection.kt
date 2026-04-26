@@ -150,7 +150,7 @@ class HJSelection {
     companion object {
         fun selectOnMatches(doc: Document, selection: HJSelection, pattern: String): HJSelection? {
             val result = mutableListOf<HJRange>()
-            val regex = regex(pattern)
+            val regex = regex(pattern) ?: return null
 
             for (sel in selection.ranges) {
                 for (mat in regex.findAll(doc.getText(TextRange(sel.from, sel.to)))) {
@@ -177,7 +177,7 @@ class HJSelection {
             if (pattern.isEmpty()) return selection.clone()
 
             val result = mutableListOf<HJRange>()
-            val regex = regex(pattern)
+            val regex = regex(pattern) ?: return selection.clone()
 
             for (sel in selection.ranges) {
                 // special case: zero-width selection
@@ -246,7 +246,7 @@ fun <E> removeConsecutiveDuplicates(list: MutableList<E>, sameBucket: (E, E) -> 
  * Removes consecutive duplicate elements using the given entity relation and replaces the kept element with the given value.
  */
 fun <E> removeConsecutiveDuplicatesAndReplace(list: MutableList<E>, sameBucket: (E, E) -> Pair<Boolean, E?>) {
-    if (list.size <= 1) return;
+    if (list.size <= 1) return
 
     var write = 1
     for (read in 1 until list.size) {

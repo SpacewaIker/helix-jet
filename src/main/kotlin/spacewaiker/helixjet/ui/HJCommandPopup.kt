@@ -127,6 +127,12 @@ class HJCommandPopup(val editor: Editor) {
             sb.append(command.aliases.joinToString(separator = ", "))
         }
 
+        // flags
+        if (command.flagsDoc.isNotEmpty()) {
+            sb.append("\nFlags:\n  ")
+            sb.append(command.flagsDoc.joinToString(separator = "\n  "))
+        }
+
         return sb.toString()
     }
 }

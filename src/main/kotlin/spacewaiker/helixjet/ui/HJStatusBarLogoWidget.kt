@@ -83,11 +83,6 @@ class HJStatusBarLogoWidget(private val project: Project) : StatusBarWidget, Sta
                     HJState.config = HJConfiguration()
                 }
             })
-            add(object : AnAction("Disable HelixJet") {
-                override fun actionPerformed(e: AnActionEvent) {
-                    // todo: implement
-                }
-            })
         }
 
         val menu = JBPopupFactory.getInstance().createActionGroupPopup(

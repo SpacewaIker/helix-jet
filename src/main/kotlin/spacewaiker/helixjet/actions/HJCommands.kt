@@ -2,6 +2,7 @@
 
 import com.intellij.lang.ASTNode
 import com.intellij.lang.tree.util.children
+import com.intellij.notification.NotificationType
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.psi.PsiElement
 import spacewaiker.helixjet.editor.HJConfiguration
@@ -137,6 +138,17 @@ private val debugCommands = arrayOf(
 
         println("digraph AST {\n$decl$edges}")
     },
+    HJCommand(
+        "notify",
+        flagsDoc = listOf("-i  information", "-w  warning", "-e  error"),
+        doc = "Send notification to user"
+    ) { cx, args, flags ->
+        val type = if (flags.contains("e")) NotificationType.ERROR
+        else if (flags.contains("w")) NotificationType.WARNING
+        else NotificationType.INFORMATION
+
+        cx.hjEditor.notify(args.joinToString(separator = " "), type)
+    }
 )
 
 private val commandsRaw =

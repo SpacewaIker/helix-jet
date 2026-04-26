@@ -1,7 +1,6 @@
 ﻿package spacewaiker.helixjet.editor
 
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.editor.Document
 import com.intellij.openapi.util.TextRange
 
 sealed class HJRegister {
@@ -27,13 +26,14 @@ sealed class HJRegister {
     companion object {
         val logger = Logger.getInstance(this::class.java)
 
-        fun selectionToRegister(doc: Document, selection: HJSelection, register: HJRegister): List<String>? {
+        fun selectionToRegister(hjEditor: HJEditor, selection: HJSelection, register: HJRegister): List<String>? {
             if (register.readOnly) {
-                // TODO: user warning/error message
+                hjEditor.setError("Register ${register.char} does not support writing")
                 logger.debug("Register '${register.char}' is read-only")
                 return null
             }
 
+            val doc = hjEditor.editor.document
             return when (register) {
                 is Void -> null
                 is Clipboard -> {

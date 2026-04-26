@@ -7,7 +7,6 @@ import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.IdeActions
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.VisualPosition
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.wm.WindowManager
@@ -242,7 +241,7 @@ private val actionsRaw = arrayOf(
     HJAction("later", "Move forward in history"),
     HJAction("commit_undo_checkpoint", "Commit changes to new checkpoint"),
     HJAction("yank", "Yank selection") { yank(it) },
-    HJAction("yank_to_clipboard", "Yank selections to clipboard") { yankImpl(it.hjEditor.editor.document, it.hjEditor.selection, HJRegister.Clipboard) },
+    HJAction("yank_to_clipboard", "Yank selections to clipboard") { yankImpl(it, it.hjEditor.selection, HJRegister.Clipboard) },
     HJAction("yank_to_primary_clipboard", "Yank selections to primary clipboard"),
     HJAction("yank_joined", "Join and yank selections"),
     HJAction("yank_joined_to_clipboard", "Join and yank selections to clipboard"),
@@ -508,12 +507,12 @@ private fun deleteSelectionImpl(cx: HJActionContext, change: Boolean, yank: Bool
 }
 
 private fun yank(cx: HJActionContext) {
-    yankImpl(cx.hjEditor.editor.document, cx.hjEditor.selection, cx.register ?: HJRegister.LastYank)
+    yankImpl(cx, cx.hjEditor.selection, cx.register ?: HJRegister.LastYank)
 }
 
-private fun yankImpl(doc: Document, selection: HJSelection, register: HJRegister) {
+private fun yankImpl(cx: HJActionContext, selection: HJSelection, register: HJRegister) {
     // TODO: full, correct implementation
-    HJState.copyToRegister(doc, selection, register)
+    HJState.copyToRegister(cx.hjEditor, selection, register)
 }
 
 private fun pasteImpl(cx: HJActionContext, pasteBefore: Boolean) {
@@ -741,16 +740,15 @@ private fun selectRegex(cx: HJActionContext) {
                 cx.hjEditor.setNewSelection(snapshot)
             }
 
-            HJPromptEvent.Update if regex != null -> {
+            else if regex != null -> {
                 if (regex.isEmpty()) {
                     cx.hjEditor.setNewSelection(snapshot)
                 } else {
-                    val doc = cx.hjEditor.editor.document
-                    val selection = HJSelection.selectOnMatches(doc, snapshot, regex)
+                    val selection = HJSelection.selectOnMatches(cx.doc, snapshot, regex)
                     if (selection != null) {
                         cx.hjEditor.setNewSelection(selection)
                     } else if (e == HJPromptEvent.Validate) {
-                        // TODO: User facing warning
+                        cx.hjEditor.setError("Nothing selected")
                         HJActions.logger.debug("selectRegex - nothing is selected")
                     }
                 }
@@ -775,8 +773,7 @@ private fun splitSelection(cx: HJActionContext) {
                 if (regex.isEmpty()) {
                     cx.hjEditor.setNewSelection(snapshot)
                 } else {
-                    val doc = cx.hjEditor.editor.document
-                    val selection = HJSelection.splitOnMatches(doc, snapshot, regex)
+                    val selection = HJSelection.splitOnMatches(cx.doc, snapshot, regex)
                     cx.hjEditor.setNewSelection(selection)
                 }
             }
@@ -1215,7 +1212,11 @@ private fun searchImpl(
             }
         }
         if (showWarnings) {
-            // TODO: Show user warnings
+            if (wrapAround && mat != null) {
+                cx.hjEditor.setStatus("Wrapped around document")
+            } else {
+                cx.hjEditor.setError("No more matches")
+            }
         }
     }
 
@@ -1246,15 +1247,19 @@ private fun searcher(cx: HJActionContext, direction: HJDirection) {
     val extend = HJState.mode == HJEditorMode.SELECT
     val snapshot = cx.hjEditor.selection.clone()
 
-    val onEvent = onEvent@{ e: HJPromptEvent, regex: String? ->
+    val onEvent = onEvent@{ e: HJPromptEvent, pattern: String? ->
         when (e) {
             HJPromptEvent.Abort -> {
                 cx.hjEditor.setNewSelection(snapshot)
             }
 
-            HJPromptEvent.Update if regex != null -> {
-                val regex = regex(regex)
-                searchImpl(cx, snapshot, regex, extend, direction, false)
+            HJPromptEvent.Update if pattern != null -> {
+                val regex = regex(pattern)
+                if (regex == null) {
+                    cx.hjEditor.setError("Invalid regex: $pattern")
+                } else {
+                    searchImpl(cx, snapshot, regex, extend, direction, false)
+                }
             }
 
             else -> {}
@@ -1269,12 +1274,14 @@ private fun searchNextOrPrevImpl(cx: HJActionContext, extend: Boolean, direction
 
     HJState.getRegisterContents(register)?.lastOrNull()?.let { pattern ->
         val regex = regex(pattern)
-        repeat(cx.count) {
-            searchImpl(cx, cx.hjEditor.selection, regex, extend, direction, true)
+        if (regex == null) {
+            cx.hjEditor.setError("Invalid regex: $pattern")
+        } else {
+            repeat(cx.count) {
+                searchImpl(cx, cx.hjEditor.selection, regex, extend, direction, true)
+            }
         }
-        return
     }
-    // TODO: user warning
 }
 
 private fun selectTextObject(cx: HJActionContext, objtype: HJTextObject.TextObject) {

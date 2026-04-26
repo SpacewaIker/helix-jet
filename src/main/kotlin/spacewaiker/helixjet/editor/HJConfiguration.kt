@@ -671,7 +671,6 @@ private val defaultMappingSelect: Map<String, Any> = defaultMappingNormal + mapO
     "end" to "extend_to_line_end",
     "esc" to "exit_select_mode",
     "v" to "normal_mode",
-    // TODO: Goto
     "g" to Pair(
         "Goto", mapOf(
             "g" to "extend_to_file_start",

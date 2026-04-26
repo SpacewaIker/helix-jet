@@ -1,6 +1,5 @@
 ﻿package spacewaiker.helixjet.editor
 
-import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.ide.CopyPasteManager
 import spacewaiker.helixjet.editor.HJState.allEditors
@@ -55,8 +54,8 @@ object HJState {
 
     fun getHJEditor(editor: Editor) = editors.getOrPut(editor) { HJEditor(editor) }
 
-    fun copyToRegister(doc: Document, selection: HJSelection, register: HJRegister) {
-        HJRegister.selectionToRegister(doc, selection, register)?.let {
+    fun copyToRegister(hjEditor: HJEditor, selection: HJSelection, register: HJRegister) {
+        HJRegister.selectionToRegister(hjEditor, selection, register)?.let {
             if (register == HJRegister.Clipboard) {
                 CopyPasteManager.getInstance().setContents(StringSelection(it[0]))
             } else {
@@ -81,7 +80,7 @@ object HJState {
             helpWidget = HJHelpWidget(editor)
             helpWidget!!.show()
         }
-        
+
         return helpWidget!!
     }
 }

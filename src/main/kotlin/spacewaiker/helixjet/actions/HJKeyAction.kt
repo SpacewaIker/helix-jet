@@ -20,7 +20,8 @@ sealed class HJKeyAction(val name: String, val doc: String) {
 
         fun execute(cx: HJActionContext) {
             if (action == null) {
-                HJActions.logger.warn("Action $name is not yet defined")
+                cx.hjEditor.setWarning("Action $name is not yet implemented")
+                HJActions.logger.warn("Action $name is not yet implemented")
             } else {
                 HJActions.logger.debug("Executing action $name")
                 action(cx)

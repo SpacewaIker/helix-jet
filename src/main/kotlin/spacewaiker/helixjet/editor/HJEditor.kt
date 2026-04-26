@@ -1,5 +1,7 @@
 ﻿package spacewaiker.helixjet.editor
 
+import com.intellij.notification.NotificationGroupManager
+import com.intellij.notification.NotificationType
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.CaretVisualAttributes
@@ -157,5 +159,24 @@ class HJEditor {
 
     fun setCorrectScroll() {
         editor.scrollingModel.scrollToCaret(ScrollType.RELATIVE)
+    }
+
+    fun notify(message: String, type: NotificationType) {
+        NotificationGroupManager.getInstance()
+            .getNotificationGroup("HelixJet Notifications")
+            .createNotification(message, type)
+            .notify(editor.project)
+    }
+
+    fun setStatus(message: String) {
+        notify(message, NotificationType.INFORMATION)
+    }
+
+    fun setWarning(message: String) {
+        notify(message, NotificationType.WARNING)
+    }
+
+    fun setError(message: String) {
+        notify(message, NotificationType.ERROR)
     }
 }
