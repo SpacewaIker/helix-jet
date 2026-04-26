@@ -5,7 +5,6 @@
 - user warning system
 - modify minor mode widget to allow custom on-the-fly help windows
 - maybe add a widget to show whether the current file has AST support?
-- when exiting insert mode after typing stuff, cursor is out of date with position
 - textobject VCS change
 - should probably use TS after all. AST is unusable in some languages/IDEs. Look at TS integration for textobjects
   and other places that currently use JB AST.
