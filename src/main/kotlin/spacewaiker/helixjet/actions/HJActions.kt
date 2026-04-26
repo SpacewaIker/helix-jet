@@ -1065,6 +1065,15 @@ private fun matchBrackets(cx: HJActionContext) {
     cx.hjEditor.setNewSelection(selection)
 }
 
+private val surroundHelpTextLines = listOf(
+    Pair("m", "Nearest matching pair"),
+    Pair("( or )", "Parentheses"),
+    Pair("{ or }", "Curly braces"),
+    Pair("< or >", "Angled brackets"),
+    Pair("[ or ]", "Square brackets"),
+    Pair(" ", "... or any character"),
+)
+
 private fun surroundAdd(cx: HJActionContext) {
     HJInputHandler.onNextKey { inputKey ->
         val (open, close, surroundLen) = when (inputKey) {
@@ -1095,6 +1104,9 @@ private fun surroundAdd(cx: HJActionContext) {
         cx.hjEditor.apply(transaction)
         switchToMode(cx, HJEditorMode.NORMAL)
     }
+
+    HJState.getOrCreateHelpWidget(cx.hjEditor.editor)
+        .setHelpContent("Surround selections with", surroundHelpTextLines.drop(1))
 }
 
 private fun surroundReplace(cx: HJActionContext) {
@@ -1141,7 +1153,13 @@ private fun surroundReplace(cx: HJActionContext) {
             cx.hjEditor.apply(transaction)
             switchToMode(cx, HJEditorMode.NORMAL)
         }
+
+        HJState.getOrCreateHelpWidget(cx.hjEditor.editor)
+            .setHelpContent("Replace with a pair of", surroundHelpTextLines.drop(1))
     }
+
+    HJState.getOrCreateHelpWidget(cx.hjEditor.editor)
+        .setHelpContent("Replace surrounding pair of", surroundHelpTextLines)
 }
 
 private fun surroundDelete(cx: HJActionContext) {
@@ -1162,6 +1180,9 @@ private fun surroundDelete(cx: HJActionContext) {
         cx.hjEditor.apply(transaction)
         switchToMode(cx, HJEditorMode.NORMAL)
     }
+
+    HJState.getOrCreateHelpWidget(cx.hjEditor.editor)
+        .setHelpContent("Delete surrounding pair of", surroundHelpTextLines)
 }
 
 private fun searchImpl(
@@ -1292,5 +1313,28 @@ private fun selectTextObject(cx: HJActionContext, objtype: HJTextObject.TextObje
             hjEditor.setNewSelection(selection)
         }
     }
+
+    val title = when (objtype) {
+        HJTextObject.TextObject.INSIDE -> "Match inside"
+        HJTextObject.TextObject.AROUND -> "Match around"
+        else -> return
+    }
+    HJState.getOrCreateHelpWidget(cx.hjEditor.editor).setHelpContent(
+        title, listOf(
+            Pair("w", "Word"),
+            Pair("W", "WORD"),
+            Pair("p", "Paragraph"),
+            Pair("t", "Type definition"),
+            Pair("f", "Function"),
+            Pair("a", "Argument/parameter"),
+            Pair("c", "Comment"),
+            Pair("T", "Test"),
+            Pair("e", "Data structure entry"),
+            Pair("m", "Closest surrounding pair"),
+            Pair("g", "Change"),
+            Pair("x", "(X)HTML element"),
+            Pair(" ", "... or any character acting as a pair"),
+        )
+    )
     // TODO: modify minor mode widget to allow for on-the-fly windows such as here (and in surround)
 }

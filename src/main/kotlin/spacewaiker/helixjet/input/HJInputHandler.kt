@@ -13,7 +13,6 @@ import spacewaiker.helixjet.input.HJInputHandler.lastKey
 import spacewaiker.helixjet.input.HJInputHandler.minorModeName
 import spacewaiker.helixjet.input.HJInputHandler.onNextKeyCallback
 import spacewaiker.helixjet.input.HJInputHandler.pendingActionKey
-import spacewaiker.helixjet.ui.HJMinorModeWidget
 import spacewaiker.helixjet.ui.HJStatusBarInputWidget
 import java.util.*
 import kotlin.math.max
@@ -50,6 +49,10 @@ object HJInputHandler {
 
         lastKey = key
 
+        // clear help widget
+        HJState.helpWidget?.hide()
+        HJState.helpWidget = null
+
         // if there is a callback set for the next key, execute it instead of normal key handling
         if (onNextKeyCallback.isNotEmpty()) {
             onNextKeyCallback.remove().invoke(key)
@@ -84,7 +87,6 @@ object HJInputHandler {
             { inputKey -> it[inputKey] }
         } ?: { inputKey -> HJState.config.mapping[HJState.mode]!![inputKey] }
 
-        var newMinorMode: HJKeyAction.HJMinorMode? = null
         when (val keyAction = getKeyAction(key)) {
             null -> {
                 if (usingMinorMode) {
@@ -119,27 +121,13 @@ object HJInputHandler {
                 updateInputWidget()
                 minorModeMapping = keyAction.mapping
 
-                newMinorMode = keyAction
+                HJState.getOrCreateHelpWidget(editor).setNewMinorMode(keyAction)
             }
 
             is HJKeyAction.HJPassthroughAction -> {
                 logger.debug("Passthrough action")
                 return false
             }
-        }
-
-        // update minor mode widget
-        if (newMinorMode != null) {
-            val widget = HJState.minorModeWidget ?: run {
-                val widget1 = HJMinorModeWidget(editor)
-                widget1.show()
-                widget1
-            }
-            HJState.minorModeWidget = widget
-            widget.setNewMinorMode(newMinorMode)
-        } else if (HJState.minorModeWidget != null) {
-            HJState.minorModeWidget?.hide()
-            HJState.minorModeWidget = null
         }
 
         return true

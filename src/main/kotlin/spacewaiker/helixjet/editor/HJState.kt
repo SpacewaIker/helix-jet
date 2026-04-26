@@ -8,7 +8,7 @@ import spacewaiker.helixjet.editor.HJState.config
 import spacewaiker.helixjet.editor.HJState.focusedEditor
 import spacewaiker.helixjet.editor.HJState.mode
 import spacewaiker.helixjet.editor.HJState.typedHandlerBlock
-import spacewaiker.helixjet.ui.HJMinorModeWidget
+import spacewaiker.helixjet.ui.HJHelpWidget
 import spacewaiker.helixjet.ui.HJPrompt
 import java.awt.datatransfer.StringSelection
 
@@ -34,7 +34,7 @@ object HJState {
     val allRegisterContents get() = registers.toList()
     val allEditors get() = editors.keys
     var activePrompt: HJPrompt? = null
-    var minorModeWidget: HJMinorModeWidget? = null
+    var helpWidget: HJHelpWidget? = null
 
     private var cachedFocusedEditor: Editor? = null
     val focusedEditor: Editor?
@@ -74,5 +74,14 @@ object HJState {
 
     fun forAllEditors(f: (HJEditor) -> Unit) {
         editors.values.forEach(f)
+    }
+
+    fun getOrCreateHelpWidget(editor: Editor): HJHelpWidget {
+        if (helpWidget == null) {
+            helpWidget = HJHelpWidget(editor)
+            helpWidget!!.show()
+        }
+        
+        return helpWidget!!
     }
 }
