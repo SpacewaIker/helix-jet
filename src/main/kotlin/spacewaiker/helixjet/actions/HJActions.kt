@@ -8,7 +8,13 @@ import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.IdeActions
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.VisualPosition
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.util.TextRange
+import com.intellij.openapi.vcs.changes.VcsIgnoreManager
+import com.intellij.openapi.vfs.VfsUtilCore
+import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.VirtualFileVisitor
 import com.intellij.openapi.wm.WindowManager
 import spacewaiker.helixjet.actions.HJKeyAction.HJAction
 import spacewaiker.helixjet.editor.*
@@ -152,8 +158,8 @@ private val actionsRaw = arrayOf(
     HJAction("insert_mode", "Insert before selection") { insertMode(it, false) },
     HJAction("append_mode", "Append after selection") { insertMode(it, true) },
     HJAction("command_mode", "Enter command mode") { commandMode(it) },
-    HJAction("file_picker", "Open file picker"),
-    HJAction("file_picker_in_current_buffer_directory", "Open file picker at current buffer's directory"),
+    HJAction("file_picker", "Open file picker") { filePickerProjectRoot(it) },
+    HJAction("file_picker_in_current_buffer_directory", "Open file picker at current buffer's directory") { filePickerImpl(it, "File Picker (Current Buffer Directory)", it.hjEditor.editor.virtualFile.parent) },
     HJAction("file_picker_in_current_directory", "Open file picker at current working directory"),
     HJAction("file_explorer", "Open file explorer in workspace root"),
     HJAction("file_explorer_in_current_buffer_directory", "Open file explorer at current buffer's directory"),
@@ -1344,4 +1350,41 @@ private fun selectTextObject(cx: HJActionContext, objtype: HJTextObject.TextObje
         )
     )
     // TODO: modify minor mode widget to allow for on-the-fly windows such as here (and in surround)
+}
+
+private fun filePickerImpl(cx: HJActionContext, title: String, directory: VirtualFile) {
+    val project = cx.hjEditor.editor.project!!
+
+    val vcsIgnoreManager = VcsIgnoreManager.getInstance(project)
+    val data = buildList {
+        VfsUtilCore.visitChildrenRecursively(directory, object : VirtualFileVisitor<Unit>() {
+            override fun visitFile(file: VirtualFile): Boolean {
+                if (vcsIgnoreManager.isPotentiallyIgnoredFile(file)) return false
+                if (!file.isDirectory) add(file)
+                return true
+            }
+        })
+    }
+
+    val directoryPathLength = directory.path.length
+    val model = object : AbstractTableModel() {
+        override fun getRowCount() = data.size
+        override fun getColumnCount() = 1
+        override fun getValueAt(rowIndex: Int, columnIndex: Int) = data[rowIndex].path.drop(directoryPathLength)
+        override fun getColumnName(column: Int) = "File"
+    }
+
+    HJPicker(title, model) { rowIdx ->
+        val file = data[rowIdx]
+        FileEditorManager.getInstance(project).openFile(file, true)
+    }.show(project)
+}
+
+private fun filePickerProjectRoot(cx: HJActionContext) {
+    val projectDir = cx.hjEditor.editor.project!!.guessProjectDir()
+    if (projectDir == null) {
+        cx.hjEditor.setError("Could not find project directory")
+    } else {
+        filePickerImpl(cx, "File Picker (root)", projectDir)
+    }
 }

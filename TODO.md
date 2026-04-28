@@ -6,4 +6,3 @@
 - textobject VCS change
 - should probably use TS after all. AST is unusable in some languages/IDEs. Look at TS integration for textobjects
   and other places that currently use JB AST.
-- HJPicker: allow searching in specific columns

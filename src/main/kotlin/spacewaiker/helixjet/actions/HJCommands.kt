@@ -4,6 +4,10 @@ import com.intellij.lang.ASTNode
 import com.intellij.lang.tree.util.children
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.project.guessProjectDir
+import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.psi.PsiElement
 import spacewaiker.helixjet.editor.HJConfiguration
 import spacewaiker.helixjet.editor.HJRegister
@@ -65,6 +69,49 @@ private val helixCommands = arrayOf(
     },
     HJCommand("config-reload", listOf(), "Reload user config") { _, _, _ ->
         HJState.config = HJConfiguration()
+    },
+    HJCommand("open", listOf("o", "edit", "e"), "Open a file from disk into a new tab") { cx, args, _ ->
+        if (args.isEmpty()) {
+            cx.hjEditor.setError("'open': expected at least 1 argument, got 0")
+            return@HJCommand
+        }
+
+        val project = cx.hjEditor.editor.project!!
+        val projectRoot = project.guessProjectDir()
+        val fileManager = FileEditorManager.getInstance(project)
+
+        for (filePath in args) {
+            val fileRelative =
+                projectRoot?.let { VirtualFileManager.getInstance().findFileByUrl("file://${it.path}/$filePath") }
+
+            if (fileRelative != null) {
+                fileManager.openFile(fileRelative, true)
+                continue
+            }
+
+            val fileAbsolute = VirtualFileManager.getInstance().findFileByUrl("file://$filePath")
+            if (fileAbsolute != null) {
+                fileManager.openFile(fileAbsolute, true)
+                continue
+            }
+
+            cx.hjEditor.setWarning("Could not open file $filePath")
+        }
+    },
+    HJCommand("buffer-close", listOf("bc", "bclose"), "Close the current buffer.") { cx, _, _ ->
+        // TODO: Does this close a modified but unsaved buffer?
+        closeFilesImpl(cx) { it.currentFile?.let { file -> listOf(file) } ?: emptyList() }
+    },
+    HJCommand(
+        "buffer-close-others",
+        listOf("bco", "bcloseother"),
+        "Close all buffers except the currently focused one.",
+        listOf("-s  don't close buffers that are visible")
+    ) { cx, _, _ ->
+        closeFilesImpl(cx) { it.openFiles.filterNot { file -> file == it.currentFile } }
+    },
+    HJCommand("buffer-close-all", listOf("bca", "bcloseall"), "Close all buffers without quitting.") { cx, _, _ ->
+        closeFilesImpl(cx) { it.openFiles.toList() }
     },
 )
 
@@ -153,3 +200,12 @@ private val debugCommands = arrayOf(
 
 private val commandsRaw =
     if (System.getProperty("idea.plugin.in.sandbox.mode") == "true") helixCommands + debugCommands else helixCommands
+
+private fun closeFilesImpl(cx: HJActionContext, selector: (FileEditorManager) -> List<VirtualFile>) {
+    val project = cx.hjEditor.editor.project!!
+    val fileEditorManager = FileEditorManager.getInstance(project)
+    for (file in selector(fileEditorManager)) {
+        fileEditorManager.closeFile(file)
+    }
+    fileEditorManager.selectedTextEditor?.contentComponent?.requestFocusInWindow()
+}
