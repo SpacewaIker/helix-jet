@@ -67,12 +67,16 @@ class HJPicker(
                     return
                 }
 
-                val matcher = NameUtil.buildMatcher("*$query*").build()
+                val words = query.split(Regex("\\s+"))
+                val cols =
+                    words.filter { it.startsWith("%") }.map { NameUtil.buildMatcher("*${it.trimStart('%')}*").build() }
+                val pattern = words.filterNot { it.startsWith("%") }.joinToString("*")
+                val matcher = NameUtil.buildMatcher("*$pattern*").build()
                 sorter.rowFilter = object : RowFilter<AbstractTableModel, Int>() {
                     override fun include(entry: Entry<out AbstractTableModel, out Int>): Boolean {
-                        // TODO: allow searching in specific columns
                         return (0 until entry.valueCount).any { col ->
-                            matcher.matches(entry.getValue(col).toString())
+                            val considerColumn = cols.isEmpty() || cols.any { it.matches(model.getColumnName(col)) }
+                            considerColumn && matcher.matches(entry.getValue(col).toString())
                         }
                     }
                 }
