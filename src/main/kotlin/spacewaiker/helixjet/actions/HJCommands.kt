@@ -108,6 +108,7 @@ private val helixCommands = arrayOf(
         "Close all buffers except the currently focused one.",
         listOf("-s  don't close buffers that are visible")
     ) { cx, _, _ ->
+        // TODO: don't close buffers that are visible
         closeFilesImpl(cx) { it.openFiles.filterNot { file -> file == it.currentFile } }
     },
     HJCommand("buffer-close-all", listOf("bca", "bcloseall"), "Close all buffers without quitting.") { cx, _, _ ->

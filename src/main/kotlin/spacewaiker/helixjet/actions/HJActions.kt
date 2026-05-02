@@ -446,6 +446,8 @@ private fun insertMode(cx: HJActionContext, append: Boolean) {
 
 private fun commandMode(cx: HJActionContext) {
     val popup = HJCommandPopup(cx.hjEditor.editor)
+    val autocompleteUi = HJPromptAutocomplete(cx.hjEditor.editor)
+
     val onEvent = { e: HJPromptEvent, s: String? ->
         if (e == HJPromptEvent.Update && s != null) {
             val words = s.split(Regex("\\s+"))
@@ -476,11 +478,18 @@ private fun commandMode(cx: HJActionContext) {
 
         if (e == HJPromptEvent.Validate || e == HJPromptEvent.Abort) {
             popup.hide()
+            autocompleteUi.hide()
         }
     }
-    val commandBar = HJPrompt(cx.hjEditor.editor, onEvent, historyRegister = HJRegister.LastCmd)
+
+    val autocompleteProvider = HJCommands.allCommands.map { it.name }
+    val commandBar = HJPrompt(
+        cx.hjEditor.editor, onEvent, historyRegister = HJRegister.LastCmd,
+        autocompleteProvider = autocompleteProvider, autocompleteUi = autocompleteUi, commandPopup = popup,
+    )
     commandBar.show()
     popup.show()
+    autocompleteUi.show()
 }
 
 private fun collapseSelection(cx: HJActionContext) {

@@ -5,6 +5,7 @@ import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.editor.colors.EditorFontType
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.ex.FileEditorManagerEx
+import com.intellij.psi.codeStyle.NameUtil
 import spacewaiker.helixjet.editor.HJRegister
 import spacewaiker.helixjet.editor.HJState
 import java.awt.BorderLayout
@@ -19,12 +20,17 @@ internal class HJPromptTextField(
     editor: Editor,
     private val onEvent: (HJPromptEvent, String?) -> Unit,
     private val historyRegister: HJRegister?,
+    private val autocompleteProvider: List<String>?,
+    private val autocompleteUi: HJPromptAutocomplete?,
+    private val commandPopup: HJCommandPopup?,
 ) : JTextField() {
     private var registerIndex = historyRegister?.let { HJState.getRegisterContents(it)?.size } ?: 0
     private val historyEntry
         get() = historyRegister?.let { HJState.getRegisterContents(it)?.getOrNull(registerIndex) } ?: ""
     private val hint = historyRegister?.let { HJState.getRegisterContents(it)?.lastOrNull() } ?: ""
     private var isHintShown = false
+    private var autocompleteChoices: List<String>? = null
+    private var autocompleteIdx: Int? = null
 
     init {
         font = editor.colorsScheme.getFont(EditorFontType.PLAIN) // monospace
@@ -32,17 +38,27 @@ internal class HJPromptTextField(
         background = EditorColorsManager.getInstance().globalScheme.defaultBackground
         resetHint()
         if (isHintShown) onEvent(HJPromptEvent.Update, text)
+        setFocusTraversalKeysEnabled(false) // allows catching Tab key events
+
+        if (!autocompleteProvider.isNullOrEmpty()) {
+            val height = autocompleteUi?.setNewEntries(autocompleteProvider)
+            if (height != null && commandPopup != null) {
+                commandPopup.bottomPosition = height
+                commandPopup.forceRecomputePosition()
+            }
+        }
     }
 
     override fun processKeyEvent(e: KeyEvent) {
+        var eventType: HJPromptEvent? = null
+
         // this needs to be handled in a special way because it only sends KeyReleased events
         if (e.keyCode == KeyEvent.VK_BACK_SPACE) {
             if (text.isEmpty()) {
                 resetHint()
                 // I believe helix wouldn't send an update here, but I don't see why not...
             }
-            onEvent(HJPromptEvent.Update, text)
-            return
+            eventType = HJPromptEvent.Update
         }
 
         // below we also check for event ID because different keys use different key events. however, if we don't
@@ -50,11 +66,11 @@ internal class HJPromptTextField(
         when (e.keyCode) {
             KeyEvent.VK_ENTER if e.id == KeyEvent.KEY_PRESSED -> {
                 historyRegister?.let { HJState.pushRegister(it, text) }
-                onEvent(HJPromptEvent.Validate, text)
+                eventType = HJPromptEvent.Validate
             }
 
             KeyEvent.VK_ESCAPE if e.id == KeyEvent.KEY_PRESSED -> {
-                onEvent(HJPromptEvent.Abort, null)
+                eventType = HJPromptEvent.Abort
             }
 
             KeyEvent.VK_UP if e.id == KeyEvent.KEY_PRESSED -> {
@@ -74,10 +90,41 @@ internal class HJPromptTextField(
                     isHintShown = false
                 }
                 super.processKeyEvent(e)
-                onEvent(HJPromptEvent.Update, text)
+                eventType = HJPromptEvent.Update
             }
 
             else -> {}
+        }
+
+        // autocomplete
+        // needs to happen after so that it has the updated text field
+        if (!autocompleteProvider.isNullOrEmpty()) {
+            if (e.keyChar == '\t') {
+                if (e.id == KeyEvent.KEY_PRESSED) {
+                    autocompleteIdx = if (autocompleteIdx == null) {
+                        if (e.isShiftDown) autocompleteChoices!!.size - 1 else 0
+                    } else {
+                        val change = if (e.isShiftDown) -1 else 1
+                        (autocompleteIdx!! + change) % autocompleteChoices!!.size
+                    }
+
+                    text = autocompleteChoices!![autocompleteIdx!!]
+                    autocompleteUi?.highlightEntry(autocompleteIdx!!)
+                }
+            } else if (e.keyCode != KeyEvent.VK_SHIFT && (e.keyCode == KeyEvent.VK_BACK_SPACE || e.id == KeyEvent.KEY_TYPED)) { // non-tab key typed
+                val matcher = NameUtil.buildMatcher("*$text*").build()
+                autocompleteChoices = autocompleteProvider.filter { matcher.matches(it) }
+                    .sortedByDescending { matcher.matchingDegree(it) }
+                val height = autocompleteUi?.setNewEntries(autocompleteChoices!!)
+                if (height != null && commandPopup != null) {
+                    commandPopup.bottomPosition = height
+                }
+            }
+        }
+
+        // send event after everything is done
+        if (eventType != null) {
+            onEvent(eventType, text)
         }
     }
 
@@ -94,6 +141,9 @@ class HJPrompt(
     private val onEvent: (HJPromptEvent, String?) -> Unit,
     prompt: String = ":",
     historyRegister: HJRegister? = null,
+    autocompleteProvider: List<String>? = null,
+    autocompleteUi: HJPromptAutocomplete? = null,
+    commandPopup: HJCommandPopup? = null,
 ) {
     private val editorsComponent = (FileEditorManager.getInstance(editor.project!!) as FileEditorManagerEx).splitters
 
@@ -101,7 +151,9 @@ class HJPrompt(
         font = editor.colorsScheme.getFont(EditorFontType.PLAIN)
         border = BorderFactory.createEmptyBorder(2, 2, 2, 0)
     }
-    private val textField = HJPromptTextField(editor, ::onEventInternal, historyRegister)
+    private val textField = HJPromptTextField(
+        editor, ::onEventInternal, historyRegister, autocompleteProvider, autocompleteUi, commandPopup
+    )
 
     private val panel = JPanel(BorderLayout()).apply {
         add(promptCmp, BorderLayout.WEST)

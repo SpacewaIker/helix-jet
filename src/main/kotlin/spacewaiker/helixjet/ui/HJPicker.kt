@@ -74,10 +74,11 @@ class HJPicker(
                 val matcher = NameUtil.buildMatcher("*$pattern*").build()
                 sorter.rowFilter = object : RowFilter<AbstractTableModel, Int>() {
                     override fun include(entry: Entry<out AbstractTableModel, out Int>): Boolean {
-                        return (0 until entry.valueCount).any { col ->
-                            val considerColumn = cols.isEmpty() || cols.any { it.matches(model.getColumnName(col)) }
-                            considerColumn && matcher.matches(entry.getValue(col).toString())
-                        }
+                        val combinedString = (0 until entry.valueCount)
+                            .filter { colIdx -> cols.isEmpty() || cols.any { it.matches(model.getColumnName(colIdx)) } }
+                            .joinToString(separator = " ") { colIdx -> entry.getValue(colIdx).toString() }
+
+                        return matcher.matches(combinedString)
                     }
                 }
 
