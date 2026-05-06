@@ -1,7 +1,10 @@
 ﻿package spacewaiker.helixjet.actions
 
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.util.TextRange
+import com.intellij.psi.PsiFile
+import com.intellij.psi.codeStyle.CodeStyleManager
 import spacewaiker.helixjet.editor.HJState
 import java.util.regex.PatternSyntaxException
 
@@ -64,5 +67,12 @@ fun regex(pattern: String, smartCase: Boolean? = null, ignoreCase: Boolean? = nu
         Regex(pattern, options)
     } catch (_: PatternSyntaxException) {
         null
+    }
+}
+
+fun getIndentForLine(psiFile: PsiFile, lineStartOffset: Int): String {
+    return ApplicationManager.getApplication().runReadAction<String> {
+        CodeStyleManager.getInstance(psiFile.project)
+            .getLineIndent(psiFile, lineStartOffset) ?: ""
     }
 }

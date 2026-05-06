@@ -178,10 +178,10 @@ private val actionsRaw = arrayOf(
     HJAction("diagnostics_picker", "Open diagnostic picker"),
     HJAction("workspace_diagnostics_picker", "Open workspace diagnostic picker"),
     HJAction("last_picker", "Open last picker"),
-    HJAction("insert_at_line_start", "Insert at start of line"),
-    HJAction("insert_at_line_end", "Insert at end of line"),
-    HJAction("open_below", "Open new line below selection") { cx -> open(cx, true, true) },
-    HJAction("open_above", "Open new line above selection") { cx -> open(cx, false, true) },
+    HJAction("insert_at_line_start", "Insert at start of line") { insertWithIndent(it, true) },
+    HJAction("insert_at_line_end", "Insert at end of line") { insertWithIndent(it, false) },
+    HJAction("open_below", "Open new line below selection") { open(it, true, true) },
+    HJAction("open_above", "Open new line above selection") { open(it, false, true) },
     HJAction("normal_mode", "Enter normal mode") { switchToMode(it, HJEditorMode.NORMAL) },
     HJAction("select_mode", "Enter selection extend mode") { switchToMode(it, HJEditorMode.SELECT) },
     HJAction("exit_select_mode", "Exit selection mode") { if (HJState.mode == HJEditorMode.SELECT) switchToMode(it, HJEditorMode.NORMAL) },
@@ -1311,6 +1311,11 @@ private fun selectTextObject(cx: HJActionContext, objtype: HJTextObject.TextObje
                 else HJTextObject.textObjectAst(range, objtype, astObject, ast, syntax)
             }
 
+            val textObjectChange = textObjectChange@{ range: HJRange ->
+                val textRange = HJVCSHandling.getHunk(cx.hjEditor, range) ?: return@textObjectChange range
+                HJRange(textRange.startOffset, textRange.endOffset).withDirection(range.direction)
+            }
+
             val selection = hjEditor.selection.clone().transform { range ->
                 when (inputKey.char) {
                     'w' -> HJTextObject.textObjectWord(cx.doc, range, objtype, false)
@@ -1323,7 +1328,7 @@ private fun selectTextObject(cx: HJActionContext, objtype: HJTextObject.TextObje
                     'x' -> astTextObject(range, HJAstObject.XML_ELEMENT)
                     'p' -> HJTextObject.textObjectParagraph(cx.doc, range, objtype, cx.count)
                     'm' -> HJTextObject.textObjectPairSurroundClosest(ast, cx.doc, range, objtype, cx.count)
-                    'g' -> TODO("change")
+                    'g' -> textObjectChange(range)
                     else if !inputKey.char.isLetterOrDigit() -> HJTextObject.textObjectPairSurround(
                         ast, cx.doc, range, objtype, inputKey.char, cx.count
                     )
@@ -1396,4 +1401,47 @@ private fun filePickerProjectRoot(cx: HJActionContext) {
     } else {
         filePickerImpl(cx, "File Picker (root)", projectDir)
     }
+}
+
+private fun insertWithIndent(cx: HJActionContext, fallbackLineStart: Boolean) {
+    insertMode(cx, false)
+
+    val psiFile = cx.hjEditor.psiFile
+
+    val ranges = mutableListOf<HJRange>()
+    var offs = 0
+
+    var transaction = cx.hjEditor.changeBySelection { range ->
+        val cursorLine = range.cursorLine(cx.doc)
+        val cursorLineStart = cx.doc.getLineStartOffset(cursorLine)
+
+        if (cx.doc.getLineEndOffset(cursorLine) == cursorLineStart) {
+            // line is empty -> auto indent
+            val lineEndIndex = cursorLineStart
+
+            val indent = if (psiFile != null) getIndentForLine(psiFile, cursorLineStart) else ""
+
+            // calculate new selection ranges
+            val pos = offs + cursorLineStart
+            val indentWidth = indent.length
+            ranges.add(HJRange.point(pos + indentWidth))
+            offs += indentWidth
+
+            HJChange.Insert(lineEndIndex, indent)
+        } else {
+            // move cursor to the fallback position
+            val pos = if (fallbackLineStart) {
+                cx.doc.getLine(cursorLine)?.let { firstNonWhitespaceChar(it, cursorLineStart) } ?: cursorLineStart
+            } else {
+                cx.doc.getLineEndOffset(cursorLine)
+            }
+
+            ranges.add(range.putCursor(cx.doc, pos + offs, false))
+
+            null
+        }
+    }
+
+    transaction = transaction.copy(selection = HJSelection(ranges, cx.hjEditor.selection.primaryIndex))
+    cx.hjEditor.apply(transaction)
 }
