@@ -25,3 +25,7 @@ fun charIsLineEnding(c: Char): Boolean {
     if (c == '\r') HJCharHandling.logger.error("CR encountered. Newline logic will not work.")
     return c == '\n'
 }
+
+fun charIsWord(c: Char): Boolean {
+    return c.isLetterOrDigit() || c == '_'
+}

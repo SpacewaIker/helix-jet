@@ -147,6 +147,13 @@ class HJSelection {
         }.normalize()
     }
 
+    override fun toString(): String {
+        val sb = StringBuilder("HJSelection(")
+        sb.append(ranges.joinToString { if (it == primary) "*$it" else "$it" })
+        sb.append(')')
+        return sb.toString()
+    }
+
     companion object {
         fun selectOnMatches(doc: Document, selection: HJSelection, pattern: String): HJSelection? {
             val result = mutableListOf<HJRange>()

@@ -7,15 +7,23 @@ import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.IdeActions
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.VisualPosition
 import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.ex.FileEditorManagerEx
+import com.intellij.openapi.fileEditor.impl.EditorComposite
 import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.util.TextRange
+import com.intellij.openapi.vcs.changes.Change
+import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vcs.changes.VcsIgnoreManager
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileVisitor
 import com.intellij.openapi.wm.WindowManager
+import com.intellij.psi.util.endOffset
+import com.intellij.psi.util.startOffset
+import com.intellij.ui.table.JBTable
 import spacewaiker.helixjet.actions.HJKeyAction.HJAction
 import spacewaiker.helixjet.editor.*
 import spacewaiker.helixjet.input.HJInputHandler
@@ -137,24 +145,24 @@ private val actionsRaw = arrayOf(
     HJAction("search_prev", "Select previous search match") { searchNextOrPrevImpl(it, false, HJDirection.BACKWARD) },
     HJAction("extend_search_next", "Add next search match to selection") { searchNextOrPrevImpl(it, true, HJDirection.FORWARD) },
     HJAction("extend_search_prev", "Add previous search match to selection") { searchNextOrPrevImpl(it, true, HJDirection.BACKWARD) },
-    HJAction("search_selection", "Use current selection as search pattern"),
-    HJAction("search_selection_detect_word_boundaries", "Use current selection as the search pattern, automatically wrapping with `\\b` on word boundaries"),
-    HJAction("make_search_word_bounded", "Modify current search to make it word bounded"),
-    HJAction("global_search", "Global search in workspace folder"),
+    HJAction("search_selection", "Use current selection as search pattern") { searchSelectionImpl(it, false) },
+    HJAction("search_selection_detect_word_boundaries", "Use current selection as the search pattern, automatically wrapping with `\\b` on word boundaries") { searchSelectionImpl(it, true) },
+    HJAction("make_search_word_bounded", "Modify current search to make it word bounded") { makeSearchWordBounded(it) },
+    HJAction("global_search", "Global search in workspace folder") {executeIdeAction(it, "TextSearchAction") },
     HJAction("extend_line", "Select current line, if already selected, extend to another line based on the anchor") { extendLine(it) },
     HJAction("extend_line_below", "Select current line, if already selected, extend to next line") { extendImpl(it, true) },
     HJAction("extend_line_above", "Select current line, if already selected, extend to previous line") { extendImpl(it, false) },
-    HJAction("select_line_above", "Select current line, if already selected, extend or shrink line above based on the anchor"),
-    HJAction("select_line_below", "Select current line, if already selected, extend or shrink line below based on the anchor"),
-    HJAction("extend_to_line_bounds", "Extend selection to line bounds"),
-    HJAction("shrink_to_line_bounds", "Shrink selection to line bounds"),
+    HJAction("select_line_above", "Select current line, if already selected, extend or shrink line above based on the anchor") { selectLineImpl(it, true) },
+    HJAction("select_line_below", "Select current line, if already selected, extend or shrink line below based on the anchor") { selectLineImpl(it, false) },
+    HJAction("extend_to_line_bounds", "Extend selection to line bounds") { extendToLineBounds(it) },
+    HJAction("shrink_to_line_bounds", "Shrink selection to line bounds") { shrinkToLineBounds(it) },
     HJAction("delete_selection", "Delete selection") { deleteSelectionImpl(it, false, true) },
     HJAction("delete_selection_noyank", "Delete selection without yanking") { deleteSelectionImpl(it, false, false) },
     HJAction("change_selection", "Change selection") { deleteSelectionImpl(it, true, true) },
     HJAction("change_selection_noyank", "Change selection without yanking") { deleteSelectionImpl(it, true, false) },
     HJAction("collapse_selection", "Collapse selection into single cursor") { collapseSelection(it) },
-    HJAction("flip_selections", "Flip selection cursor and anchor"),
-    HJAction("ensure_selections_forward", "Ensure all selections face forward"),
+    HJAction("flip_selections", "Flip selection cursor and anchor") { flipSelections(it) },
+    HJAction("ensure_selections_forward", "Ensure all selections face forward") { ensureSelectionsForward(it) },
     HJAction("insert_mode", "Insert before selection") { insertMode(it, false) },
     HJAction("append_mode", "Append after selection") { insertMode(it, true) },
     HJAction("command_mode", "Enter command mode") { commandMode(it) },
@@ -164,15 +172,15 @@ private val actionsRaw = arrayOf(
     HJAction("file_explorer", "Open file explorer in workspace root"),
     HJAction("file_explorer_in_current_buffer_directory", "Open file explorer at current buffer's directory"),
     HJAction("file_explorer_in_current_directory", "Open file explorer at current working directory"),
-    HJAction("code_action", "Perform code action"),
-    HJAction("buffer_picker", "Open buffer picker"),
+    HJAction("code_action", "Perform code action") { executeIdeAction(it, IdeActions.ACTION_SHOW_INTENTION_ACTIONS) },
+    HJAction("buffer_picker", "Open buffer picker") { bufferPicker(it) },
     HJAction("jumplist_picker", "Open jumplist picker"),
-    HJAction("symbol_picker", "Open symbol picker"),
+    HJAction("symbol_picker", "Open symbol picker") { symbolPicker(it) },
     HJAction("syntax_symbol_picker", "Open symbol picker from syntax information"),
     HJAction("lsp_or_syntax_symbol_picker", "Open symbol picker from LSP or syntax information"),
-    HJAction("changed_file_picker", "Open changed file picker"),
+    HJAction("changed_file_picker", "Open changed file picker") { changedFilePicker(it) },
     HJAction("select_references_to_symbol_under_cursor", "Select symbol references"),
-    HJAction("workspace_symbol_picker", "Open workspace symbol picker"),
+    HJAction("workspace_symbol_picker", "Open workspace symbol picker") { executeIdeAction(it, "GotoSymbol") },
     HJAction("syntax_workspace_symbol_picker", "Open workspace symbol picker from syntax information"),
     HJAction("lsp_or_syntax_workspace_symbol_picker", "Open workspace symbol picker from LSP or syntax information"),
     HJAction("diagnostics_picker", "Open diagnostic picker"),
@@ -1394,6 +1402,43 @@ private fun filePickerImpl(cx: HJActionContext, title: String, directory: Virtua
     }.show(project)
 }
 
+private fun changedFilePicker(cx: HJActionContext) {
+    val project = cx.hjEditor.editor.project!!
+
+    val changeListManager = ChangeListManager.getInstance(project)
+    val data = changeListManager.allChanges.distinctBy { it.virtualFile }
+
+    val projectRoot = project.guessProjectDir()?.path ?: ""
+    val model = object : AbstractTableModel() {
+        override fun getRowCount() = data.size
+        override fun getColumnCount() = 2
+        override fun getValueAt(rowIndex: Int, columnIndex: Int) = when (columnIndex) {
+            0 -> when (data[rowIndex].type) {
+                Change.Type.NEW -> "Added"
+                Change.Type.DELETED -> "Deleted"
+                Change.Type.MODIFICATION -> "Modified"
+                Change.Type.MOVED -> "Moved"
+            }
+
+            1 -> data[rowIndex].virtualFile?.path?.removePrefix(projectRoot) ?: ""
+            else -> ""
+        }
+
+        override fun getColumnName(column: Int) = when (column) {
+            0 -> "Change"
+            1 -> "Path"
+            else -> ""
+        }
+    }
+
+    val tableModifier = { table: JBTable -> table.columnModel.getColumn(0).maxWidth = 100 }
+
+    HJPicker("Changed File Picker", model, tableModifier) callback@{ rowIdx ->
+        val file = data[rowIdx].virtualFile ?: return@callback
+        FileEditorManager.getInstance(project).openFile(file, true)
+    }.show(project)
+}
+
 private fun filePickerProjectRoot(cx: HJActionContext) {
     val projectDir = cx.hjEditor.editor.project!!.guessProjectDir()
     if (projectDir == null) {
@@ -1444,4 +1489,229 @@ private fun insertWithIndent(cx: HJActionContext, fallbackLineStart: Boolean) {
 
     transaction = transaction.copy(selection = HJSelection(ranges, cx.hjEditor.selection.primaryIndex))
     cx.hjEditor.apply(transaction)
+}
+
+private fun searchSelectionImpl(cx: HJActionContext, detectWordBoundaries: Boolean) {
+    fun isAtWordStart(doc: Document, index: Int): Boolean {
+        if (index == doc.textLength) return false
+
+        val ch = doc.charsSequence[index]
+        if (index == 0) return charIsWord(ch)
+
+        val prevCh = doc.charsSequence[index - 1]
+        return !charIsWord(prevCh) && charIsWord(ch)
+    }
+
+    fun isAtWordEnd(doc: Document, index: Int): Boolean {
+        if (index == 0 || index == doc.textLength) return false
+
+        val ch = doc.charsSequence[index]
+        val prevCh = doc.charsSequence[index - 1]
+
+        return charIsWord(prevCh) && !charIsWord(ch)
+    }
+
+    val register = cx.register ?: HJRegister.LastSearch
+
+    val regex = cx.hjEditor.selection.ranges.map { range ->
+        val addBoundaryPrefix = detectWordBoundaries && isAtWordStart(cx.doc, range.from)
+        val addBoundarySuffix = detectWordBoundaries && isAtWordEnd(cx.doc, range.to)
+
+        val prefix = if (addBoundaryPrefix) "\\b" else ""
+        val suffix = if (addBoundarySuffix) "\\b" else ""
+
+        val word = Regex.escape(range.slice(cx.doc) ?: "")
+        "$prefix$word$suffix"
+    }.toHashSet()
+        .toList()
+        .joinToString(separator = "|")
+
+    if (HJState.pushRegister(register, regex)) {
+        cx.hjEditor.setStatus("register '$register' set to '$regex'")
+    }
+}
+
+private fun makeSearchWordBounded(cx: HJActionContext) {
+    val register = cx.register ?: HJRegister.LastSearch
+    val regex = HJState.getRegisterContents(register)?.lastOrNull() ?: return
+
+    val startAnchored = regex.startsWith("\\b")
+    val endAnchored = regex.endsWith("\\b")
+
+    if (startAnchored && endAnchored) return
+
+    var newRegex = ""
+    if (!startAnchored) newRegex += "\\b"
+    newRegex += regex
+    if (!endAnchored) newRegex += "\\b"
+
+    if (HJState.pushRegister(register, newRegex)) {
+        cx.hjEditor.setStatus("register '$register' set to '$newRegex'")
+    }
+}
+
+private fun selectLineImpl(cx: HJActionContext, above: Boolean) {
+    var count = cx.count
+    val saturatingAdd = { a: Int, b: Int -> (a + b).coerceAtMost(cx.doc.lineCount) }
+
+    val selection = cx.hjEditor.selection.clone().transform { range ->
+        val (startLine, endLine) = range.lineRange(cx.doc)
+        val start = cx.doc.getLineStartOffset(startLine)
+        val end = 1 + cx.doc.getLineEndOffset(endLine)
+        val direction = range.direction
+
+        // Extending to line bounds is counted as one step
+        if (range.from != start || range.to != end) {
+            count = (count - 1).coerceAtLeast(0)
+        }
+        val (anchorLine, headLine) = when (Pair(above, direction)) {
+            Pair(true, HJDirection.FORWARD) -> Pair(startLine, (endLine - count).coerceAtLeast(0))
+            Pair(true, HJDirection.BACKWARD) -> Pair(endLine, (startLine - count).coerceAtLeast(0))
+            Pair(false, HJDirection.FORWARD) -> Pair(startLine, saturatingAdd(endLine, count))
+            Pair(false, HJDirection.BACKWARD) -> Pair(endLine, saturatingAdd(startLine, count))
+            else -> Pair(0, 0) // unreachable
+        }
+        val (anchor, head) = when (anchorLine.compareTo(headLine)) {
+            in Int.MIN_VALUE..-1 /* LESS THAN */ -> Pair(
+                cx.doc.getLineStartOffset(anchorLine),
+                1 + cx.doc.getLineEndOffset(headLine)
+            )
+
+            0 /* EQUAL */ -> if (above) Pair(
+                1 + cx.doc.getLineEndOffset(anchorLine),
+                cx.doc.getLineStartOffset(headLine)
+            ) else Pair(
+                cx.doc.getLineStartOffset(headLine),
+                1 + cx.doc.getLineEndOffset(anchorLine)
+            )
+
+            in 1..Int.MAX_VALUE /* GREATER THAN */ -> Pair(
+                1 + cx.doc.getLineEndOffset(anchorLine),
+                cx.doc.getLineStartOffset(headLine)
+            )
+
+            else -> Pair(0, 0) // unreachable
+        }
+
+        HJRange(anchor, head)
+    }
+
+    cx.hjEditor.setNewSelection(selection)
+}
+
+private fun extendToLineBounds(cx: HJActionContext) {
+    val selection = cx.hjEditor.selection.clone().transform { range ->
+        val (startLine, endLine) = range.lineRange(cx.doc)
+        val start = cx.doc.getLineStartOffset(startLine)
+        val end = 1 + cx.doc.getLineEndOffset(endLine)
+
+        HJRange(start, end).withDirection(range.direction)
+    }
+    cx.hjEditor.setNewSelection(selection)
+}
+
+private fun shrinkToLineBounds(cx: HJActionContext) {
+    val selection = cx.hjEditor.selection.clone().transform { range ->
+        val (startLine, endLine) = range.lineRange(cx.doc)
+
+        // Do nothing if the selection is within one line to prevent conditional logic for the behaviour of this command
+        if (startLine == endLine) return@transform range
+
+        var start = cx.doc.getLineStartOffset(startLine)
+        var end = 1 + cx.doc.getLineEndOffset(endLine)
+
+        if (start != range.from) {
+            start = 1 + cx.doc.getLineEndOffset(startLine)
+        }
+        if (end != range.to) {
+            end = cx.doc.getLineStartOffset(endLine)
+        }
+        HJRange(start, end).withDirection(range.direction)
+    }
+    cx.hjEditor.setNewSelection(selection)
+}
+
+private fun flipSelections(cx: HJActionContext) {
+    cx.hjEditor.setNewSelection(cx.hjEditor.selection.clone().transform(HJRange::flip))
+}
+
+private fun ensureSelectionsForward(cx: HJActionContext) {
+    cx.hjEditor.setNewSelection(cx.hjEditor.selection.clone().transform { it.withDirection(HJDirection.FORWARD) })
+}
+
+private fun bufferPicker(cx: HJActionContext) {
+    val project = cx.hjEditor.editor.project!!
+
+    val fileEditorManager = FileEditorManagerEx.getInstanceEx(project)
+    val data = fileEditorManager.allEditors.toList()
+    val rootDir = project.guessProjectDir()?.path ?: ""
+
+    val model = object : AbstractTableModel() {
+        override fun getRowCount() = data.size
+        override fun getColumnCount() = 2
+        override fun getValueAt(rowIndex: Int, columnIndex: Int) = when (columnIndex) {
+            0 -> if (data[rowIndex].isModified) "*" else ""
+            1 -> data[rowIndex].file.path.removePrefix(rootDir)
+            else -> ""
+        }
+
+        override fun getColumnName(column: Int) = when (column) {
+            0 -> "Flags"
+            1 -> "Path"
+            else -> ""
+        }
+    }
+
+    val tableModifier = { table: JBTable -> table.columnModel.getColumn(0).maxWidth = 50 }
+
+    HJPicker("Buffer Picker", model, tableModifier) callback@{ rowIdx ->
+        val fileEditor = data[rowIdx]
+        var composite: EditorComposite? = null
+
+        val window = fileEditorManager.windows.find { window ->
+            window.allComposites.any {
+                if (it.allEditors.contains(fileEditor)) {
+                    composite = it
+                    true
+                } else false
+            }
+        } ?: return@callback
+
+        window.setSelectedComposite(composite!!, true)
+    }.show(project)
+}
+
+// TODO: fix slow operations on EDT issue
+private fun symbolPicker(cx: HJActionContext) {
+    val project = cx.hjEditor.editor.project!!
+    val psiFile = cx.hjEditor.psiFile ?: return
+
+    val data = getStructureElements(project, psiFile)
+
+    val model = object : AbstractTableModel() {
+        override fun getRowCount() = data.size
+        override fun getColumnCount() = 3
+
+        override fun getValueAt(rowIndex: Int, columnIndex: Int) = when (columnIndex) {
+            0 -> data[rowIndex].kind
+            1 -> data[rowIndex].name
+            2 -> data[rowIndex].container
+            else -> ""
+        }
+
+        override fun getColumnName(column: Int) = when (column) {
+            0 -> "Kind"
+            1 -> "Name"
+            2 -> "Container"
+            else -> ""
+        }
+    }
+
+    HJPicker("Symbol Picker", model) callback@{ rowIdx ->
+        val psiElement = data[rowIdx].psiElement
+        val start = psiElement.startOffset
+        val end = psiElement.endOffset
+
+        cx.hjEditor.setNewSelection(HJSelection(HJRange(start, end)))
+    }.show(project)
 }

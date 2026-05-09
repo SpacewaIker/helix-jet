@@ -22,7 +22,6 @@
     <!-- Extensions defined by the plugin.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
     <extensions defaultExtensionNs="com.intellij">
-        <editorFactoryListener implementation="spacewaiker.helixjet.core.HJEditorListener"/>
         <postStartupActivity implementation="spacewaiker.helixjet.core.HJStartupActivity"/>
         <statusBarWidgetFactory implementation="spacewaiker.helixjet.ui.HJStatusBarInputWidgetFactory"
                                 id="HelixInputWidget" order="first"/>

@@ -64,8 +64,15 @@ object HJState {
         }
     }
 
-    fun pushRegister(register: HJRegister, value: String) {
+    /**
+     * Attempts to push the given value to the given register.
+     *
+     * @return True if the operation was successful, false otherwise.
+     */
+    fun pushRegister(register: HJRegister, value: String): Boolean {
+        if (register.readOnly) return false
         registers.getOrPut(register, ::mutableListOf).add(value)
+        return true
     }
 
     fun getRegisterContents(register: HJRegister) =

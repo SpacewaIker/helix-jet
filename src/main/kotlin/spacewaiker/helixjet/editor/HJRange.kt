@@ -168,6 +168,10 @@ class HJRange {
         } else null
     }
 
+    override fun toString(): String {
+        return "HJRange($from, $to)"
+    }
+
     companion object {
         fun point(head: Int) = HJRange(head, head)
     }

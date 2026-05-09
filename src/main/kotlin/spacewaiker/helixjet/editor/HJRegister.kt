@@ -57,4 +57,6 @@ sealed class HJRegister {
             }
         }
     }
+
+    override fun toString() = char.toString()
 }

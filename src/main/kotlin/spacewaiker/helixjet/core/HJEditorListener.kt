@@ -1,20 +1,26 @@
 ﻿package spacewaiker.helixjet.core
 
-import com.intellij.openapi.editor.event.EditorFactoryEvent
-import com.intellij.openapi.editor.event.EditorFactoryListener
+import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.FileEditorManagerListener
+import com.intellij.openapi.fileEditor.TextEditor
+import com.intellij.openapi.vfs.VirtualFile
 import spacewaiker.helixjet.editor.HJState
 import spacewaiker.helixjet.input.HJMouseListener
 
-class HJEditorListener : EditorFactoryListener {
-    override fun editorCreated(event: EditorFactoryEvent) {
-        val editor = event.editor
+class HJEditorListener : FileEditorManagerListener {
+    override fun fileOpened(source: FileEditorManager, file: VirtualFile) {
+        val editor = source.getSelectedEditor(file)
+            ?.let { it as? TextEditor }
+            ?.editor ?: return
 
-        // create entry for this editor in HJEditors map
-        HJState.getHJEditor(editor)
-
-        editor.addEditorMouseListener(HJMouseListener())
+        handleNewEditor(editor)
     }
 
-    override fun editorReleased(event: EditorFactoryEvent) {
+    companion object {
+        fun handleNewEditor(editor: Editor) {
+            HJState.getHJEditor(editor)
+            editor.addEditorMouseListener(HJMouseListener())
+        }
     }
 }

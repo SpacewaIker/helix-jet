@@ -20,6 +20,7 @@ import javax.swing.table.TableRowSorter
 class HJPicker(
     title: String,
     model: AbstractTableModel,
+    tableModifier: ((JBTable) -> Unit)? = null,
     val callback: (Int) -> Unit,
 ) {
     private val confirmAction = object : AbstractAction() {
@@ -55,6 +56,8 @@ class HJPicker(
         rowSorter = sorter
 
         addMappings(inputMap, actionMap)
+
+        tableModifier?.invoke(this)
     }
     private val searchField = SearchTextField(false).apply {
         addMappings(textEditor.getInputMap(JComponent.WHEN_FOCUSED), textEditor.actionMap)

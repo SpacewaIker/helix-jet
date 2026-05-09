@@ -59,7 +59,10 @@ class HJEditor {
         this.editor = editor
         this.selection = HJSelection(editor.caretModel)
 
+        logger.debug("Created HJEditor with selection: $selection")
+
         editor.settings.verticalScrollOffset = HJState.config.scrolloff
+        reloadCaretShapes()
     }
 
     /**
