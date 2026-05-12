@@ -329,3 +329,22 @@ fun findNthChar(doc: Document, charMatcher: HJCharMatcher, pos: Int, count: Int,
         }
     }
 }
+
+/**
+ * Returns the first index that doesn't satisfy the given predicate when advancing the character index.
+ *
+ * Returns null if all characters satisfy the predicate.
+ */
+fun skipWhile(string: String, pos: Int, predicate: (Char) -> Boolean): Int? {
+    return string.drop(pos).withIndex().find { !predicate(it.value) }?.let { it.index + pos }
+}
+
+/**
+ * Returns the first index that doesn't satisfy the given predicate when retreating the character index.
+ *
+ * Returns null if all characters satisfy the predicate.
+ */
+fun backwardsSkipWhile(string: String, pos: Int, predicate: (Char) -> Boolean): Int? {
+    return string.reversed().drop(string.length - pos - 1).withIndex().find { !predicate(it.value) }
+        ?.let { pos - it.index }
+}

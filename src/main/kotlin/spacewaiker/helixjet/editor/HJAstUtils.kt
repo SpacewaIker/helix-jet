@@ -1,13 +1,17 @@
 ﻿package spacewaiker.helixjet.editor
 
+import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerEx
+import com.intellij.codeInsight.daemon.impl.HighlightInfo
 import com.intellij.ide.structureView.StructureViewTreeElement
 import com.intellij.ide.util.treeView.smartTree.TreeElement
 import com.intellij.lang.ASTNode
 import com.intellij.lang.LanguageStructureViewBuilder
+import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.lang.tree.util.children
 import com.intellij.lang.tree.util.parents
 import com.intellij.lang.tree.util.siblings
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.psi.PsiElement
@@ -99,6 +103,34 @@ fun getStructureElements(project: Project, psiFile: PsiFile): List<HJSymbolData>
         }
 
         Disposer.dispose(structureView)
+
+        results
+    }
+}
+
+fun getDiagnostics(editor: Editor): List<HighlightInfo> {
+    val project = editor.project ?: return emptyList()
+
+    return ApplicationManager.getApplication().runReadAction<List<HighlightInfo>> {
+        val results = mutableListOf<HighlightInfo>()
+
+        DaemonCodeAnalyzerEx.processHighlights(
+            editor.document,
+            project,
+            null,
+            0,
+            editor.document.textLength,
+        ) { info ->
+            if (info.severity in listOf(
+                    HighlightSeverity.ERROR, HighlightSeverity.WARNING, HighlightSeverity.WEAK_WARNING,
+                    HighlightSeverity.INFORMATION, HighlightSeverity.TEXT_ATTRIBUTES
+                ) || info.severity.name == "TYPO"
+            ) {
+                results.add(info)
+            }
+
+            true
+        }
 
         results
     }

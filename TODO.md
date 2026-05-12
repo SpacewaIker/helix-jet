@@ -8,3 +8,4 @@
 - open empty buffer when all are closed to maintain functionality?
 - jumplist
 - HJPicker: make column width max of text width up to max
+- HJPicker: allow for coloured text in columns (e.g. coloured modification type in changed file picker)

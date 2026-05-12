@@ -3,6 +3,7 @@
 package spacewaiker.helixjet.actions
 
 import com.intellij.lang.LanguageCommenters
+import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.IdeActions
@@ -10,6 +11,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.VisualPosition
 import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.fileEditor.ex.FileEditorManagerEx
 import com.intellij.openapi.fileEditor.impl.EditorComposite
 import com.intellij.openapi.project.guessProjectDir
@@ -183,8 +185,8 @@ private val actionsRaw = arrayOf(
     HJAction("workspace_symbol_picker", "Open workspace symbol picker") { executeIdeAction(it, "GotoSymbol") },
     HJAction("syntax_workspace_symbol_picker", "Open workspace symbol picker from syntax information"),
     HJAction("lsp_or_syntax_workspace_symbol_picker", "Open workspace symbol picker from LSP or syntax information"),
-    HJAction("diagnostics_picker", "Open diagnostic picker"),
-    HJAction("workspace_diagnostics_picker", "Open workspace diagnostic picker"),
+    HJAction("diagnostics_picker", "Open diagnostic picker") { diagnosticPicker(it) },
+    HJAction("workspace_diagnostics_picker", "Open workspace diagnostic picker") { diagnosticPickerWorkspace(it) },
     HJAction("last_picker", "Open last picker"),
     HJAction("insert_at_line_start", "Insert at start of line") { insertWithIndent(it, true) },
     HJAction("insert_at_line_end", "Insert at end of line") { insertWithIndent(it, false) },
@@ -193,12 +195,12 @@ private val actionsRaw = arrayOf(
     HJAction("normal_mode", "Enter normal mode") { switchToMode(it, HJEditorMode.NORMAL) },
     HJAction("select_mode", "Enter selection extend mode") { switchToMode(it, HJEditorMode.SELECT) },
     HJAction("exit_select_mode", "Exit selection mode") { if (HJState.mode == HJEditorMode.SELECT) switchToMode(it, HJEditorMode.NORMAL) },
-    HJAction("goto_definition", "Goto definition"),
-    HJAction("goto_declaration", "Goto declaration"),
-    HJAction("add_newline_above", "Add newline above"),
-    HJAction("add_newline_below", "Add newline below"),
-    HJAction("goto_type_definition", "Goto type definition"),
-    HJAction("goto_implementation", "Goto implementation"),
+    HJAction("goto_definition", "Goto definition") { executeIdeAction(it, IdeActions.ACTION_GOTO_IMPLEMENTATION) },
+    HJAction("goto_declaration", "Goto declaration") { executeIdeAction(it, IdeActions.ACTION_GOTO_DECLARATION) },
+    HJAction("add_newline_above", "Add newline above") { addNewlineImpl(it, true) },
+    HJAction("add_newline_below", "Add newline below") { addNewlineImpl(it, false) },
+    HJAction("goto_type_definition", "Goto type definition") { executeIdeAction(it, IdeActions.ACTION_GOTO_TYPE_DECLARATION) },
+    HJAction("goto_implementation", "Goto implementation") { executeIdeAction(it, IdeActions.ACTION_GOTO_IMPLEMENTATION) },
     HJAction("goto_file_start", "Goto line number `<n>` else file start") { gotoFileStartImpl(it, false) },
     HJAction("goto_file_end", "Goto file end") { gotoFileEndImpl(it, false) },
     HJAction("extend_to_file_start", "Extend to line number `<n>` else file start") { gotoFileStartImpl(it, true) },
@@ -226,13 +228,13 @@ private val actionsRaw = arrayOf(
     HJAction("goto_last_change", "Goto last change"),
     HJAction("goto_line_start", "Goto line start") { gotoLineStartEnd(it, true) },
     HJAction("goto_line_end", "Goto line end") { gotoLineStartEnd(it, false) },
-    HJAction("goto_column", "Goto column"),
-    HJAction("extend_to_column", "Extend to column"),
+    HJAction("goto_column", "Goto column") { gotoColumnImpl(it, false) },
+    HJAction("extend_to_column", "Extend to column") { gotoColumnImpl(it, true) },
     HJAction("goto_next_buffer", "Goto next buffer") { executeIdeAction(it, IdeActions.ACTION_NEXT_TAB) },
     HJAction("goto_previous_buffer", "Goto previous buffer") { executeIdeAction(it, IdeActions.ACTION_PREVIOUS_TAB) },
     HJAction("goto_line_end_newline", "Goto newline at line end") { gotoLineEndNewline(it) },
     HJAction("goto_first_nonwhitespace", "Goto first non-blank in line") { gotoFirstNonWhitespace(it) },
-    HJAction("trim_selections", "Trim whitespace from selections"),
+    HJAction("trim_selections", "Trim whitespace from selections") { trimSelections(it) },
     HJAction("extend_to_line_start", "Extend to line start") { gotoLineStartEndImpl(it, true, true) },
     HJAction("extend_to_first_nonwhitespace", "Extend to first non-blank in line") { gotoFirstNonWhitespaceImpl(it, true) },
     HJAction("extend_to_line_end", "Extend to line end") { gotoLineStartEndImpl(it, false, true) },
@@ -271,8 +273,8 @@ private val actionsRaw = arrayOf(
     HJAction("paste_clipboard_before", "Paste clipboard before selections") { pasteImpl(it.copy(register = HJRegister.Clipboard), true) },
     HJAction("paste_primary_clipboard_after", "Paste primary clipboard after selections"),
     HJAction("paste_primary_clipboard_before", "Paste primary clipboard before selections"),
-    HJAction("indent", "Indent selection") { executeIdeAction(it, IdeActions.ACTION_EDITOR_INDENT_SELECTION) },
-    HJAction("unindent", "Unindent selection") { executeIdeAction(it, IdeActions.ACTION_EDITOR_UNINDENT_SELECTION) },
+    HJAction("indent", "Indent selection") { executeIdeAction(it, IdeActions.ACTION_EDITOR_INDENT_SELECTION, true) },
+    HJAction("unindent", "Unindent selection") { executeIdeAction(it, IdeActions.ACTION_EDITOR_UNINDENT_SELECTION, true) },
     HJAction("format_selections", "Format selection") { executeIdeAction(it, IdeActions.ACTION_EDITOR_REFORMAT)}, // TODO: only format selected?
     HJAction("join_selections", "Join lines inside selection"),
     HJAction("join_selections_space", "Join lines inside selection and select spaces"),
@@ -554,11 +556,18 @@ private fun pasteImpl(cx: HJActionContext, pasteBefore: Boolean) {
     cx.hjEditor.apply(transaction)
 }
 
-fun executeIdeAction(cx: HJActionContext, actionId: String) {
+fun executeIdeAction(cx: HJActionContext, actionId: String, extendLines: Boolean = false) {
     val action = ActionManager.getInstance().getAction(actionId) ?: return
+    val selection = cx.hjEditor.selection.clone()
+    if (extendLines) {
+        extendLine(cx)
+    }
     repeat(cx.count) {
         ActionManager.getInstance()
             .tryToExecute(action, null, cx.hjEditor.editor.contentComponent, ActionPlaces.UNKNOWN, true)
+    }
+    if (extendLines) {
+        cx.hjEditor.setNewSelection(selection)
     }
 }
 
@@ -1714,4 +1723,135 @@ private fun symbolPicker(cx: HJActionContext) {
 
         cx.hjEditor.setNewSelection(HJSelection(HJRange(start, end)))
     }.show(project)
+}
+
+private fun diagnosticPicker(cx: HJActionContext) {
+    val project = cx.hjEditor.editor.project!!
+
+    val data = getDiagnostics(cx.hjEditor.editor)
+
+    val model = object : AbstractTableModel() {
+        override fun getRowCount() = data.size
+        override fun getColumnCount() = 2
+
+        override fun getValueAt(rowIndex: Int, columnIndex: Int) = when (columnIndex) {
+            0 -> when (val severity = data[rowIndex].severity) {
+                HighlightSeverity.ERROR -> "Error"
+                HighlightSeverity.WARNING -> "Warning"
+                HighlightSeverity.INFORMATION -> "Info"
+                HighlightSeverity.WEAK_WARNING -> "Hint"
+                HighlightSeverity.TEXT_ATTRIBUTES -> "Style"
+                else if severity.name == "TYPO" -> "Typo"
+                else -> ""
+            }
+
+            1 -> data[rowIndex].description
+            else -> ""
+        }
+
+        override fun getColumnName(column: Int) = when (column) {
+            0 -> "Severity"
+            1 -> "Message"
+            else -> ""
+        }
+    }
+
+    val tableModifier = { table: JBTable -> table.columnModel.getColumn(0).maxWidth = 100 }
+
+    HJPicker("Diagnostic Picker", model, tableModifier) { rowIdx ->
+        val info = data[rowIdx]
+        cx.hjEditor.setNewSelection(HJSelection(HJRange(info.startOffset, info.endOffset)))
+    }.show(project)
+}
+
+private fun diagnosticPickerWorkspace(cx: HJActionContext) {
+    val project = cx.hjEditor.editor.project!!
+
+    val fileEditorManager = FileEditorManagerEx.getInstanceEx(project)
+    val data = fileEditorManager.allEditors
+        .filterIsInstance<TextEditor>()
+        .flatMap { textEditor ->
+            getDiagnostics(textEditor.editor).map { Pair(textEditor.file.path, it) }
+        }
+
+    val projectRoot = project.guessProjectDir()?.path ?: ""
+    val model = object : AbstractTableModel() {
+        override fun getRowCount() = data.size
+        override fun getColumnCount() = 3
+
+        override fun getValueAt(rowIndex: Int, columnIndex: Int) = when (columnIndex) {
+            0 -> when (val severity = data[rowIndex].second.severity) {
+                HighlightSeverity.ERROR -> "Error"
+                HighlightSeverity.WARNING -> "Warning"
+                HighlightSeverity.INFORMATION -> "Info"
+                HighlightSeverity.WEAK_WARNING -> "Hint"
+                HighlightSeverity.TEXT_ATTRIBUTES -> "Style"
+                else if severity.name == "TYPO" -> "Typo"
+                else -> ""
+            }
+
+            1 -> data[rowIndex].first.removePrefix(projectRoot)
+
+            2 -> data[rowIndex].second.description
+            else -> ""
+        }
+
+        override fun getColumnName(column: Int) = when (column) {
+            0 -> "Severity"
+            1 -> "Path"
+            2 -> "Message"
+            else -> ""
+        }
+    }
+
+    val tableModifier = { table: JBTable -> table.columnModel.getColumn(0).maxWidth = 100 }
+
+    HJPicker("Workspace Diagnostic Picker (Opened and Analyzed Files)", model, tableModifier) { rowIdx ->
+        val info = data[rowIdx].second
+        cx.hjEditor.setNewSelection(HJSelection(HJRange(info.startOffset, info.endOffset)))
+    }.show(project)
+}
+
+private fun addNewlineImpl(cx: HJActionContext, above: Boolean) {
+    val transaction = cx.hjEditor.changeBySelection { range ->
+        val (start, end) = range.lineRange(cx.doc)
+        val pos = if (above) cx.doc.getLineStartOffset(start)
+        else cx.doc.getLineEndOffset(end)
+        HJChange.Insert(pos, "\n".repeat(cx.count))
+    }
+
+    cx.hjEditor.apply(transaction)
+}
+
+private fun gotoColumnImpl(cx: HJActionContext, extend: Boolean) {
+    val selection = cx.hjEditor.selection.clone().transform { range ->
+        val line = range.cursorLine(cx.doc)
+        val lineStart = cx.doc.getLineStartOffset(line)
+        val lineEnd = cx.doc.getLineEndOffset(line)
+        val pos = (lineStart + cx.count).coerceAtMost(lineEnd)
+        range.putCursor(cx.doc, pos, extend)
+    }
+    cx.hjEditor.setNewSelection(selection)
+}
+
+private fun trimSelections(cx: HJActionContext) {
+    val ranges = cx.hjEditor.selection.ranges.filterNot { range ->
+        range.isEmpty || (range.slice(cx.doc)?.all { it.isWhitespace() } ?: false)
+    }.map { range ->
+        var start = range.from
+        var end = range.to
+        start = skipWhile(cx.doc.text, start) { it.isWhitespace() } ?: start
+        end = backwardsSkipWhile(cx.doc.text, end) { it.isWhitespace() }?.plus(1) ?: end
+        HJRange(start, end).withDirection(range.direction)
+    }
+
+    if (ranges.isNotEmpty()) {
+        val primary = cx.hjEditor.selection.primary
+        val idx = ranges.indexOfFirst { it.overlaps(primary) }
+        val primaryIndex = if (idx == -1) ranges.size - 1 else idx
+        cx.hjEditor.setNewSelection(HJSelection(ranges, primaryIndex))
+    } else {
+        collapseSelection(cx)
+        keepPrimarySelection(cx)
+    }
 }
