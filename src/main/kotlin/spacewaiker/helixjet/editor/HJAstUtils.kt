@@ -89,14 +89,14 @@ fun getStructureElements(project: Project, psiFile: PsiFile, onComplete: (List<H
         val stack = mutableListOf<Pair<TreeElement, TreeElement?>>(Pair(structureView.treeModel.root, null))
         while (stack.isNotEmpty()) {
             val (node, parent) = stack.removeLast()
-            if (node is StructureViewTreeElement) {
+            if (node is StructureViewTreeElement && parent != null) {
                 val psiElement = node.value as? PsiElement ?: continue
                 results.add(
                     HJSymbolData(
                         psiElement,
                         psiElement.node.elementType.toString().lowercase().replaceFirstChar { it.uppercase() },
                         node.presentation.presentableText ?: "",
-                        parent?.presentation?.presentableText ?: "",
+                        parent.presentation.presentableText ?: "",
                     )
                 )
             }

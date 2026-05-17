@@ -17,6 +17,13 @@ class HJEditorListener : FileEditorManagerListener {
         handleNewEditor(editor)
     }
 
+    override fun fileClosed(source: FileEditorManager, file: VirtualFile) {
+        val editor = source.getSelectedEditor(file)
+            ?.let { it as? TextEditor }
+            ?.editor ?: return
+        HJState.releaseEditor(editor)
+    }
+
     companion object {
         fun handleNewEditor(editor: Editor) {
             HJState.getHJEditor(editor)

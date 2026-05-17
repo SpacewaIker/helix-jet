@@ -10,6 +10,7 @@ import com.intellij.openapi.actionSystem.IdeActions
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.VisualPosition
+import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.fileEditor.ex.FileEditorManagerEx
@@ -25,7 +26,7 @@ import com.intellij.openapi.vfs.VirtualFileVisitor
 import com.intellij.openapi.wm.WindowManager
 import com.intellij.psi.util.endOffset
 import com.intellij.psi.util.startOffset
-import com.intellij.ui.table.JBTable
+import com.intellij.ui.JBColor
 import spacewaiker.helixjet.actions.HJKeyAction.HJAction
 import spacewaiker.helixjet.editor.*
 import spacewaiker.helixjet.input.HJInputHandler
@@ -249,8 +250,8 @@ private val actionsRaw = arrayOf(
     HJAction("delete_char_forward", "Delete next char") { executeIdeAction(it, IdeActions.ACTION_EDITOR_DELETE); it.hjEditor.setNewSelection(HJSelection(it.hjEditor.editor.caretModel)) },
     HJAction("delete_word_backward", "Delete previous word") { executeIdeAction(it, IdeActions.ACTION_EDITOR_DELETE_TO_WORD_START); it.hjEditor.setNewSelection(HJSelection(it.hjEditor.editor.caretModel)) },
     HJAction("delete_word_forward", "Delete next word") { executeIdeAction(it, IdeActions.ACTION_EDITOR_DELETE_TO_WORD_END); it.hjEditor.setNewSelection(HJSelection(it.hjEditor.editor.caretModel)) },
-    HJAction("kill_to_line_start", "Delete till start of line"),
-    HJAction("kill_to_line_end", "Delete till end of line"),
+    HJAction("kill_to_line_start", "Delete till start of line") { killToLineStart(it) },
+    HJAction("kill_to_line_end", "Delete till end of line") { killToLineEnd(it) },
     HJAction("undo", "Undo change") { executeIdeAction(it, IdeActions.ACTION_UNDO); it.hjEditor.setNewSelection(HJSelection(it.hjEditor.editor.caretModel)) },
     HJAction("redo", "Redo change") { executeIdeAction(it, IdeActions.ACTION_REDO); it.hjEditor.setNewSelection(HJSelection(it.hjEditor.editor.caretModel)) },
     HJAction("earlier", "Move backward in history"),
@@ -529,6 +530,44 @@ private fun deleteSelectionImpl(cx: HJActionContext, change: Boolean, yank: Bool
     } else {
         switchToMode(cx, HJEditorMode.NORMAL)
     }
+}
+
+private fun killToLineStart(cx: HJActionContext) {
+    val transaction = cx.hjEditor.changeBySelection { range ->
+        val line = range.cursorLine(cx.doc)
+        val firstChar = cx.doc.getLineStartOffset(line)
+        val anchor = range.cursor
+        val head = if (anchor == firstChar && line != 0) {
+            cx.doc.getLineEndOffset(line - 1)
+        } else {
+            val pos = cx.doc.getLine(line)?.let { firstNonWhitespaceChar(it) }
+            if (pos != null) {
+                if (firstChar + pos < anchor) {
+                    firstChar + pos
+                } else firstChar
+            } else firstChar
+        }
+        HJChange.Delete(head, anchor)
+    }
+
+    cx.hjEditor.apply(transaction)
+}
+
+private fun killToLineEnd(cx: HJActionContext) {
+    val transaction = cx.hjEditor.changeBySelection { range ->
+        val line = range.cursorLine(cx.doc)
+        val lineEndPos = cx.doc.getLineEndOffset(line)
+        val pos = range.cursor
+
+        // if the cursor is on the newline char delete that
+        if (pos == lineEndPos) {
+            HJChange.Delete(pos, cx.doc.getLineStartOffset(line + 1))
+        } else {
+            HJChange.Delete(pos, lineEndPos)
+        }
+    }
+
+    cx.hjEditor.apply(transaction)
 }
 
 private fun yank(cx: HJActionContext) {
@@ -982,7 +1021,7 @@ private fun commandPalette(cx: HJActionContext) {
         }
     }
 
-    HJPicker("HelixJet Commands", model) { rowIdx ->
+    HJPicker(cx.hjEditor.editor.project!!, "HelixJet Commands", model) { rowIdx ->
         when (val act = data[rowIdx].first) {
             is HJAction -> act.execute(cx)
             is HJCommand -> act.execute(cx, listOf(), listOf())
@@ -1405,7 +1444,9 @@ private fun filePickerImpl(cx: HJActionContext, title: String, directory: Virtua
         override fun getColumnName(column: Int) = "File"
     }
 
-    HJPicker(title, model) { rowIdx ->
+    val previewSelector = { rowIdx: Int -> Pair(data[rowIdx], null) }
+
+    HJPickerWithPreview(project, title, model, previewSelector) { rowIdx ->
         val file = data[rowIdx]
         FileEditorManager.getInstance(project).openFile(file, true)
     }.show(project)
@@ -1440,9 +1481,18 @@ private fun changedFilePicker(cx: HJActionContext) {
         }
     }
 
-    val tableModifier = { table: JBTable -> table.columnModel.getColumn(0).maxWidth = 100 }
+    val columnColors = listOf(
+        Pair(0) { value: String ->
+            when (value) {
+                "Added" -> JBColor.green
+                "Deleted" -> JBColor.red
+                "Modified", "Moved" -> JBColor.blue
+                else -> null
+            }
+        }
+    )
 
-    HJPicker("Changed File Picker", model, tableModifier) callback@{ rowIdx ->
+    HJPicker(project, "Changed File Picker", model, columnColors) callback@{ rowIdx ->
         val file = data[rowIdx].virtualFile ?: return@callback
         FileEditorManager.getInstance(project).openFile(file, true)
     }.show(project)
@@ -1671,9 +1721,9 @@ private fun bufferPicker(cx: HJActionContext) {
         }
     }
 
-    val tableModifier = { table: JBTable -> table.columnModel.getColumn(0).maxWidth = 50 }
+    val previewSelector = { rowIdx: Int -> Pair(data[rowIdx].file, null) }
 
-    HJPicker("Buffer Picker", model, tableModifier) callback@{ rowIdx ->
+    HJPickerWithPreview(project, "Buffer Picker", model, previewSelector) callback@{ rowIdx ->
         val fileEditor = data[rowIdx]
         var composite: EditorComposite? = null
 
@@ -1690,7 +1740,6 @@ private fun bufferPicker(cx: HJActionContext) {
     }.show(project)
 }
 
-// TODO: fix slow operations on EDT issue
 private fun symbolPicker(cx: HJActionContext) {
     val project = cx.hjEditor.editor.project!!
     val psiFile = cx.hjEditor.psiFile ?: return
@@ -1715,7 +1764,12 @@ private fun symbolPicker(cx: HJActionContext) {
             }
         }
 
-        HJPicker("Symbol Picker", model) callback@{ rowIdx ->
+        val previewSelector = { rowIdx: Int ->
+            val psiElement = data[rowIdx].psiElement
+            Pair(psiElement.containingFile.virtualFile, Pair(psiElement.startOffset, psiElement.endOffset))
+        }
+
+        HJPickerWithPreview(project, "Symbol Picker", model, previewSelector) callback@{ rowIdx ->
             val psiElement = data[rowIdx].psiElement
             val start = psiElement.startOffset
             val end = psiElement.endOffset
@@ -1756,9 +1810,10 @@ private fun diagnosticPicker(cx: HJActionContext) {
         }
     }
 
-    val tableModifier = { table: JBTable -> table.columnModel.getColumn(0).maxWidth = 100 }
+    val previewSelector =
+        { rowIdx: Int -> Pair(cx.hjEditor.editor.virtualFile, Pair(data[rowIdx].startOffset, data[rowIdx].endOffset)) }
 
-    HJPicker("Diagnostic Picker", model, tableModifier) { rowIdx ->
+    HJPickerWithPreview(project, "Diagnostic Picker", model, previewSelector) { rowIdx ->
         val info = data[rowIdx]
         cx.hjEditor.setNewSelection(HJSelection(HJRange(info.startOffset, info.endOffset)))
     }.show(project)
@@ -1771,7 +1826,7 @@ private fun diagnosticPickerWorkspace(cx: HJActionContext) {
     val data = fileEditorManager.allEditors
         .filterIsInstance<TextEditor>()
         .flatMap { textEditor ->
-            getDiagnostics(textEditor.editor).map { Pair(textEditor.file.path, it) }
+            getDiagnostics(textEditor.editor).map { Pair(textEditor as FileEditor, it) }
         }
 
     val projectRoot = project.guessProjectDir()?.path ?: ""
@@ -1790,7 +1845,7 @@ private fun diagnosticPickerWorkspace(cx: HJActionContext) {
                 else -> ""
             }
 
-            1 -> data[rowIndex].first.removePrefix(projectRoot)
+            1 -> data[rowIndex].first.file.path.removePrefix(projectRoot)
 
             2 -> data[rowIndex].second.description
             else -> ""
@@ -1804,11 +1859,32 @@ private fun diagnosticPickerWorkspace(cx: HJActionContext) {
         }
     }
 
-    val tableModifier = { table: JBTable -> table.columnModel.getColumn(0).maxWidth = 100 }
+    // TODO: this picker does not change the file!
+    val previewSelector = previewSelector@{ rowIdx: Int ->
+        val (fileEditor, hlInfo) = data.getOrNull(rowIdx) ?: return@previewSelector null
+        Pair(fileEditor.file, Pair(hlInfo.startOffset, hlInfo.endOffset))
+    }
 
-    HJPicker("Workspace Diagnostic Picker (Opened and Analyzed Files)", model, tableModifier) { rowIdx ->
-        val info = data[rowIdx].second
-        cx.hjEditor.setNewSelection(HJSelection(HJRange(info.startOffset, info.endOffset)))
+    HJPickerWithPreview(
+        project, "Workspace Diagnostic Picker (Opened and Analyzed Files)", model, previewSelector
+    ) { rowIdx ->
+        val (fileEditor, info) = data[rowIdx]
+
+        // select buffer
+        var composite: EditorComposite? = null
+        val window = fileEditorManager.windows.find { window ->
+            window.allComposites.any {
+                if (it.allEditors.contains(fileEditor)) {
+                    composite = it
+                    true
+                } else false
+            }
+        } ?: return@HJPickerWithPreview
+        window.setSelectedComposite(composite!!, true)
+
+        // set selection
+        val hjEditor = HJState.getHJEditor((fileEditor as TextEditor).editor)
+        hjEditor.setNewSelection(HJSelection(HJRange(info.startOffset, info.endOffset)))
     }.show(project)
 }
 

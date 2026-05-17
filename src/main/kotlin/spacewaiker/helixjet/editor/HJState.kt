@@ -54,6 +54,8 @@ object HJState {
 
     fun getHJEditor(editor: Editor) = editors.getOrPut(editor) { HJEditor(editor) }
 
+    fun releaseEditor(editor: Editor) = editors.remove(editor) != null
+
     fun copyToRegister(hjEditor: HJEditor, selection: HJSelection, register: HJRegister) {
         HJRegister.selectionToRegister(hjEditor, selection, register)?.let {
             if (register == HJRegister.Clipboard) {
