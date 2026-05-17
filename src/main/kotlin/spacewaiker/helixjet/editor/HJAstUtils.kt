@@ -2,6 +2,7 @@
 
 import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerEx
 import com.intellij.codeInsight.daemon.impl.HighlightInfo
+import com.intellij.ide.structureView.StructureView
 import com.intellij.ide.structureView.StructureViewTreeElement
 import com.intellij.ide.util.treeView.smartTree.TreeElement
 import com.intellij.lang.ASTNode
@@ -16,6 +17,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
+import com.intellij.util.concurrency.AppExecutorUtil
 
 /**
  * Get the smallest node within this node that spans the given range.
@@ -77,11 +79,10 @@ data class HJSymbolData(
     val container: String,
 )
 
-fun getStructureElements(project: Project, psiFile: PsiFile): List<HJSymbolData> {
-    return ApplicationManager.getApplication().runReadAction<List<HJSymbolData>> {
-        val builder =
-            LanguageStructureViewBuilder.getInstance().getStructureViewBuilder(psiFile)
-                ?: return@runReadAction emptyList()
+fun getStructureElements(project: Project, psiFile: PsiFile, onComplete: (List<HJSymbolData>) -> Unit) {
+    val readAction = readAction@{
+        val builder = LanguageStructureViewBuilder.getInstance().getStructureViewBuilder(psiFile)
+            ?: return@readAction Pair(null, emptyList<HJSymbolData>())
         val structureView = builder.createStructureView(null, project)
         val results = mutableListOf<HJSymbolData>()
 
@@ -102,9 +103,17 @@ fun getStructureElements(project: Project, psiFile: PsiFile): List<HJSymbolData>
             node.children.forEach { stack.add(Pair(it, node)) }
         }
 
-        Disposer.dispose(structureView)
+        Pair(structureView, results)
+    }
 
-        results
+    AppExecutorUtil.getAppExecutorService().submit {
+        val (structureView, results) =
+            ApplicationManager.getApplication().runReadAction<Pair<StructureView?, List<HJSymbolData>>>(readAction)
+
+        ApplicationManager.getApplication().invokeLater {
+            structureView?.let { Disposer.dispose(it) }
+            onComplete(results)
+        }
     }
 }
 

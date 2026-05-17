@@ -1695,34 +1695,34 @@ private fun symbolPicker(cx: HJActionContext) {
     val project = cx.hjEditor.editor.project!!
     val psiFile = cx.hjEditor.psiFile ?: return
 
-    val data = getStructureElements(project, psiFile)
+    getStructureElements(project, psiFile) { data ->
+        val model = object : AbstractTableModel() {
+            override fun getRowCount() = data.size
+            override fun getColumnCount() = 3
 
-    val model = object : AbstractTableModel() {
-        override fun getRowCount() = data.size
-        override fun getColumnCount() = 3
+            override fun getValueAt(rowIndex: Int, columnIndex: Int) = when (columnIndex) {
+                0 -> data[rowIndex].kind
+                1 -> data[rowIndex].name
+                2 -> data[rowIndex].container
+                else -> ""
+            }
 
-        override fun getValueAt(rowIndex: Int, columnIndex: Int) = when (columnIndex) {
-            0 -> data[rowIndex].kind
-            1 -> data[rowIndex].name
-            2 -> data[rowIndex].container
-            else -> ""
+            override fun getColumnName(column: Int) = when (column) {
+                0 -> "Kind"
+                1 -> "Name"
+                2 -> "Container"
+                else -> ""
+            }
         }
 
-        override fun getColumnName(column: Int) = when (column) {
-            0 -> "Kind"
-            1 -> "Name"
-            2 -> "Container"
-            else -> ""
-        }
+        HJPicker("Symbol Picker", model) callback@{ rowIdx ->
+            val psiElement = data[rowIdx].psiElement
+            val start = psiElement.startOffset
+            val end = psiElement.endOffset
+
+            cx.hjEditor.setNewSelection(HJSelection(HJRange(start, end)))
+        }.show(project)
     }
-
-    HJPicker("Symbol Picker", model) callback@{ rowIdx ->
-        val psiElement = data[rowIdx].psiElement
-        val start = psiElement.startOffset
-        val end = psiElement.endOffset
-
-        cx.hjEditor.setNewSelection(HJSelection(HJRange(start, end)))
-    }.show(project)
 }
 
 private fun diagnosticPicker(cx: HJActionContext) {
