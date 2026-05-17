@@ -2,6 +2,7 @@
 
 package spacewaiker.helixjet.actions
 
+import com.intellij.ide.BrowserUtil
 import com.intellij.lang.LanguageCommenters
 import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.openapi.actionSystem.ActionManager
@@ -20,6 +21,7 @@ import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vcs.changes.VcsIgnoreManager
+import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileVisitor
@@ -34,6 +36,8 @@ import spacewaiker.helixjet.input.HJInputKey
 import spacewaiker.helixjet.ui.*
 import java.awt.event.KeyEvent
 import javax.swing.table.AbstractTableModel
+import kotlin.io.path.Path
+import kotlin.io.path.isDirectory
 import kotlin.math.max
 import kotlin.math.min
 
@@ -206,7 +210,7 @@ private val actionsRaw = arrayOf(
     HJAction("goto_file_end", "Goto file end") { gotoFileEndImpl(it, false) },
     HJAction("extend_to_file_start", "Extend to line number `<n>` else file start") { gotoFileStartImpl(it, true) },
     HJAction("extend_to_file_end", "Extend to file end") { gotoFileEndImpl(it, true) },
-    HJAction("goto_file", "Goto files/URLs in selections"),
+    HJAction("goto_file", "Goto files/URLs in selections") { gotoFileImpl(it, HJFileOpenLocation.InPlace) },
     HJAction("goto_file_hsplit", "Goto files in selections (hsplit)"),
     HJAction("goto_file_vsplit", "Goto files in selections (vsplit)"),
     HJAction("goto_reference", "Goto references"),
@@ -979,6 +983,53 @@ private fun gotoLineEndNewlineImpl(cx: HJActionContext, extend: Boolean) {
 
 private fun gotoLineEndNewline(cx: HJActionContext) {
     gotoLineEndNewlineImpl(cx, HJState.mode == HJEditorMode.SELECT)
+}
+
+// TODO: open file in background/vsplit/hsplit (refactor into openFile function)
+private fun gotoFileImpl(cx: HJActionContext, location: HJFileOpenLocation) {
+    // TODO: detect URL/path from LSP?
+    val project = cx.hjEditor.editor.project!!
+
+    val relPath = Path(cx.hjEditor.editor.virtualFile.path)
+
+    val paths = cx.hjEditor.selection.ranges.mapNotNull { range ->
+        if (range.isSingleGrapheme) {
+            // cap the search at 1000 chars around the cursor
+            val lookaround = 1000
+            val pos = range.cursor
+            val searchStart = (pos - lookaround).coerceAtLeast(0)
+            val searchEnd = (pos + lookaround).coerceAtMost(cx.doc.textLength - 1)
+            val searchRange = cx.doc.charsSequence.subSequence(searchStart, searchEnd).toString()
+            val path = findPaths(searchRange, true)
+                .takeWhile { searchStart + it.first <= pos + 1 }
+                .find { pos <= searchStart + it.last }
+                ?.let { searchRange.substring(it) }
+
+            HJActions.logger.debug("gotoFile auto-detected path: $path")
+
+            path
+        } else range.slice(cx.doc)?.trim()?.let { it.ifEmpty { null } }
+    }
+
+    println(paths.size)
+    println(paths)
+
+    for (path in paths) {
+        if (BrowserUtil.isAbsoluteURL(path)) {
+            BrowserUtil.browse(path)
+            continue
+        }
+
+        var path = Path(path)
+        path = relPath.resolve(path)
+        val virtualFile = VfsUtil.findFile(path, true) ?: continue
+        if (path.isDirectory()) {
+            filePickerImpl(cx, "File Picker", virtualFile)
+            break
+        } else {
+            FileEditorManager.getInstance(project).openFile(virtualFile, false)
+        }
+    }
 }
 
 private fun commandPalette(cx: HJActionContext) {
@@ -1859,7 +1910,6 @@ private fun diagnosticPickerWorkspace(cx: HJActionContext) {
         }
     }
 
-    // TODO: this picker does not change the file!
     val previewSelector = previewSelector@{ rowIdx: Int ->
         val (fileEditor, hlInfo) = data.getOrNull(rowIdx) ?: return@previewSelector null
         Pair(fileEditor.file, Pair(hlInfo.startOffset, hlInfo.endOffset))

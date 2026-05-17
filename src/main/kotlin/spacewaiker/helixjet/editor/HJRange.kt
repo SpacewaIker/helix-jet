@@ -38,6 +38,9 @@ class HJRange {
     val isEmpty
         get() = anchor == head
 
+    val isSingleGrapheme
+        get() = (to - from) == 1
+
     val direction
         get() = if (head < anchor) {
             HJDirection.BACKWARD

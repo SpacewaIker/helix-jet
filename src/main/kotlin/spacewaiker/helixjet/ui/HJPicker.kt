@@ -161,7 +161,6 @@ open class HJPicker(
 
         // scroll
         val scrollAmount = (computeSize().height - 80) / 22
-        println(scrollAmount)
 
         // scroll up
         inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_PAGE_UP, 0), "scroll_up")

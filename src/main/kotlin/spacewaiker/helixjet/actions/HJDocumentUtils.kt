@@ -8,6 +8,10 @@ import com.intellij.psi.codeStyle.CodeStyleManager
 import spacewaiker.helixjet.editor.HJState
 import java.util.regex.PatternSyntaxException
 
+enum class HJFileOpenLocation {
+    InPlace, BackgroundTab, VSplit, HSplit,
+}
+
 fun nthPrevGraphemeBoundary(charIdx: Int, n: Int): Int {
     return (charIdx - n).coerceAtLeast(0)
 }
@@ -75,4 +79,33 @@ fun getIndentForLine(psiFile: PsiFile, lineStartOffset: Int): String {
         CodeStyleManager.getInstance(psiFile.project)
             .getLineIndent(psiFile, lineStartOffset) ?: ""
     }
+}
+
+/**
+ * Returns an iterator of the char ranges in src that contain a path
+ */
+fun findPaths(src: String, matchSingleFile: Boolean): List<IntRange> {
+    val regex = getPathRegex("", "", matchSingleFile)
+    return regex.findAll(src).map { it.range }.toList()
+}
+
+@Suppress("ConvertToStringTemplate")
+private fun getPathRegex(prefix: String, postfix: String, matchSingleFile: Boolean): Regex {
+    val pathComponentRegex = """[\w@.\-+#$%?!,;~&]|[\\]\s"""
+    val bracedEnvRegex = """\$\{(?:""" + pathComponentRegex + """|[/:=])+\}"""
+
+    val firstComponent = "(?:$bracedEnvRegex|(?:$pathComponentRegex))"
+    // for all components except the first we allow an equals so that `foo=/bar/baz` does not include foo.
+    // This is primarily intended for url queries (where an equals is never in the first component)
+    val component = "(?:$firstComponent|=)"
+    val sep = """[/\\]""" // match \ on non-windows OSs too, why not
+    val urlPrefix = """[\w+\-.]+://??"""
+    // single slash handles most windows prefixes (like \\server\...) but `\\?\C:\..` (and C:\) needs special handling,
+    // since we don't allow : in the path components (so that colon separated paths and <path>:<line> work)
+    val pathPrefix = """\\\\\?\\\w:|\w:|\\|"""
+
+    val pathStart = "(?:$firstComponent+|~|$pathPrefix$urlPrefix)"
+    val optional = if (matchSingleFile) "|$pathStart" else ""
+    val pathRegex = "$prefix(?:$pathStart?(?:(?:$sep$component+)+$sep?|$sep)$optional)$postfix"
+    return Regex(pathRegex)
 }

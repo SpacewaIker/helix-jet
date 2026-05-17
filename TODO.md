@@ -8,6 +8,7 @@
 - jumplist
 - HJPicker: additional mappings (A-Enter for open in background, C-t toggle preview)
 - xp doesn't set the selection on the right line
+- open file in background/vsplit/hsplit (refactor into openFile function)
 
 Fix:
 
