@@ -5,9 +5,7 @@ import com.intellij.lang.tree.util.children
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.FileEditorManager
-import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.psi.PsiElement
 import spacewaiker.helixjet.editor.HJConfiguration
 import spacewaiker.helixjet.editor.HJRegister
@@ -70,32 +68,41 @@ private val helixCommands = arrayOf(
     HJCommand("config-reload", listOf(), "Reload user config") { _, _, _ ->
         HJState.config = HJConfiguration()
     },
-    HJCommand("open", listOf("o", "edit", "e"), "Open a file from disk into a new tab") { cx, args, _ ->
+    HJCommand(
+        "open",
+        listOf("o", "edit", "e"),
+        "Open a file from disk into a new tab",
+        listOf("--bg  Open in background tab")
+    ) { cx, args, flags ->
         if (args.isEmpty()) {
             cx.hjEditor.setError("'open': expected at least 1 argument, got 0")
             return@HJCommand
         }
 
-        val project = cx.hjEditor.editor.project!!
-        val projectRoot = project.guessProjectDir()
-        val fileManager = FileEditorManager.getInstance(project)
+        val openLocation = if (flags.contains("bg")) HJFileOpenLocation.BackgroundTab else HJFileOpenLocation.InPlace
 
-        for (filePath in args) {
-            val fileRelative =
-                projectRoot?.let { VirtualFileManager.getInstance().findFileByUrl("file://${it.path}/$filePath") }
+        for (path in args) {
+            openFile(cx, path, openLocation)
+        }
+    },
+    HJCommand("hsplit", listOf("hs", "sp"), "Open the file in a horizontal split") { cx, args, _ ->
+        if (args.isEmpty()) {
+            cx.hjEditor.setError("'hsplit': expected at least 1 argument, got 0")
+            return@HJCommand
+        }
 
-            if (fileRelative != null) {
-                fileManager.openFile(fileRelative, true)
-                continue
-            }
+        for (path in args) {
+            openFile(cx, path, HJFileOpenLocation.HSplit)
+        }
+    },
+    HJCommand("vsplit", listOf("vs"), "Open the file in a vertical split") { cx, args, _ ->
+        if (args.isEmpty()) {
+            cx.hjEditor.setError("'vsplit': expected at least 1 argument, got 0")
+            return@HJCommand
+        }
 
-            val fileAbsolute = VirtualFileManager.getInstance().findFileByUrl("file://$filePath")
-            if (fileAbsolute != null) {
-                fileManager.openFile(fileAbsolute, true)
-                continue
-            }
-
-            cx.hjEditor.setWarning("Could not open file $filePath")
+        for (path in args) {
+            openFile(cx, path, HJFileOpenLocation.VSplit)
         }
     },
     HJCommand("buffer-close", listOf("bc", "bclose"), "Close the current buffer.") { cx, _, _ ->

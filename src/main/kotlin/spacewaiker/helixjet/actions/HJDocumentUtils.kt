@@ -2,11 +2,21 @@
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.editor.Document
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.ex.FileEditorManagerEx
+import com.intellij.openapi.fileEditor.impl.EditorComposite
+import com.intellij.openapi.fileEditor.impl.text.TextEditorProvider
+import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.util.TextRange
+import com.intellij.openapi.vfs.VfsUtil
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiFile
 import com.intellij.psi.codeStyle.CodeStyleManager
 import spacewaiker.helixjet.editor.HJState
+import java.nio.file.Path
 import java.util.regex.PatternSyntaxException
+import javax.swing.JSplitPane
+import kotlin.io.path.Path
 
 enum class HJFileOpenLocation {
     InPlace, BackgroundTab, VSplit, HSplit,
@@ -108,4 +118,69 @@ private fun getPathRegex(prefix: String, postfix: String, matchSingleFile: Boole
     val optional = if (matchSingleFile) "|$pathStart" else ""
     val pathRegex = "$prefix(?:$pathStart?(?:(?:$sep$component+)+$sep?|$sep)$optional)$postfix"
     return Regex(pathRegex)
+}
+
+fun openFile(cx: HJActionContext, path: String, openLocation: HJFileOpenLocation) {
+    val path = Path(path)
+    openFile(cx, path, openLocation)
+}
+
+fun openFile(cx: HJActionContext, path: Path, openLocation: HJFileOpenLocation) {
+    // resolve WRT cx file path
+    val cxPath = cx.hjEditor.editor.virtualFile.toNioPath()
+    val filePath = cxPath.resolve(path)
+    var file = VfsUtil.findFile(filePath, true)
+
+    if (file == null) {
+        // resolve WRT project root
+        val projDir = cx.hjEditor.editor.project!!.guessProjectDir()?.toNioPath()
+        if (projDir != null) {
+            val filePath = projDir.resolve(path)
+            file = VfsUtil.findFile(filePath, true)
+        }
+    }
+
+    if (file == null) {
+        cx.hjEditor.setError("Could not find file $path")
+        return
+    }
+
+    openFile(cx, file, openLocation)
+}
+
+fun openFile(cx: HJActionContext, file: VirtualFile, openLocation: HJFileOpenLocation) {
+    val project = cx.hjEditor.editor.project!!
+
+    when (openLocation) {
+        HJFileOpenLocation.InPlace -> {
+            FileEditorManager.getInstance(project).openFile(file, true)
+        }
+
+        HJFileOpenLocation.BackgroundTab -> {
+            val fileEditorManagerEx = FileEditorManagerEx.getInstanceEx(project)
+
+            // "false" parameter should open in background but doesn't...
+            // so we need to manually re-focus the old editor. Not great but only workaround found so far
+            fileEditorManagerEx.openFile(file, false)
+
+            val currentTextEditor = TextEditorProvider.getInstance().getTextEditor(cx.hjEditor.editor)
+            var composite: EditorComposite? = null
+            fileEditorManagerEx.windows.find { window ->
+                window.allComposites.any {
+                    if (it.allEditors.contains(currentTextEditor)) {
+                        composite = it
+                        true
+                    } else false
+                }
+            }?.setSelectedComposite(composite!!, true)
+        }
+
+        HJFileOpenLocation.HSplit, HJFileOpenLocation.VSplit -> {
+            val fileEditorManagerEx = FileEditorManagerEx.getInstanceEx(project)
+            val currentWindow = fileEditorManagerEx.currentWindow ?: return
+            val orientation =
+                if (openLocation == HJFileOpenLocation.HSplit) JSplitPane.VERTICAL_SPLIT else JSplitPane.HORIZONTAL_SPLIT
+            currentWindow.split(orientation, true, file, true)
+        }
+    }
 }

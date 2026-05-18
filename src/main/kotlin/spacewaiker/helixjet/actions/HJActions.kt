@@ -2,6 +2,8 @@
 
 package spacewaiker.helixjet.actions
 
+import com.intellij.codeInsight.actions.VcsFacade
+import com.intellij.codeInsight.daemon.impl.HighlightInfo
 import com.intellij.ide.BrowserUtil
 import com.intellij.lang.LanguageCommenters
 import com.intellij.lang.annotation.HighlightSeverity
@@ -211,9 +213,10 @@ private val actionsRaw = arrayOf(
     HJAction("extend_to_file_start", "Extend to line number `<n>` else file start") { gotoFileStartImpl(it, true) },
     HJAction("extend_to_file_end", "Extend to file end") { gotoFileEndImpl(it, true) },
     HJAction("goto_file", "Goto files/URLs in selections") { gotoFileImpl(it, HJFileOpenLocation.InPlace) },
-    HJAction("goto_file_hsplit", "Goto files in selections (hsplit)"),
-    HJAction("goto_file_vsplit", "Goto files in selections (vsplit)"),
-    HJAction("goto_reference", "Goto references"),
+    HJAction("goto_file_hsplit", "Goto files in selections (hsplit)") { gotoFileImpl(it, HJFileOpenLocation.HSplit) },
+    HJAction("goto_file_vsplit", "Goto files in selections (vsplit)") { gotoFileImpl(it, HJFileOpenLocation.VSplit) },
+    HJAction("goto_file_background", "Goto files in selections (background)") { gotoFileImpl(it, HJFileOpenLocation.BackgroundTab) },
+    HJAction("goto_reference", "Goto references") { executeIdeAction(it, IdeActions.ACTION_FIND_USAGES) },
     HJAction("goto_window_top", "Goto window top"),
     HJAction("goto_window_center", "Goto window center"),
     HJAction("goto_window_bottom", "Goto window bottom"),
@@ -223,14 +226,14 @@ private val actionsRaw = arrayOf(
     HJAction("goto_line", "Goto line") { gotoLineImpl(it, false) },
     HJAction("goto_last_line", "Goto last line") { gotoLastLineImpl(it, false) },
     HJAction("extend_to_last_line", "Extend to last line") { gotoLastLineImpl(it, true) },
-    HJAction("goto_first_diag", "Goto first diagnostic"),
-    HJAction("goto_last_diag", "Goto last diagnostic"),
-    HJAction("goto_next_diag", "Goto next diagnostic"),
-    HJAction("goto_prev_diag", "Goto previous diagnostic"),
-    HJAction("goto_next_change", "Goto next change"),
-    HJAction("goto_prev_change", "Goto previous change"),
-    HJAction("goto_first_change", "Goto first change"),
-    HJAction("goto_last_change", "Goto last change"),
+    HJAction("goto_first_diag", "Goto first diagnostic") { gotoDiagnosticImpl(it, HJGotoTarget.FIRST) },
+    HJAction("goto_last_diag", "Goto last diagnostic") { gotoDiagnosticImpl(it, HJGotoTarget.LAST) },
+    HJAction("goto_next_diag", "Goto next diagnostic") { gotoDiagnosticImpl(it, HJGotoTarget.NEXT) },
+    HJAction("goto_prev_diag", "Goto previous diagnostic") { gotoDiagnosticImpl(it, HJGotoTarget.PREV) },
+    HJAction("goto_next_change", "Goto next change") { gotoChangeImpl(it, HJGotoTarget.NEXT) },
+    HJAction("goto_prev_change", "Goto previous change") { gotoChangeImpl(it, HJGotoTarget.PREV) },
+    HJAction("goto_first_change", "Goto first change") { gotoChangeImpl(it, HJGotoTarget.FIRST) },
+    HJAction("goto_last_change", "Goto last change") { gotoChangeImpl(it, HJGotoTarget.LAST) },
     HJAction("goto_line_start", "Goto line start") { gotoLineStartEnd(it, true) },
     HJAction("goto_line_end", "Goto line end") { gotoLineStartEnd(it, false) },
     HJAction("goto_column", "Goto column") { gotoColumnImpl(it, false) },
@@ -985,7 +988,6 @@ private fun gotoLineEndNewline(cx: HJActionContext) {
     gotoLineEndNewlineImpl(cx, HJState.mode == HJEditorMode.SELECT)
 }
 
-// TODO: open file in background/vsplit/hsplit (refactor into openFile function)
 private fun gotoFileImpl(cx: HJActionContext, location: HJFileOpenLocation) {
     // TODO: detect URL/path from LSP?
     val project = cx.hjEditor.editor.project!!
@@ -1011,9 +1013,6 @@ private fun gotoFileImpl(cx: HJActionContext, location: HJFileOpenLocation) {
         } else range.slice(cx.doc)?.trim()?.let { it.ifEmpty { null } }
     }
 
-    println(paths.size)
-    println(paths)
-
     for (path in paths) {
         if (BrowserUtil.isAbsoluteURL(path)) {
             BrowserUtil.browse(path)
@@ -1027,9 +1026,31 @@ private fun gotoFileImpl(cx: HJActionContext, location: HJFileOpenLocation) {
             filePickerImpl(cx, "File Picker", virtualFile)
             break
         } else {
-            FileEditorManager.getInstance(project).openFile(virtualFile, false)
+            openFile(cx, virtualFile, location)
         }
     }
+}
+
+private fun gotoDiagnosticImpl(cx: HJActionContext, gotoTarget: HJGotoTarget) {
+    val diagnostics = getDiagnostics(cx.hjEditor.editor)
+
+    val startOffsetFn = { diagnostic: HighlightInfo -> diagnostic.startOffset }
+    val endOffsetFn = { diagnostic: HighlightInfo -> diagnostic.endOffset }
+    val targetDiagnostic = gotoElementInList(cx, diagnostics, gotoTarget, startOffsetFn, endOffsetFn) ?: return
+
+    cx.hjEditor.setNewSelection(HJSelection(HJRange(targetDiagnostic.startOffset, targetDiagnostic.endOffset)))
+}
+
+private fun gotoChangeImpl(cx: HJActionContext, gotoTarget: HJGotoTarget) {
+    val psiFile = cx.hjEditor.psiFile ?: return
+    val changedRangesInfo = VcsFacade.getInstance().getChangedRangesInfo(psiFile) ?: return
+    val changes = changedRangesInfo.allChangedRanges
+
+    val startOffsetFn = { change: TextRange -> change.startOffset }
+    val endOffsetFn = { change: TextRange -> change.startOffset }
+    val targetChange = gotoElementInList(cx, changes, gotoTarget, startOffsetFn, endOffsetFn) ?: return
+
+    cx.hjEditor.setNewSelection(HJSelection(HJRange(targetChange.startOffset, targetChange.endOffset)))
 }
 
 private fun commandPalette(cx: HJActionContext) {

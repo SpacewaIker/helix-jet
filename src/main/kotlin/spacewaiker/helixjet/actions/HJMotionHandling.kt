@@ -24,6 +24,10 @@ enum class HJDirection {
         }
 }
 
+enum class HJGotoTarget {
+    FIRST, LAST, PREV, NEXT,
+}
+
 enum class HJCharMovementKind {
     HORIZONTAL, VERTICAL, VERTICAL_VISUAL
 }
@@ -347,4 +351,38 @@ fun skipWhile(string: String, pos: Int, predicate: (Char) -> Boolean): Int? {
 fun backwardsSkipWhile(string: String, pos: Int, predicate: (Char) -> Boolean): Int? {
     return string.reversed().drop(string.length - pos - 1).withIndex().find { !predicate(it.value) }
         ?.let { pos - it.index }
+}
+
+/**
+ * Returns the element in the provided list for "goto" first/last/next/prev commands.
+ */
+fun <T> gotoElementInList(
+    cx: HJActionContext,
+    list: List<T>,
+    gotoTarget: HJGotoTarget,
+    startOffsetFn: (T) -> Int,
+    endOffsetFn: (T) -> Int,
+): T? {
+    if (list.isEmpty()) return null
+
+    return when (gotoTarget) {
+        HJGotoTarget.FIRST -> list.first()
+        HJGotoTarget.LAST -> list.last()
+        HJGotoTarget.PREV -> {
+            val pos = cx.hjEditor.selection.primary.cursor
+            val reversed = list.asReversed()
+            // coerce at least 0 since indexOfFirst returns -1 if nothing is found
+            val firstPrevIdx = reversed.indexOfFirst { endOffsetFn(it) < pos }.coerceAtLeast(0)
+            val targetIdx = (firstPrevIdx + cx.count - 1) % reversed.size
+            reversed[targetIdx]
+        }
+
+        HJGotoTarget.NEXT -> {
+            val pos = cx.hjEditor.selection.primary.cursor
+            // coerce at least 0 since indexOfFirst returns -1 if nothing is found
+            val firstNextIdx = list.indexOfFirst { startOffsetFn(it) > pos }.coerceAtLeast(0)
+            val targetIdx = (firstNextIdx + cx.count - 1) % list.size
+            list[targetIdx]
+        }
+    }
 }

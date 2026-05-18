@@ -275,6 +275,7 @@ class HJPickerWithPreview(
     }
 
     private fun updatePreviewForRow(rowIdx: Int) {
+        if (rowIdx > table.model.rowCount - 1) return
         val (file, offsets) = previewSelector(rowIdx) ?: return
 
         val content = ApplicationManager.getApplication().runReadAction<String> {

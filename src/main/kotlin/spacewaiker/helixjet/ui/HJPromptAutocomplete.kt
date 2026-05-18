@@ -33,8 +33,6 @@ class HJPromptAutocomplete(editor: Editor) : HJFloatingTextarea(editor) {
         // -(-a).floorDiv(b) == a.ceilDiv(b)
         val numRows = -(-entries.size).floorDiv(numCols)
 
-        println("maxChars: $maxChars, numRows: $numRows, numCols: $numCols")
-
         val sb = StringBuilder()
 
         val offsets = MutableList(entries.size) { 0 }
