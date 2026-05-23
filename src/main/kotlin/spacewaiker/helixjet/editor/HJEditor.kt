@@ -7,10 +7,15 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.CaretVisualAttributes
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.ScrollType
+import com.intellij.openapi.util.Key
 import com.intellij.psi.PlainTextTokenTypes
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.codeStyle.CodeStyleManager
 import com.intellij.psi.util.elementType
+import spacewaiker.helixjet.ui.HJJumpLabelOverlay
+import java.awt.event.MouseWheelListener
+
+private val JUMP_OVERLAY_KEY = Key.create<HJJumpLabelOverlay>("helixjet.gotoword.inlays")
 
 sealed class HJChange {
     abstract val rank: Int
@@ -181,5 +186,35 @@ class HJEditor {
 
     fun setError(message: String) {
         notify(message, NotificationType.ERROR)
+    }
+
+    private lateinit var jumpLabelMouseWheelListener: MouseWheelListener
+
+    fun setJumpLabels(labels: List<Pair<Int, String>>) {
+        var overlay = editor.getUserData(JUMP_OVERLAY_KEY)
+        if (overlay == null) {
+            overlay = HJJumpLabelOverlay(editor)
+            editor.contentComponent.add(overlay)
+            editor.contentComponent.revalidate()
+            editor.putUserData(JUMP_OVERLAY_KEY, overlay)
+
+            // hide labels on mouse scroll
+            jumpLabelMouseWheelListener = MouseWheelListener { event ->
+                hideJumpLabels()
+                editor.contentComponent.parent.dispatchEvent(event)
+                editor.contentComponent.removeMouseWheelListener(jumpLabelMouseWheelListener)
+            }
+            editor.contentComponent.addMouseWheelListener(jumpLabelMouseWheelListener)
+        }
+        overlay.setLabels(labels)
+    }
+
+    fun hideJumpLabels() {
+        editor.getUserData(JUMP_OVERLAY_KEY)?.let { overlay ->
+            editor.contentComponent.remove(overlay)
+            editor.contentComponent.revalidate()
+            editor.contentComponent.repaint()
+            editor.putUserData(JUMP_OVERLAY_KEY, null)
+        }
     }
 }

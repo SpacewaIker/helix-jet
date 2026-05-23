@@ -31,6 +31,8 @@ class HJConfiguration {
         private set
     var searchWrapAround: Boolean = true
         private set
+    var jumpLabelAlphabet: CharArray = /* @formatter:off */ charArrayOf('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z') /* @formatter:on */
+        private set
     // ======================================================================================
 
     constructor() {
@@ -45,17 +47,14 @@ class HJConfiguration {
      * Try to load configuration file
      */
     private fun loadConfiguration(): TomlFile? {
-        val userHome = System.getProperty("user.home")
-        val configFile = "$userHome/.helixjet.toml"
-
         return try {
-            val file = File(configFile)
+            val file = File(userConfigPath)
             if (!file.exists()) {
-                logger.info("Configuration file not found: $configFile")
+                logger.info("Configuration file not found: $userConfigPath")
                 return null
             }
             if (!file.canRead()) {
-                logger.warn("Configuration file is not readable: $configFile")
+                logger.warn("Configuration file is not readable: $userConfigPath")
                 return null
             }
             val content = file.readText()
@@ -64,7 +63,7 @@ class HJConfiguration {
             logger.info("Successfully parsed toml configuration")
             toml
         } catch (e: Exception) {
-            logger.error("Failed to load configuration file: $configFile")
+            logger.error("Failed to load configuration file: $userConfigPath")
             logger.error(e.message)
             null
         }
@@ -91,6 +90,9 @@ class HJConfiguration {
                 getTomlValue<Boolean>(search, "smart-case")?.let { searchSmartCase = it }
                 getTomlValue<Boolean>(search, "wrap-around")?.let { searchWrapAround = it }
             }
+
+            // jump label alphabet
+            getTomlValue<String>(editor, "jump-label-alphabet")?.let { jumpLabelAlphabet = it.toCharArray().distinct().toCharArray() }
         }
 
         // keymap
@@ -225,6 +227,8 @@ class HJConfiguration {
 
     companion object {
         private val logger = Logger.getInstance(this::class.java)
+
+        val userConfigPath = System.getProperty("user.home") + "/.helixjet.toml"
 
         /**
          * The default key mapping, parsed.

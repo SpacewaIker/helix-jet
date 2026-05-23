@@ -120,12 +120,12 @@ private fun getPathRegex(prefix: String, postfix: String, matchSingleFile: Boole
     return Regex(pathRegex)
 }
 
-fun openFile(cx: HJActionContext, path: String, openLocation: HJFileOpenLocation) {
+fun openFile(cx: HJActionContext, path: String, openLocation: HJFileOpenLocation = HJFileOpenLocation.InPlace) {
     val path = Path(path)
     openFile(cx, path, openLocation)
 }
 
-fun openFile(cx: HJActionContext, path: Path, openLocation: HJFileOpenLocation) {
+fun openFile(cx: HJActionContext, path: Path, openLocation: HJFileOpenLocation = HJFileOpenLocation.InPlace) {
     // resolve WRT cx file path
     val cxPath = cx.hjEditor.editor.virtualFile.toNioPath()
     val filePath = cxPath.resolve(path)
@@ -148,7 +148,7 @@ fun openFile(cx: HJActionContext, path: Path, openLocation: HJFileOpenLocation) 
     openFile(cx, file, openLocation)
 }
 
-fun openFile(cx: HJActionContext, file: VirtualFile, openLocation: HJFileOpenLocation) {
+fun openFile(cx: HJActionContext, file: VirtualFile, openLocation: HJFileOpenLocation = HJFileOpenLocation.InPlace) {
     val project = cx.hjEditor.editor.project!!
 
     when (openLocation) {
@@ -184,3 +184,5 @@ fun openFile(cx: HJActionContext, file: VirtualFile, openLocation: HJFileOpenLoc
         }
     }
 }
+
+fun CharArray.indexOfOrNull(char: Char) = indexOf(char).let { if (it == -1) null else it }

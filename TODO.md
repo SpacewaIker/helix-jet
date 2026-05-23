@@ -13,4 +13,5 @@
 
 Fix:
 
+- HJJumpLabelOverlay: folds in editor means text isn't visible and shouldn't be considered
 - ctrl shift U in picker with preview doesn't scroll up

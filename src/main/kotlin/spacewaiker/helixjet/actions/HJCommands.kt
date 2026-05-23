@@ -68,6 +68,9 @@ private val helixCommands = arrayOf(
     HJCommand("config-reload", listOf(), "Reload user config") { _, _, _ ->
         HJState.config = HJConfiguration()
     },
+    HJCommand("config-open", listOf(), "Open user config") { cx, _, _ ->
+        openFile(cx, HJConfiguration.userConfigPath)
+    },
     HJCommand(
         "open",
         listOf("o", "edit", "e"),

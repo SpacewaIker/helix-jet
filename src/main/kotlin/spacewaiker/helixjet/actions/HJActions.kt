@@ -36,6 +36,7 @@ import spacewaiker.helixjet.editor.*
 import spacewaiker.helixjet.input.HJInputHandler
 import spacewaiker.helixjet.input.HJInputKey
 import spacewaiker.helixjet.ui.*
+import java.awt.Point
 import java.awt.event.KeyEvent
 import javax.swing.table.AbstractTableModel
 import kotlin.io.path.Path
@@ -386,8 +387,8 @@ private val actionsRaw = arrayOf(
     HJAction("record_macro", "Record macro"),
     HJAction("replay_macro", "Replay macro"),
     HJAction("command_palette", "Open command palette") { commandPalette(it) },
-    HJAction("goto_word", "Jump to a two-character label"),
-    HJAction("extend_to_word", "Extend to a two-character label"),
+    HJAction("goto_word", "Jump to a two-character label") { jumpToWord(it, false) },
+    HJAction("extend_to_word", "Extend to a two-character label") { jumpToWord(it, true) },
     HJAction("goto_next_tabstop", "Goto next snippet placeholder"),
     HJAction("goto_prev_tabstop", "Goto next snippet placeholder"),
     HJAction("rotate_selections_first", "Make the first selection your primary one"),
@@ -1051,6 +1052,144 @@ private fun gotoChangeImpl(cx: HJActionContext, gotoTarget: HJGotoTarget) {
     val targetChange = gotoElementInList(cx, changes, gotoTarget, startOffsetFn, endOffsetFn) ?: return
 
     cx.hjEditor.setNewSelection(HJSelection(HJRange(targetChange.startOffset, targetChange.endOffset)))
+}
+
+private fun jumpToWord(cx: HJActionContext, extend: Boolean) {
+    // Calculate the jump candidates: ranges for any visible words with two or more characters.
+
+    val alphabet = HJState.config.jumpLabelAlphabet
+    val jumpLabelLimit = alphabet.size * alphabet.size
+    val words = mutableListOf<HJRange>()
+
+    val visibleArea = cx.hjEditor.editor.scrollingModel.visibleArea
+    val start = cx.hjEditor.editor.logicalPositionToOffset(
+        cx.hjEditor.editor.xyToLogicalPosition(Point(visibleArea.x, visibleArea.y))
+    )
+    val end = cx.hjEditor.editor.logicalPositionToOffset(
+        cx.hjEditor.editor.xyToLogicalPosition(
+            Point(visibleArea.x + visibleArea.width, visibleArea.y + visibleArea.height)
+        )
+    )
+
+    val primarySelection = cx.hjEditor.selection.primary
+    val cursor = primarySelection.cursor
+    var cursorFwd = HJRange.point(cursor)
+    var cursorRev = HJRange.point(cursor)
+    if (cx.doc.charsSequence.getOrNull(cursor)?.let { !it.isWhitespace() } ?: false) {
+        val cursorWordEnd = wordMove(cx.doc, cursorFwd, HJWordMotionTarget.NEXT_WORD_END, 1)
+        // single grapheme words need a special case
+        if (cursorWordEnd.anchor == cursor) {
+            cursorFwd = cursorWordEnd
+        }
+        val cursorWordStart = wordMove(cx.doc, cursorRev, HJWordMotionTarget.PREV_WORD_START, 1)
+        if (cursorWordStart.anchor == nextGraphemeBoundary(cx.doc, cursor)) {
+            cursorRev = cursorWordStart
+        }
+    }
+
+    outer@ while (true) {
+        var changed = false
+        while (cursorFwd.head < end) {
+            cursorFwd = wordMove(cx.doc, cursorFwd, HJWordMotionTarget.NEXT_WORD_END, 1)
+            // The cursor is on a word that is at least two graphemes long and made up of word characters. The latter
+            // condition is needed because move_next_word_end simply treats a sequence of characters from the same char
+            // class as a word so '=<' would also count as a word.
+            val addLabel = cx.doc.charsSequence
+                .take(cursorFwd.head)
+                .reversed()
+                .take(2)
+                .takeWhile(::charIsWord)
+                .count() == 2
+            if (!addLabel) {
+                continue
+            }
+            changed = true
+            // skip any leading whitespace
+            cursorFwd.anchor += cx.doc.charsSequence.drop(cursorFwd.anchor).takeWhile { !charIsWord(it) }.count()
+            words.add(cursorFwd)
+            if (words.size == jumpLabelLimit) {
+                break@outer
+            }
+            break
+        }
+        while (cursorRev.head > start) {
+            cursorRev = wordMove(cx.doc, cursorRev, HJWordMotionTarget.PREV_WORD_START, 1)
+            // The cursor is on a word that is at least two graphemes long and made up of word characters. The latter
+            // condition is needed because move_next_word_end simply treats a sequence of characters from the same char
+            // class as a word so '=<' would also count as a word.
+            val addLabel = cx.doc.charsSequence
+                .drop(cursorRev.head)
+                .take(2)
+                .takeWhile(::charIsWord)
+                .count() == 2
+            if (!addLabel) {
+                continue
+            }
+            changed = true
+            cursorRev.anchor -= cx.doc.charsSequence.take(cursorRev.anchor).reversed().takeWhile { !charIsWord(it) }
+                .count()
+            words.add(cursorRev)
+            if (words.size == jumpLabelLimit) {
+                break@outer
+            }
+            break
+        }
+        if (!changed) {
+            break
+        }
+    }
+    jumpToLabel(cx, words, extend)
+}
+
+private fun jumpToLabel(cx: HJActionContext, labels: List<HJRange>, extend: Boolean) {
+    val alphabet = HJState.config.jumpLabelAlphabet
+    if (labels.isEmpty()) {
+        return
+    }
+
+    // Add label for each jump candidate
+    cx.hjEditor.setJumpLabels(labels.withIndex().map { (i, range) ->
+        val firstChar = alphabet[i / alphabet.size]
+        val secondChar = alphabet[i % alphabet.size]
+        Pair(range.from, charArrayOf(firstChar, secondChar).concatToString())
+    })
+
+    // Accept two characters matching a visible label. Jump to the candidate for that label if it exists
+    val primarySelection = cx.hjEditor.selection.primary
+    HJInputHandler.onNextKey { inputKey ->
+        val i = if (inputKey is HJInputKey.Character && !(inputKey.ctrl || inputKey.shift || inputKey.alt)) {
+            inputKey.char.let { alphabet.indexOfOrNull(it) }
+        } else null
+        // bail if the given character is invalid or cannot be a jump label
+        if (i == null || i * alphabet.size > labels.size) {
+            cx.hjEditor.hideJumpLabels()
+            return@onNextKey
+        }
+        val outer = i * alphabet.size
+        HJInputHandler.onNextKey { inputKey ->
+            cx.hjEditor.hideJumpLabels()
+
+            val inner = if (inputKey is HJInputKey.Character && !(inputKey.ctrl || inputKey.shift || inputKey.alt)) {
+                inputKey.char.let { alphabet.indexOfOrNull(it) }
+            } else null
+            if (inner == null) {
+                return@onNextKey
+            }
+            labels.getOrNull(outer + inner)?.let { range ->
+                val range = if (extend) {
+                    val anchor = if (range.anchor < range.head) {
+                        min(range.anchor, primarySelection.from)
+                    } else {
+                        max(range.anchor, primarySelection.to)
+                    }
+                    HJRange(anchor, range.head)
+                } else {
+                    range.withDirection(HJDirection.FORWARD)
+                }
+                cx.hjEditor.setNewSelection(HJSelection(range))
+            }
+        }
+    }
 }
 
 private fun commandPalette(cx: HJActionContext) {

@@ -9,8 +9,8 @@ import com.intellij.openapi.fileEditor.ex.FileEditorManagerEx
 import com.intellij.rml.dfa.Quadruple
 import java.awt.BorderLayout
 import java.awt.Point
+import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent
-import java.awt.event.ComponentListener
 import javax.swing.*
 
 abstract class HJFloatingTextarea(editor: Editor) {
@@ -30,21 +30,13 @@ abstract class HJFloatingTextarea(editor: Editor) {
     private val maxWidth get() = width?.second ?: editorsComponent.width
 
     init {
-        editorsComponent.addComponentListener(object : ComponentListener {
+        editorsComponent.addComponentListener(object : ComponentAdapter() {
             override fun componentResized(e: ComponentEvent?) {
                 recomputeElement()
             }
 
             override fun componentMoved(e: ComponentEvent?) {
                 recomputeElement()
-            }
-
-            override fun componentShown(e: ComponentEvent?) {
-                logger.error("componentShown not implemented. If encountered, please report!")
-            }
-
-            override fun componentHidden(e: ComponentEvent?) {
-                logger.error("componentHidden not implemented. If encountered, please report!")
             }
         })
     }

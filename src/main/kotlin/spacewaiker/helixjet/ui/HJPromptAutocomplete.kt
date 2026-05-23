@@ -15,7 +15,7 @@ class HJPromptAutocomplete(editor: Editor) : HJFloatingTextarea(editor) {
     }
 
     var entries = emptyList<String>()
-    var offsets = emptyList<Int>()
+    var offsets = intArrayOf()
 
     /**
      * Set the new available entries in the autocomplete list.
@@ -35,7 +35,7 @@ class HJPromptAutocomplete(editor: Editor) : HJFloatingTextarea(editor) {
 
         val sb = StringBuilder()
 
-        val offsets = MutableList(entries.size) { 0 }
+        val offsets = IntArray(entries.size) { 0 }
         for (row in 0 until numRows) {
             for (col in 0 until numCols) {
                 val idx = row + col * numRows
