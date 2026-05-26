@@ -451,6 +451,7 @@ private val defaultMappingNormal: Map<String, Any> = mapOf(
     "A-u" to "earlier",
     "A-U" to "later",
     "y" to "yank",
+    "Y" to "yank_main_selection",
     "p" to "paste_after",
     "P" to "paste_before",
     "Q" to "record_macro",

@@ -24,6 +24,10 @@ enum class HJDirection {
         }
 }
 
+enum class HJAlignment {
+    TOP, CENTER, BOTTOM,
+}
+
 enum class HJGotoTarget {
     FIRST, LAST, PREV, NEXT,
 }

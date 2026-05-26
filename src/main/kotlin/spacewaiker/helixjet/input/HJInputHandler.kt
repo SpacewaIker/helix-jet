@@ -15,7 +15,6 @@ import spacewaiker.helixjet.input.HJInputHandler.onNextKeyCallback
 import spacewaiker.helixjet.input.HJInputHandler.pendingActionKey
 import spacewaiker.helixjet.ui.HJStatusBarInputWidget
 import java.util.*
-import kotlin.math.max
 
 /**
  * Main input handler.
@@ -73,13 +72,7 @@ object HJInputHandler {
             updateInputWidget()
             return true
         }
-        var count: Int? = null
-        if (!actionCount.isEmpty()) {
-            // not a number, and action count is not empty, so we've finished entering our action count
-            count = max(1, actionCount.toInt())
-            actionCount = ""
-            updateInputWidget()
-        }
+        val count = if (actionCount.isEmpty()) null else actionCount.toInt().coerceAtLeast(1)
 
         var usingMinorMode = false
         val getKeyAction: (HJInputKey) -> HJKeyAction? = minorModeMapping?.let {
@@ -102,6 +95,7 @@ object HJInputHandler {
 
             is HJKeyAction.HJAction -> {
                 minorModeMapping = null
+                actionCount = ""
 
                 val hjEditor = HJState.getHJEditor(editor)
                 val cx = HJActionContext(hjEditor, count, null)

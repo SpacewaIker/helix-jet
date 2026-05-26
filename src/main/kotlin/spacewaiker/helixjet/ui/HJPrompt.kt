@@ -1,11 +1,11 @@
 ﻿package spacewaiker.helixjet.ui
 
-import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.editor.colors.EditorFontType
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.ex.FileEditorManagerEx
 import com.intellij.psi.codeStyle.NameUtil
+import spacewaiker.helixjet.editor.HJEditor
 import spacewaiker.helixjet.editor.HJRegister
 import spacewaiker.helixjet.editor.HJState
 import java.awt.BorderLayout
@@ -17,23 +17,23 @@ enum class HJPromptEvent {
 }
 
 internal class HJPromptTextField(
-    editor: Editor,
+    private val hjEditor: HJEditor,
     private val onEvent: (HJPromptEvent, String?) -> Unit,
     private val historyRegister: HJRegister?,
     private val autocompleteProvider: List<String>?,
     private val autocompleteUi: HJPromptAutocomplete?,
     private val commandPopup: HJCommandPopup?,
 ) : JTextField() {
-    private var registerIndex = historyRegister?.let { HJState.getRegisterContents(it)?.size } ?: 0
+    private var registerIndex = historyRegister?.let { HJState.registers.read(it, hjEditor)?.size } ?: 0
     private val historyEntry
-        get() = historyRegister?.let { HJState.getRegisterContents(it)?.getOrNull(registerIndex) } ?: ""
-    private val hint = historyRegister?.let { HJState.getRegisterContents(it)?.lastOrNull() } ?: ""
+        get() = historyRegister?.let { HJState.registers.read(it, hjEditor)?.getOrNull(registerIndex) } ?: ""
+    private val hint = historyRegister?.let { HJState.registers.first(it, hjEditor) } ?: ""
     private var isHintShown = false
     private var autocompleteChoices: List<String>? = null
     private var autocompleteIdx: Int? = null
 
     init {
-        font = editor.colorsScheme.getFont(EditorFontType.PLAIN) // monospace
+        font = hjEditor.editor.colorsScheme.getFont(EditorFontType.PLAIN) // monospace
         border = BorderFactory.createEmptyBorder(2, 0, 2, 2)
         background = EditorColorsManager.getInstance().globalScheme.defaultBackground
         resetHint()
@@ -65,7 +65,7 @@ internal class HJPromptTextField(
         // check for these at all, we get duplicate events and send onEvent twice for some keys...
         when (e.keyCode) {
             KeyEvent.VK_ENTER if e.id == KeyEvent.KEY_PRESSED -> {
-                historyRegister?.let { HJState.pushRegister(it, text) }
+                historyRegister?.let { HJState.registers.push(it, text, hjEditor) }
                 eventType = HJPromptEvent.Validate
             }
 
@@ -137,7 +137,7 @@ internal class HJPromptTextField(
 }
 
 class HJPrompt(
-    private val editor: Editor,
+    private val hjEditor: HJEditor,
     private val onEvent: (HJPromptEvent, String?) -> Unit,
     prompt: String = ":",
     historyRegister: HJRegister? = null,
@@ -145,14 +145,15 @@ class HJPrompt(
     autocompleteUi: HJPromptAutocomplete? = null,
     commandPopup: HJCommandPopup? = null,
 ) {
-    private val editorsComponent = (FileEditorManager.getInstance(editor.project!!) as FileEditorManagerEx).splitters
+    private val editorsComponent =
+        (FileEditorManager.getInstance(hjEditor.editor.project!!) as FileEditorManagerEx).splitters
 
     private val promptCmp = JLabel(prompt).apply {
-        font = editor.colorsScheme.getFont(EditorFontType.PLAIN)
+        font = hjEditor.editor.colorsScheme.getFont(EditorFontType.PLAIN)
         border = BorderFactory.createEmptyBorder(2, 2, 2, 0)
     }
     private val textField = HJPromptTextField(
-        editor, ::onEventInternal, historyRegister, autocompleteProvider, autocompleteUi, commandPopup
+        hjEditor, ::onEventInternal, historyRegister, autocompleteProvider, autocompleteUi, commandPopup
     )
 
     private val panel = JPanel(BorderLayout()).apply {
@@ -181,7 +182,7 @@ class HJPrompt(
         editorsComponent.remove(panel)
         editorsComponent.revalidate()
         editorsComponent.repaint()
-        editor.contentComponent.requestFocusInWindow()
+        hjEditor.editor.contentComponent.requestFocusInWindow()
         HJState.activePrompt = null
     }
 

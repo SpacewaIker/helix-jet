@@ -154,6 +154,8 @@ class HJSelection {
         return sb.toString()
     }
 
+    fun slices(doc: Document) = ranges.map { it.slice(doc) }
+
     companion object {
         fun selectOnMatches(doc: Document, selection: HJSelection, pattern: String): HJSelection? {
             val result = mutableListOf<HJRange>()
@@ -270,5 +272,5 @@ fun <E> removeConsecutiveDuplicatesAndReplace(list: MutableList<E>, sameBucket: 
         }
     }
 
-    list.dropLast(list.size - write)
+    list.subList(write, list.size).clear()
 }

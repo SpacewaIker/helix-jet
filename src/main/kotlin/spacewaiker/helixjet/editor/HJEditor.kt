@@ -6,7 +6,9 @@ import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.CaretVisualAttributes
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.LogicalPosition
 import com.intellij.openapi.editor.ScrollType
+import com.intellij.openapi.editor.impl.stickyLines.StickyLinesModel
 import com.intellij.openapi.util.Key
 import com.intellij.psi.PlainTextTokenTypes
 import com.intellij.psi.PsiDocumentManager

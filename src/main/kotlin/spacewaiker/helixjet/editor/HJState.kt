@@ -1,7 +1,6 @@
 ﻿package spacewaiker.helixjet.editor
 
 import com.intellij.openapi.editor.Editor
-import com.intellij.openapi.ide.CopyPasteManager
 import spacewaiker.helixjet.editor.HJState.allEditors
 import spacewaiker.helixjet.editor.HJState.config
 import spacewaiker.helixjet.editor.HJState.focusedEditor
@@ -9,7 +8,6 @@ import spacewaiker.helixjet.editor.HJState.mode
 import spacewaiker.helixjet.editor.HJState.typedHandlerBlock
 import spacewaiker.helixjet.ui.HJHelpWidget
 import spacewaiker.helixjet.ui.HJPrompt
-import java.awt.datatransfer.StringSelection
 
 enum class HJEditorMode {
     NORMAL, INSERT, SELECT,
@@ -29,8 +27,8 @@ object HJState {
     var mode: HJEditorMode = HJEditorMode.NORMAL
     var config: HJConfiguration = HJConfiguration()
     private val editors: MutableMap<Editor, HJEditor> = mutableMapOf()
-    private val registers: MutableMap<HJRegister, MutableList<String>> = mutableMapOf()
-    val allRegisterContents get() = registers.toList()
+    val registers = HJRegisters()
+    val allRegisterContents get() = registers.rawRegisters.toList()
     val allEditors get() = editors.keys
     var activePrompt: HJPrompt? = null
     var helpWidget: HJHelpWidget? = null
@@ -55,30 +53,6 @@ object HJState {
     fun getHJEditor(editor: Editor) = editors.getOrPut(editor) { HJEditor(editor) }
 
     fun releaseEditor(editor: Editor) = editors.remove(editor) != null
-
-    fun copyToRegister(hjEditor: HJEditor, selection: HJSelection, register: HJRegister) {
-        HJRegister.selectionToRegister(hjEditor, selection, register)?.let {
-            if (register == HJRegister.Clipboard) {
-                CopyPasteManager.getInstance().setContents(StringSelection(it[0]))
-            } else {
-                registers[register] = it.toMutableList()
-            }
-        }
-    }
-
-    /**
-     * Attempts to push the given value to the given register.
-     *
-     * @return True if the operation was successful, false otherwise.
-     */
-    fun pushRegister(register: HJRegister, value: String): Boolean {
-        if (register.readOnly) return false
-        registers.getOrPut(register, ::mutableListOf).add(value)
-        return true
-    }
-
-    fun getRegisterContents(register: HJRegister) =
-        if (register == HJRegister.Clipboard) listOf(CopyPasteManager.getInstance().contents.toString()) else registers[register]
 
     fun forAllEditors(f: (HJEditor) -> Unit) {
         editors.values.forEach(f)

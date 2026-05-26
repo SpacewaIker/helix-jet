@@ -218,9 +218,9 @@ private val actionsRaw = arrayOf(
     HJAction("goto_file_vsplit", "Goto files in selections (vsplit)") { gotoFileImpl(it, HJFileOpenLocation.VSplit) },
     HJAction("goto_file_background", "Goto files in selections (background)") { gotoFileImpl(it, HJFileOpenLocation.BackgroundTab) },
     HJAction("goto_reference", "Goto references") { executeIdeAction(it, IdeActions.ACTION_FIND_USAGES) },
-    HJAction("goto_window_top", "Goto window top"),
-    HJAction("goto_window_center", "Goto window center"),
-    HJAction("goto_window_bottom", "Goto window bottom"),
+    HJAction("goto_window_top", "Goto window top") { gotoWindowImpl(it, HJAlignment.TOP) },
+    HJAction("goto_window_center", "Goto window center") { gotoWindowImpl(it, HJAlignment.CENTER) },
+    HJAction("goto_window_bottom", "Goto window bottom") { gotoWindowImpl(it, HJAlignment.BOTTOM) },
     HJAction("goto_last_accessed_file", "Goto last accessed file"),
     HJAction("goto_last_modified_file", "Goto last modified file"),
     HJAction("goto_last_modification", "Goto last modification"),
@@ -268,9 +268,10 @@ private val actionsRaw = arrayOf(
     HJAction("yank", "Yank selection") { yank(it) },
     HJAction("yank_to_clipboard", "Yank selections to clipboard") { yankImpl(it, it.hjEditor.selection, HJRegister.Clipboard) },
     HJAction("yank_to_primary_clipboard", "Yank selections to primary clipboard"),
-    HJAction("yank_joined", "Join and yank selections"),
-    HJAction("yank_joined_to_clipboard", "Join and yank selections to clipboard"),
-    HJAction("yank_main_selection_to_clipboard", "Yank main selection to clipboard"),
+    HJAction("yank_joined", "Join and yank selections") { yankJoinedImpl(it, "\n", it.register ?: HJRegister.LastYank) },
+    HJAction("yank_joined_to_clipboard", "Join and yank selections to clipboard") { yankJoinedImpl(it, "\n", HJRegister.Clipboard) },
+    HJAction("yank_main_selection", "Yank main selection") { yankMainSelectionImpl(it, it.register ?: HJRegister.LastYank) },
+    HJAction("yank_main_selection_to_clipboard", "Yank main selection to clipboard") { yankMainSelectionImpl(it, HJRegister.Clipboard) },
     HJAction("yank_joined_to_primary_clipboard", "Join and yank selections to primary clipboard"),
     HJAction("yank_main_selection_to_primary_clipboard", "Yank main selection to primary clipboard"),
     HJAction("replace_with_yanked", "Replace with yanked text"),
@@ -503,7 +504,7 @@ private fun commandMode(cx: HJActionContext) {
 
     val autocompleteProvider = HJCommands.allCommands.map { it.name }
     val commandBar = HJPrompt(
-        cx.hjEditor.editor, onEvent, historyRegister = HJRegister.LastCmd,
+        cx.hjEditor, onEvent, historyRegister = HJRegister.LastCmd,
         autocompleteProvider = autocompleteProvider, autocompleteUi = autocompleteUi, commandPopup = popup,
     )
     commandBar.show()
@@ -583,17 +584,43 @@ private fun yank(cx: HJActionContext) {
 }
 
 private fun yankImpl(cx: HJActionContext, selection: HJSelection, register: HJRegister) {
-    // TODO: full, correct implementation
-    HJState.copyToRegister(cx.hjEditor, selection, register)
+    val values = cx.hjEditor.selection.slices(cx.doc).filterNotNull()
+    val selections = values.size
+
+    val plural = if (selections == 1) "" else "s"
+    if (HJState.registers.write(register, values, cx.hjEditor)) {
+        cx.hjEditor.setStatus("Yanked $selections selection$plural to register $register")
+    }
+}
+
+fun yankJoinedImpl(cx: HJActionContext, separator: String, register: HJRegister) {
+    val selection = cx.hjEditor.selection
+    val selections = selection.ranges.size
+    val joined = selection.slices(cx.doc)
+        .fold(StringBuilder()) { acc, slice ->
+            if (acc.isNotEmpty()) {
+                acc.append(separator)
+            }
+            acc.append(slice)
+            acc
+        }
+        .toString()
+
+    val plural = if (selections == 1) "" else "s"
+    if (HJState.registers.write(register, listOf(joined), cx.hjEditor)) {
+        cx.hjEditor.setStatus("Joined and yanked $selections selection$plural to register $register")
+    }
+}
+
+fun yankMainSelectionImpl(cx: HJActionContext, register: HJRegister) {
+    val selection = cx.hjEditor.selection.primary.slice(cx.doc) ?: return
+    if (HJState.registers.write(register, listOf(selection), cx.hjEditor)) {
+        cx.hjEditor.setStatus("Yanked primary selection to register $register")
+    }
 }
 
 private fun pasteImpl(cx: HJActionContext, pasteBefore: Boolean) {
-    // TODO: full, correct implementation
-    val registerContents = HJState.getRegisterContents(cx.register ?: HJRegister.LastYank)
-
-    if (registerContents == null) {
-        return
-    }
+    val registerContents = HJState.registers.read(cx.register ?: HJRegister.LastYank, cx.hjEditor) ?: return
 
     val transaction = cx.hjEditor.changeBySelectionIndexed { idx, range ->
         val pos = if (pasteBefore) range.from else range.to
@@ -836,7 +863,7 @@ private fun selectRegex(cx: HJActionContext) {
             else -> {}
         }
     }
-    val commandBar = HJPrompt(cx.hjEditor.editor, onEvent, "select:", HJRegister.LastSearch)
+    val commandBar = HJPrompt(cx.hjEditor, onEvent, "select:", HJRegister.LastSearch)
     commandBar.show()
 }
 
@@ -860,7 +887,7 @@ private fun splitSelection(cx: HJActionContext) {
             else -> {}
         }
     }
-    val commandBar = HJPrompt(cx.hjEditor.editor, onEvent, "split:", HJRegister.LastSearch)
+    val commandBar = HJPrompt(cx.hjEditor, onEvent, "split:", HJRegister.LastSearch)
     commandBar.show()
 }
 
@@ -1052,6 +1079,29 @@ private fun gotoChangeImpl(cx: HJActionContext, gotoTarget: HJGotoTarget) {
     val targetChange = gotoElementInList(cx, changes, gotoTarget, startOffsetFn, endOffsetFn) ?: return
 
     cx.hjEditor.setNewSelection(HJSelection(HJRange(targetChange.startOffset, targetChange.endOffset)))
+}
+
+private fun gotoWindowImpl(cx: HJActionContext, align: HJAlignment) {
+    val view = cx.hjEditor.editor.scrollingModel.visibleArea
+    val scrolloffOffset = HJState.config.scrolloff
+    val countOffset = cx.rawCount ?: 0
+
+    val topLine = (cx.hjEditor.editor.xyToLogicalPosition(Point(0, view.y)).line
+            + scrolloffOffset) // TODO: should also consider sticky lines, but haven't found a way to get this info
+    val bottomLine = (cx.hjEditor.editor.xyToLogicalPosition(Point(0, view.y + view.height)).line
+            - 1 - scrolloffOffset)
+
+    val visualLine = when (align) {
+        HJAlignment.TOP -> topLine + countOffset
+        HJAlignment.CENTER -> (topLine + bottomLine) / 2
+        HJAlignment.BOTTOM -> bottomLine - countOffset
+    }.coerceIn(topLine..bottomLine)
+
+    val offset = cx.doc.getLineStartOffset(visualLine)
+
+    val selection = cx.hjEditor.selection.clone()
+        .transform { it.putCursor(cx.doc, offset, HJState.mode == HJEditorMode.SELECT) }
+    cx.hjEditor.setNewSelection(selection)
 }
 
 private fun jumpToWord(cx: HJActionContext, extend: Boolean) {
@@ -1547,14 +1597,14 @@ private fun searcher(cx: HJActionContext, direction: HJDirection) {
             else -> {}
         }
     }
-    val commandBar = HJPrompt(cx.hjEditor.editor, onEvent, "search:", HJRegister.LastSearch)
+    val commandBar = HJPrompt(cx.hjEditor, onEvent, "search:", HJRegister.LastSearch)
     commandBar.show()
 }
 
 private fun searchNextOrPrevImpl(cx: HJActionContext, extend: Boolean, direction: HJDirection) {
     val register = HJRegister.LastSearch
 
-    HJState.getRegisterContents(register)?.lastOrNull()?.let { pattern ->
+    HJState.registers.first(register, cx.hjEditor)?.let { pattern ->
         val regex = regex(pattern)
         if (regex == null) {
             cx.hjEditor.setError("Invalid regex: $pattern")
@@ -1796,14 +1846,14 @@ private fun searchSelectionImpl(cx: HJActionContext, detectWordBoundaries: Boole
         .toList()
         .joinToString(separator = "|")
 
-    if (HJState.pushRegister(register, regex)) {
+    if (HJState.registers.push(register, regex, cx.hjEditor)) {
         cx.hjEditor.setStatus("register '$register' set to '$regex'")
     }
 }
 
 private fun makeSearchWordBounded(cx: HJActionContext) {
     val register = cx.register ?: HJRegister.LastSearch
-    val regex = HJState.getRegisterContents(register)?.lastOrNull() ?: return
+    val regex = HJState.registers.first(register, cx.hjEditor) ?: return
 
     val startAnchored = regex.startsWith("\\b")
     val endAnchored = regex.endsWith("\\b")
@@ -1815,7 +1865,7 @@ private fun makeSearchWordBounded(cx: HJActionContext) {
     newRegex += regex
     if (!endAnchored) newRegex += "\\b"
 
-    if (HJState.pushRegister(register, newRegex)) {
+    if (HJState.registers.push(register, newRegex, cx.hjEditor)) {
         cx.hjEditor.setStatus("register '$register' set to '$newRegex'")
     }
 }

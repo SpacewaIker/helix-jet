@@ -124,6 +124,22 @@ private val helixCommands = arrayOf(
     HJCommand("buffer-close-all", listOf("bca", "bcloseall"), "Close all buffers without quitting.") { cx, _, _ ->
         closeFilesImpl(cx) { it.openFiles.toList() }
     },
+    HJCommand(
+        "yank-join",
+        listOf(),
+        "Yank joined selections. A separator can be provided as first argument. Default value is newline."
+    ) { cx, args, _ ->
+        val separator = args.getOrNull(0) ?: "\n"
+        yankJoinedImpl(cx, separator, cx.register ?: HJRegister.LastYank)
+    },
+    HJCommand(
+        "clipboard-yank-join",
+        listOf(),
+        "Yank joined selections into system clipboard. A separator can be provided as first argument. Default value is newline."
+    ) { cx, args, _ ->
+        val separator = args.getOrNull(0) ?: "\n"
+        yankJoinedImpl(cx, separator, HJRegister.Clipboard)
+    },
 )
 
 private val debugCommands = arrayOf(
@@ -136,11 +152,20 @@ private val debugCommands = arrayOf(
             println("Flag: $flag")
         }
     },
-    HJCommand("pushRegister", listOf(), "Push values into specified register") { _, args, _ ->
+    HJCommand(
+        "pushRegister",
+        listOf(),
+        "Push values into specified register",
+        listOf("--ow  Overwrite contents")
+    ) { cx, args, flags ->
         val registerName = args.first()
         val register = HJRegister.GeneralPurpose(registerName[0])
-        for (arg in args.drop(1)) {
-            HJState.pushRegister(register, arg)
+        if (flags.contains("ow")) {
+            HJState.registers.write(register, args, cx.hjEditor)
+        } else {
+            for (arg in args.drop(1)) {
+                HJState.registers.push(register, arg, cx.hjEditor)
+            }
         }
     },
     HJCommand("printRegisters", listOf(), "Print all register contents") { _, _, _ ->
