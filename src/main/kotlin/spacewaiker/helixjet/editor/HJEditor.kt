@@ -6,9 +6,7 @@ import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.CaretVisualAttributes
 import com.intellij.openapi.editor.Editor
-import com.intellij.openapi.editor.LogicalPosition
 import com.intellij.openapi.editor.ScrollType
-import com.intellij.openapi.editor.impl.stickyLines.StickyLinesModel
 import com.intellij.openapi.util.Key
 import com.intellij.psi.PlainTextTokenTypes
 import com.intellij.psi.PsiDocumentManager
@@ -20,18 +18,22 @@ import java.awt.event.MouseWheelListener
 private val JUMP_OVERLAY_KEY = Key.create<HJJumpLabelOverlay>("helixjet.gotoword.inlays")
 
 sealed class HJChange {
-    abstract val rank: Int
+    abstract val fromRank: Int
+    abstract val toRank: Int
 
     data class Insert(val at: Int, val str: String) : HJChange() {
-        override val rank = at
+        override val fromRank = at
+        override val toRank = at
     }
 
     data class Replace(val from: Int, val to: Int, val replacement: String) : HJChange() {
-        override val rank = to
+        override val fromRank = from
+        override val toRank = to
     }
 
     data class Delete(val from: Int, val to: Int) : HJChange() {
-        override val rank = to
+        override val fromRank = from
+        override val toRank = to
     }
 }
 
@@ -101,7 +103,7 @@ class HJEditor {
                 caret.visualAttributes = CaretVisualAttributes(color, CaretVisualAttributes.Weight.NORMAL)
 
                 // in normal/insert mode, don't show 1-width selections underneath the blinking block cursor
-                if (range.len <= 1 && HJState.mode != HJEditorMode.SELECT) {
+                if (range.len <= 1 && HJState.mode != HJEditorMode.Select) {
                     caret.removeSelection()
                 } else {
                     caret.setSelection(range.from, range.to)
@@ -140,7 +142,7 @@ class HJEditor {
 
     fun apply(transaction: HJTransaction) {
         // sort changes so that their indices remain accurate in between changes
-        val changes = transaction.changes.sortedByDescending { it.rank }
+        val changes = transaction.changes.sortedByDescending { it.toRank }
 
         WriteCommandAction.runWriteCommandAction(editor.project) {
             for (change in changes) {
@@ -164,7 +166,7 @@ class HJEditor {
     }
 
     fun reloadCaretShapes() {
-        editor.settings.isBlockCursor = HJState.mode != HJEditorMode.INSERT && HJState.keymappingEnabled
+        editor.settings.isBlockCursor = HJState.mode != HJEditorMode.Insert && HJState.keymappingEnabled
     }
 
     fun setCorrectScroll() {

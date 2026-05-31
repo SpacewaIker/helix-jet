@@ -15,25 +15,29 @@ object HJMotionHandling {
 }
 
 enum class HJDirection {
-    FORWARD, BACKWARD;
+    Forward, Backward;
 
     val value
         get() = when (this) {
-            FORWARD -> 1
-            BACKWARD -> -1
+            Forward -> 1
+            Backward -> -1
         }
 }
 
+enum class HJNavDirection {
+    Up, Down, Left, Right,
+}
+
 enum class HJAlignment {
-    TOP, CENTER, BOTTOM,
+    Top, Center, Bottom,
 }
 
 enum class HJGotoTarget {
-    FIRST, LAST, PREV, NEXT,
+    First, Last, Prev, Next,
 }
 
 enum class HJCharMovementKind {
-    HORIZONTAL, VERTICAL, VERTICAL_VISUAL
+    Horizontal, Vertical, VerticalVisual
 }
 
 fun moveHorizontally(
@@ -47,8 +51,8 @@ fun moveHorizontally(
 
     // compute the new position
     val newPos = when (direction) {
-        HJDirection.FORWARD -> nthNextGraphemeBoundary(doc, pos, count)
-        HJDirection.BACKWARD -> nthPrevGraphemeBoundary(pos, count)
+        HJDirection.Forward -> nthNextGraphemeBoundary(doc, pos, count)
+        HJDirection.Backward -> nthPrevGraphemeBoundary(pos, count)
     }
 
     // compute the final new range
@@ -112,11 +116,11 @@ fun moveVertically(
 }
 
 enum class HJWordMotionTarget {
-    NEXT_WORD_START, NEXT_WORD_END, PREV_WORD_START, PREV_WORD_END, NEXT_LONG_WORD_START, NEXT_LONG_WORD_END, PREV_LONG_WORD_START, PREV_LONG_WORD_END, NEXT_SUB_WORD_START, NEXT_SUB_WORD_END, PREV_SUB_WORD_START, PREV_SUB_WORD_END;
+    NextWordStart, NextWordEnd, PrevWordStart, PrevWordEnd, NextLongWordStart, NextLongWordEnd, PrevLongWordStart, PrevLongWordEnd, NextSubWordStart, NextSubWordEnd, PrevSubWordStart, PrevSubWordEnd;
 
     val isPrev
         get() = when (this) {
-            PREV_WORD_START, PREV_WORD_END, PREV_LONG_WORD_START, PREV_LONG_WORD_END, PREV_SUB_WORD_START, PREV_SUB_WORD_END -> true
+            PrevWordStart, PrevWordEnd, PrevLongWordStart, PrevLongWordEnd, PrevSubWordStart, PrevSubWordEnd -> true
             else -> false
         }
 }
@@ -224,32 +228,32 @@ private fun rangeToTarget(chars: ListIterator<Char>, target: HJWordMotionTarget,
 private fun reachedTarget(target: HJWordMotionTarget, prevChar: Char, nextChar: Char): Boolean {
     // @formatter:off
     return when (target) {
-        HJWordMotionTarget.NEXT_WORD_START, HJWordMotionTarget.PREV_WORD_END -> {
+        HJWordMotionTarget.NextWordStart, HJWordMotionTarget.PrevWordEnd -> {
             isWordBoundary(prevChar, nextChar) && (charIsLineEnding(nextChar) || !nextChar.isWhitespace())
         }
-        HJWordMotionTarget.NEXT_WORD_END, HJWordMotionTarget.PREV_WORD_START -> {
+        HJWordMotionTarget.NextWordEnd, HJWordMotionTarget.PrevWordStart -> {
             isWordBoundary(prevChar, nextChar) && (!prevChar.isWhitespace() || charIsLineEnding(nextChar))
         }
-        HJWordMotionTarget.NEXT_LONG_WORD_START, HJWordMotionTarget.PREV_LONG_WORD_END -> {
+        HJWordMotionTarget.NextLongWordStart, HJWordMotionTarget.PrevLongWordEnd -> {
             isLongWordBoundary(prevChar, nextChar) && (charIsLineEnding(nextChar) || !nextChar.isWhitespace())
         }
-        HJWordMotionTarget.NEXT_LONG_WORD_END, HJWordMotionTarget.PREV_LONG_WORD_START -> {
+        HJWordMotionTarget.NextLongWordEnd, HJWordMotionTarget.PrevLongWordStart -> {
             isLongWordBoundary(prevChar, nextChar) && (!prevChar.isWhitespace() || charIsLineEnding(nextChar))
         }
-        HJWordMotionTarget.NEXT_SUB_WORD_START -> {
-            isSubWordBoundary(prevChar, nextChar, HJDirection.FORWARD)
+        HJWordMotionTarget.NextSubWordStart -> {
+            isSubWordBoundary(prevChar, nextChar, HJDirection.Forward)
                     && (charIsLineEnding(nextChar) || !(nextChar.isWhitespace() || nextChar == '_'))
         }
-        HJWordMotionTarget.PREV_SUB_WORD_END -> {
-            isSubWordBoundary(prevChar, nextChar, HJDirection.BACKWARD)
+        HJWordMotionTarget.PrevSubWordEnd -> {
+            isSubWordBoundary(prevChar, nextChar, HJDirection.Backward)
                     && (charIsLineEnding(nextChar) || !(nextChar.isWhitespace() || nextChar == '_'))
         }
-        HJWordMotionTarget.NEXT_SUB_WORD_END -> {
-            isSubWordBoundary(prevChar, nextChar, HJDirection.FORWARD)
+        HJWordMotionTarget.NextSubWordEnd -> {
+            isSubWordBoundary(prevChar, nextChar, HJDirection.Forward)
                     && (!(prevChar.isWhitespace() || prevChar == '_') || charIsLineEnding(nextChar))
         }
-        HJWordMotionTarget.PREV_SUB_WORD_START -> {
-            isSubWordBoundary(prevChar, nextChar, HJDirection.BACKWARD)
+        HJWordMotionTarget.PrevSubWordStart -> {
+            isSubWordBoundary(prevChar, nextChar, HJDirection.Backward)
                     && (!(prevChar.isWhitespace() || prevChar == '_') || charIsLineEnding(nextChar))
         }
     }
@@ -264,8 +268,8 @@ private fun isLongWordBoundary(a: Char, b: Char): Boolean {
     val aCat = HJCharCategory.categorize(a)
     val bCat = HJCharCategory.categorize(b)
     return when (Pair(aCat, bCat)) {
-        Pair(HJCharCategory.WORD, HJCharCategory.PUNCTUATION),
-        Pair(HJCharCategory.PUNCTUATION, HJCharCategory.WORD),
+        Pair(HJCharCategory.Word, HJCharCategory.Punctuation),
+        Pair(HJCharCategory.Punctuation, HJCharCategory.Word),
             -> false
 
         else if aCat != bCat -> true
@@ -277,14 +281,14 @@ private fun isSubWordBoundary(a: Char, b: Char, direction: HJDirection): Boolean
     val aCat = HJCharCategory.categorize(a)
     val bCat = HJCharCategory.categorize(b)
     return when (Pair(aCat, bCat)) {
-        Pair(HJCharCategory.WORD, HJCharCategory.WORD) -> {
+        Pair(HJCharCategory.Word, HJCharCategory.Word) -> {
             if ((a == '_') != (b == '_')) {
                 true
             } else {
                 // subword boundaries are directional: in 'fooBar' there is a boundary between 'o' and 'B', but not between 'B' and 'a'.
                 when (direction) {
-                    HJDirection.FORWARD -> a.isLowerCase() && b.isUpperCase()
-                    HJDirection.BACKWARD -> a.isUpperCase() && b.isLowerCase()
+                    HJDirection.Forward -> a.isLowerCase() && b.isUpperCase()
+                    HJDirection.Backward -> a.isUpperCase() && b.isLowerCase()
                 }
             }
         }
@@ -316,7 +320,7 @@ fun findNthChar(doc: Document, charMatcher: HJCharMatcher, pos: Int, count: Int,
     var pos = pos
 
     when (direction) {
-        HJDirection.FORWARD -> while (true) {
+        HJDirection.Forward -> while (true) {
             if (!chars.hasNext()) return null
             val c = chars.next()
             if (charMatcher.matches(c)) {
@@ -326,7 +330,7 @@ fun findNthChar(doc: Document, charMatcher: HJCharMatcher, pos: Int, count: Int,
             pos++
         }
 
-        HJDirection.BACKWARD -> while (true) {
+        HJDirection.Backward -> while (true) {
             if (!chars.hasPrevious()) return null
             val c = chars.previous()
             pos--
@@ -353,8 +357,9 @@ fun skipWhile(string: String, pos: Int, predicate: (Char) -> Boolean): Int? {
  * Returns null if all characters satisfy the predicate.
  */
 fun backwardsSkipWhile(string: String, pos: Int, predicate: (Char) -> Boolean): Int? {
+    val pos = pos - 1 // adjust for caret/pos being after character when going backward
     return string.reversed().drop(string.length - pos - 1).withIndex().find { !predicate(it.value) }
-        ?.let { pos - it.index }
+        ?.let { pos - it.index + 1 } // adjust again for caret positioning
 }
 
 /**
@@ -370,9 +375,9 @@ fun <T> gotoElementInList(
     if (list.isEmpty()) return null
 
     return when (gotoTarget) {
-        HJGotoTarget.FIRST -> list.first()
-        HJGotoTarget.LAST -> list.last()
-        HJGotoTarget.PREV -> {
+        HJGotoTarget.First -> list.first()
+        HJGotoTarget.Last -> list.last()
+        HJGotoTarget.Prev -> {
             val pos = cx.hjEditor.selection.primary.cursor
             val reversed = list.asReversed()
             // coerce at least 0 since indexOfFirst returns -1 if nothing is found
@@ -381,7 +386,7 @@ fun <T> gotoElementInList(
             reversed[targetIdx]
         }
 
-        HJGotoTarget.NEXT -> {
+        HJGotoTarget.Next -> {
             val pos = cx.hjEditor.selection.primary.cursor
             // coerce at least 0 since indexOfFirst returns -1 if nothing is found
             val firstNextIdx = list.indexOfFirst { startOffsetFn(it) > pos }.coerceAtLeast(0)

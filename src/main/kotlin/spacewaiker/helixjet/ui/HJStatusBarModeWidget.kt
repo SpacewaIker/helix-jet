@@ -20,9 +20,9 @@ class HJStatusBarModeWidget : StatusBarWidget, StatusBarWidget.TextPresentation 
 
     override fun getText(): String {
         return when (HJState.mode) {
-            HJEditorMode.NORMAL -> "NOR"
-            HJEditorMode.INSERT -> "INS"
-            HJEditorMode.SELECT -> "SEL"
+            HJEditorMode.Normal -> "NOR"
+            HJEditorMode.Insert -> "INS"
+            HJEditorMode.Select -> "SEL"
         }
     }
 

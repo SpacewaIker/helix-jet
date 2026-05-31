@@ -42,7 +42,7 @@ object HJInputHandler {
      * Returns true if the key event was handled, false if it should be handled by the caller.
      */
     fun handle(editor: Editor, key: HJInputKey): Boolean {
-        if (HJState.mode == HJEditorMode.INSERT && key is HJInputKey.Character) {
+        if (HJState.mode == HJEditorMode.Insert && key is HJInputKey.Character) {
             return false
         }
 

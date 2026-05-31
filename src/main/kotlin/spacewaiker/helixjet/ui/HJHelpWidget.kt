@@ -9,9 +9,9 @@ private const val MAX_WIDTH = 700
 class HJHelpWidget(editor: Editor) : HJFloatingTextarea(editor) {
     init {
         width = Pair(MIN_WIDTH, MAX_WIDTH)
-        hAlignment = HAlignment.RIGHT
+        hAlignment = HAlignment.Right
     }
-    
+
     var textRaw = emptyList<String>()
     var padding = 0
 

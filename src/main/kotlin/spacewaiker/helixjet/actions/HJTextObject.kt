@@ -13,7 +13,7 @@ object HJTextObject {
     val logger = Logger.getInstance(HJTextObject::class.java)
 
     enum class TextObject {
-        AROUND, INSIDE, MOVEMENT
+        Around, Inside, Movement
     }
 
     /**
@@ -31,9 +31,9 @@ object HJTextObject {
         val parentOfType = languageSyntax.getParentAstObject(smallestNode, astObject) ?: return range
 
         val startEndPair = when (textObject) {
-            TextObject.AROUND -> languageSyntax.aroundAstObject(parentOfType, astObject)
-            TextObject.INSIDE -> languageSyntax.insideAstObject(parentOfType, astObject)
-            TextObject.MOVEMENT -> {
+            TextObject.Around -> languageSyntax.aroundAstObject(parentOfType, astObject)
+            TextObject.Inside -> languageSyntax.insideAstObject(parentOfType, astObject)
+            TextObject.Movement -> {
                 logger.error("textObjectAst shouldn't be called with textobject Movement!")
                 return range
             }
@@ -45,10 +45,10 @@ object HJTextObject {
 
     fun textObjectWord(doc: Document, range: HJRange, textObject: TextObject, long: Boolean): HJRange {
         val pos = range.cursor
-        val wordStart = findWordBoundary(doc, pos, HJDirection.BACKWARD, long)
+        val wordStart = findWordBoundary(doc, pos, HJDirection.Backward, long)
         val wordEnd = when (HJCharCategory.categorize(doc.charsSequence[pos])) {
-            HJCharCategory.WHITESPACE, HJCharCategory.EOL -> pos
-            else -> findWordBoundary(doc, pos + 1, HJDirection.FORWARD, long)
+            HJCharCategory.Whitespace, HJCharCategory.EOL -> pos
+            else -> findWordBoundary(doc, pos + 1, HJDirection.Forward, long)
         }
 
         // special case
@@ -57,8 +57,8 @@ object HJTextObject {
         }
 
         return when (textObject) {
-            TextObject.INSIDE -> HJRange(wordStart, wordEnd)
-            TextObject.AROUND -> {
+            TextObject.Inside -> HJRange(wordStart, wordEnd)
+            TextObject.Around -> {
                 val whitespaceCountRight = doc.charsSequence.drop(wordEnd).takeWhile(Char::isWhitespace).count()
 
                 if (whitespaceCountRight > 0) {
@@ -71,7 +71,7 @@ object HJTextObject {
                 }
             }
 
-            TextObject.MOVEMENT -> {
+            TextObject.Movement -> {
                 logger.error("textObjectWord shouldn't be called with textobject Movement!")
                 range
             }
@@ -80,27 +80,27 @@ object HJTextObject {
 
     private fun findWordBoundary(doc: Document, pos: Int, direction: HJDirection, long: Boolean): Int {
         val iter = when (direction) {
-            HJDirection.FORWARD -> doc.charsSequence.drop(pos)
-            HJDirection.BACKWARD -> doc.charsSequence.reversed().drop(doc.textLength - pos)
+            HJDirection.Forward -> doc.charsSequence.drop(pos)
+            HJDirection.Backward -> doc.charsSequence.reversed().drop(doc.textLength - pos)
         }
         var prevCategory = when (direction) {
-            HJDirection.FORWARD if pos == 0 -> HJCharCategory.WHITESPACE
-            HJDirection.FORWARD -> HJCharCategory.categorize(doc.charsSequence[pos - 1])
-            HJDirection.BACKWARD if pos == doc.textLength -> HJCharCategory.WHITESPACE
-            HJDirection.BACKWARD -> HJCharCategory.categorize(doc.charsSequence[pos])
+            HJDirection.Forward if pos == 0 -> HJCharCategory.Whitespace
+            HJDirection.Forward -> HJCharCategory.categorize(doc.charsSequence[pos - 1])
+            HJDirection.Backward if pos == doc.textLength -> HJCharCategory.Whitespace
+            HJDirection.Backward -> HJCharCategory.categorize(doc.charsSequence[pos])
 
         }
         var pos = pos
         for (ch in iter) {
             when (val category = HJCharCategory.categorize(ch)) {
-                HJCharCategory.EOL, HJCharCategory.WHITESPACE -> return pos
+                HJCharCategory.EOL, HJCharCategory.Whitespace -> return pos
                 else -> {
                     if (!long && category != prevCategory && pos != 0 && pos != doc.textLength) {
                         return pos
                     }
                     when (direction) {
-                        HJDirection.FORWARD -> pos++
-                        HJDirection.BACKWARD -> pos = (pos - 1).coerceAtLeast(0)
+                        HJDirection.Forward -> pos++
+                        HJDirection.Backward -> pos = (pos - 1).coerceAtLeast(0)
                     }
                     prevCategory = category
                 }
@@ -180,8 +180,8 @@ object HJTextObject {
 
         // handle last whitespaces part separately depending on textobject
         when (textObject) {
-            TextObject.AROUND -> {}
-            TextObject.INSIDE -> {
+            TextObject.Around -> {}
+            TextObject.Inside -> {
                 // remove last whitespace paragraph
                 var lines = doc.text.lines().reversed()
                 lines = lines.drop(lines.count() - line)
@@ -189,7 +189,7 @@ object HJTextObject {
                 while (linesBool.hasNext() && linesBool.next()) line--
             }
 
-            TextObject.MOVEMENT -> logger.error("textObjectParagraph shouldn't be called with textobject Movement!")
+            TextObject.Movement -> logger.error("textObjectParagraph shouldn't be called with textobject Movement!")
         }
 
         val anchor = doc.getLineStartOffset(lineBack)
@@ -231,17 +231,17 @@ object HJTextObject {
 
         return pairPos?.let { (anchor, head) ->
             when (textObject) {
-                TextObject.INSIDE -> {
+                TextObject.Inside -> {
                     if (anchor < head) HJRange(nextGraphemeBoundary(doc, anchor), head)
                     else HJRange(anchor, nextGraphemeBoundary(doc, head))
                 }
 
-                TextObject.AROUND -> {
+                TextObject.Around -> {
                     if (anchor < head) HJRange(anchor, nextGraphemeBoundary(doc, head))
                     else HJRange(nextGraphemeBoundary(doc, anchor), head)
                 }
 
-                TextObject.MOVEMENT -> {
+                TextObject.Movement -> {
                     logger.error("textObjectSurround shouldn't be called with textobject Movement!")
                     null
                 }

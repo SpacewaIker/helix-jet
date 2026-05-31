@@ -10,7 +10,7 @@ import spacewaiker.helixjet.ui.HJHelpWidget
 import spacewaiker.helixjet.ui.HJPrompt
 
 enum class HJEditorMode {
-    NORMAL, INSERT, SELECT,
+    Normal, Insert, Select,
 }
 
 /**
@@ -24,7 +24,7 @@ enum class HJEditorMode {
  */
 object HJState {
     var keymappingEnabled = true
-    var mode: HJEditorMode = HJEditorMode.NORMAL
+    var mode: HJEditorMode = HJEditorMode.Normal
     var config: HJConfiguration = HJConfiguration()
     private val editors: MutableMap<Editor, HJEditor> = mutableMapOf()
     val registers = HJRegisters()

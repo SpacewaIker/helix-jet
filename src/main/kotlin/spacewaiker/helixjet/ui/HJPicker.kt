@@ -257,7 +257,7 @@ class HJPickerWithPreview(
             // scroll up preview
             inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_PAGE_UP, InputEvent.SHIFT_DOWN_MASK), "scroll_preview_up")
             inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_U, ctrlShiftDownMask), "scroll_preview_up")
-            actionMap.put("scroll_preview_up", scrollPreviewAction(HJDirection.BACKWARD))
+            actionMap.put("scroll_preview_up", scrollPreviewAction(HJDirection.Backward))
 
             // scroll down preview
             inputMap.put(
@@ -265,7 +265,7 @@ class HJPickerWithPreview(
                 "scroll_preview_down"
             )
             inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_D, ctrlShiftDownMask), "scroll_preview_down")
-            actionMap.put("scroll_preview_down", scrollPreviewAction(HJDirection.FORWARD))
+            actionMap.put("scroll_preview_down", scrollPreviewAction(HJDirection.Forward))
         }
     }
 

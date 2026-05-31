@@ -57,6 +57,20 @@ class HJSelection {
     }
 
     /**
+     * Removes a range from the selection
+     */
+    fun remove(index: Int): HJSelection {
+        if (ranges.size <= 1) return this
+
+        ranges.removeAt(index)
+        if (index < primaryIndex || primaryIndex == ranges.size) {
+            primaryIndex--
+        }
+
+        return this
+    }
+
+    /**
      * Replace a range in the selection with a new range
      */
     fun replace(index: Int, range: HJRange): HJSelection {
@@ -273,4 +287,18 @@ fun <E> removeConsecutiveDuplicatesAndReplace(list: MutableList<E>, sameBucket: 
     }
 
     list.subList(write, list.size).clear()
+}
+
+fun keepOrRemoveMatches(text: String, selection: HJSelection, regex: Regex, remove: Boolean): HJSelection? {
+    val oldPrimaryIdx = selection.primaryIndex
+    val result = selection.ranges.withIndex().filter { (_, range) ->
+        regex.containsMatchIn(text.substring(range.from, range.to)).xor(remove)
+    }.withIndex().toList()
+
+    if (result.isEmpty()) return null
+
+    val newPrimaryIndex = (result.find { (_, i) -> i.index > oldPrimaryIdx } ?: result.last()).index
+    val ranges = result.map { (_, i) -> i.value }
+
+    return HJSelection(ranges, newPrimaryIndex)
 }

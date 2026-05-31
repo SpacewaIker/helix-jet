@@ -43,9 +43,9 @@ class HJRange {
 
     val direction
         get() = if (head < anchor) {
-            HJDirection.BACKWARD
+            HJDirection.Backward
         } else {
-            HJDirection.FORWARD
+            HJDirection.Forward
         }
 
     /**

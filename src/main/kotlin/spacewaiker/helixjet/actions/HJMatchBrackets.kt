@@ -106,7 +106,7 @@ object HJMatchBrackets {
             val closePair = asClosePair(doc, node)
             if (closePair != null) {
                 val (startChar, endChar) = closePair
-                val pairStart = findPairEnd(doc, node.prevSibling, startChar, endChar, HJDirection.BACKWARD)
+                val pairStart = findPairEnd(doc, node.prevSibling, startChar, endChar, HJDirection.Backward)
                 if (pairStart != null) {
                     return pairStart
                 }
@@ -114,7 +114,7 @@ object HJMatchBrackets {
             val openPair = asOpenPair(doc, node)
             if (openPair != null) {
                 val (startChar, endChar) = openPair
-                val pairEnd = findPairEnd(doc, node.nextSibling, startChar, endChar, HJDirection.FORWARD)
+                val pairEnd = findPairEnd(doc, node.nextSibling, startChar, endChar, HJDirection.Forward)
                 if (pairEnd != null) {
                     return pairEnd
                 }
@@ -123,7 +123,7 @@ object HJMatchBrackets {
             if (traverseParents) {
                 for (sibling in generateSequence(node.nextSibling, ASTNode::nextSibling).take(MATCH_LIMIT)) {
                     val (startChar, endChar) = asClosePair(doc, sibling) ?: continue
-                    if (findPairEnd(doc, sibling.prevSibling, startChar, endChar, HJDirection.BACKWARD) != null) {
+                    if (findPairEnd(doc, sibling.prevSibling, startChar, endChar, HJDirection.Backward) != null) {
                         return sibling.startOffset
                     }
                 }
@@ -217,8 +217,8 @@ object HJMatchBrackets {
         direction: HJDirection,
     ): Int? {
         val advance = when (direction) {
-            HJDirection.FORWARD -> { node: ASTNode -> node.nextSibling }
-            HJDirection.BACKWARD -> { node: ASTNode -> node.prevSibling }
+            HJDirection.Forward -> { node: ASTNode -> node.nextSibling }
+            HJDirection.Backward -> { node: ASTNode -> node.prevSibling }
         }
         var depth = 0
         generateSequence(node, advance)

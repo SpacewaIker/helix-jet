@@ -18,6 +18,8 @@ import java.util.regex.PatternSyntaxException
 import javax.swing.JSplitPane
 import kotlin.io.path.Path
 
+val LINE_ENDING_REGEX = Regex("""\r\n|\r|\n""")
+
 enum class HJFileOpenLocation {
     InPlace, BackgroundTab, VSplit, HSplit,
 }

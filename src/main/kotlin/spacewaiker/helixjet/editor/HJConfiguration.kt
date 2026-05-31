@@ -113,9 +113,9 @@ class HJConfiguration {
             }.orEmpty()
 
             val overrides = listOf(
-                Pair(HJEditorMode.NORMAL, normalKeyOverrides),
-                Pair(HJEditorMode.SELECT, selectKeyOverrides),
-                Pair(HJEditorMode.INSERT, insertKeyOverrides)
+                Pair(HJEditorMode.Normal, normalKeyOverrides),
+                Pair(HJEditorMode.Select, selectKeyOverrides),
+                Pair(HJEditorMode.Insert, insertKeyOverrides)
             )
             for ((mode, keyOverrides) in overrides) {
                 for ((keys, action) in keyOverrides) {
@@ -235,24 +235,24 @@ class HJConfiguration {
          */
         private fun defaultMappingParsed(): Map<HJEditorMode, MutableMap<HJInputKey, HJKeyAction>> {
             val map: Map<HJEditorMode, MutableMap<HJInputKey, HJKeyAction>> = mapOf(
-                HJEditorMode.NORMAL to mutableMapOf(),
-                HJEditorMode.SELECT to mutableMapOf(),
-                HJEditorMode.INSERT to mutableMapOf(),
+                HJEditorMode.Normal to mutableMapOf(),
+                HJEditorMode.Select to mutableMapOf(),
+                HJEditorMode.Insert to mutableMapOf(),
             )
 
             for ((key, value) in defaultMappingNormal) {
                 parseKeyActionDefinition(key, value)?.let { (inputKey, keyAction) ->
-                    map[HJEditorMode.NORMAL]!![inputKey] = keyAction
+                    map[HJEditorMode.Normal]!![inputKey] = keyAction
                 }
             }
             for ((key, value) in defaultMappingSelect) {
                 parseKeyActionDefinition(key, value)?.let { (inputKey, keyAction) ->
-                    map[HJEditorMode.SELECT]!![inputKey] = keyAction
+                    map[HJEditorMode.Select]!![inputKey] = keyAction
                 }
             }
             for ((key, value) in defaultMappingInsert) {
                 parseKeyActionDefinition(key, value)?.let { (inputKey, keyAction) ->
-                    map[HJEditorMode.INSERT]!![inputKey] = keyAction
+                    map[HJEditorMode.Insert]!![inputKey] = keyAction
                 }
             }
 

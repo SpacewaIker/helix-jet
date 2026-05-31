@@ -15,11 +15,11 @@ import javax.swing.*
 
 abstract class HJFloatingTextarea(editor: Editor) {
     enum class HAlignment {
-        LEFT, RIGHT,
+        Left, Right,
     }
 
     protected var width: Pair<Int, Int?>? = Pair(400, 700)
-    protected var hAlignment: HAlignment = HAlignment.LEFT
+    protected var hAlignment: HAlignment = HAlignment.Left
     protected var bottomSpacing: Int = 0
     protected var margin: Int = 8
 
@@ -119,7 +119,7 @@ abstract class HJFloatingTextarea(editor: Editor) {
         val w = panelWidth(lineMaxChars)
 
         val bottomInEditors = editorsComponent.height - margin - bottomSpacing
-        val x = if (hAlignment == HAlignment.LEFT) margin else editorsComponent.width - margin - w
+        val x = if (hAlignment == HAlignment.Left) margin else editorsComponent.width - margin - w
         val origin = toRootCoordinates(x, bottomInEditors - h)
         panel.setBounds(origin.x, origin.y, w, h)
 

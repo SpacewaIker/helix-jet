@@ -11,13 +11,13 @@ object HJCharHandling {
  * Does not have helix's UNKNOWN category.
  */
 enum class HJCharCategory {
-    WHITESPACE, EOL, WORD, PUNCTUATION;
+    Whitespace, EOL, Word, Punctuation;
 
     companion object {
         fun categorize(c: Char) = if (charIsLineEnding(c)) EOL
-        else if (c.isWhitespace()) WHITESPACE
-        else if (c.isLetterOrDigit() || c == '_') WORD
-        else PUNCTUATION
+        else if (c.isWhitespace()) Whitespace
+        else if (c.isLetterOrDigit() || c == '_') Word
+        else Punctuation
     }
 }
 

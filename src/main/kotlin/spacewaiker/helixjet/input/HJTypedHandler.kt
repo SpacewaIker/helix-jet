@@ -21,7 +21,7 @@ class HJTypedHandler(private val originalHandler: TypedActionHandler) : TypedAct
     }
 
     override fun execute(editor: Editor, c: Char, context: DataContext) {
-        if ((HJState.mode == HJEditorMode.INSERT && !HJState.typedHandlerBlock)
+        if ((HJState.mode == HJEditorMode.Insert && !HJState.typedHandlerBlock)
             || !HJState.keymappingEnabled
         ) {
             originalHandler.execute(editor, c, context)

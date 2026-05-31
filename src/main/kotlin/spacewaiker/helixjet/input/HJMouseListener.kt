@@ -17,7 +17,7 @@ class HJMouseListener : EditorMouseListener {
         val editor = event.editor
 
         val cx = HJActionContext(HJState.getHJEditor(editor))
-        if (HJState.mode == HJEditorMode.SELECT) switchToMode(cx, HJEditorMode.NORMAL)
+        if (HJState.mode == HJEditorMode.Select) switchToMode(cx, HJEditorMode.Normal)
 
         // override range with block-corrected location
         val pos = editor.xyToVisualPosition(event.mouseEvent.point)

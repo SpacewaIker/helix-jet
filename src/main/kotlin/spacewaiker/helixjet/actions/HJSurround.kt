@@ -64,8 +64,8 @@ object HJSurround {
                 }
             } else {
                 Pair(
-                    findNthChar(doc, HJCharMatcher.Character(openCh), pos, n, HJDirection.BACKWARD),
-                    findNthChar(doc, HJCharMatcher.Character(closeCh), pos, n, HJDirection.FORWARD)
+                    findNthChar(doc, HJCharMatcher.Character(openCh), pos, n, HJDirection.Backward),
+                    findNthChar(doc, HJCharMatcher.Character(closeCh), pos, n, HJDirection.Forward)
                 )
             }
         } else {
@@ -78,8 +78,8 @@ object HJSurround {
         // preserve original direction
         return if (open != null && close != null) {
             when (range.direction) {
-                HJDirection.FORWARD -> Pair(open, close)
-                HJDirection.BACKWARD -> Pair(close, open)
+                HJDirection.Forward -> Pair(open, close)
+                HJDirection.Backward -> Pair(close, open)
             }
         } else null
     }
@@ -119,7 +119,7 @@ object HJSurround {
         }
 
         // keep the original direction
-        return if (range.direction == HJDirection.FORWARD) {
+        return if (range.direction == HJDirection.Forward) {
             Pair(opening, closing)
         } else {
             Pair(closing, opening)
@@ -166,8 +166,8 @@ object HJSurround {
                     continue
                 }
                 return when (range.direction) {
-                    HJDirection.FORWARD -> Pair(openPos, closePos)
-                    HJDirection.BACKWARD -> Pair(closePos, openPos)
+                    HJDirection.Forward -> Pair(openPos, closePos)
+                    HJDirection.Backward -> Pair(closePos, openPos)
                 }
             }
         }
