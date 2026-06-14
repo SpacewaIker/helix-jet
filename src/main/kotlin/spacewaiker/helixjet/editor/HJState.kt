@@ -8,6 +8,7 @@ import spacewaiker.helixjet.editor.HJState.mode
 import spacewaiker.helixjet.editor.HJState.typedHandlerBlock
 import spacewaiker.helixjet.ui.HJHelpWidget
 import spacewaiker.helixjet.ui.HJPrompt
+import spacewaiker.helixjet.ui.HJStatusBarInputWidget
 
 enum class HJEditorMode {
     Normal, Insert, Select,
@@ -49,6 +50,11 @@ object HJState {
             return null
         }
     var typedHandlerBlock = false
+    var selectedRegister: HJRegister? = null
+        set(value) {
+            field = value
+            HJStatusBarInputWidget.updateInputWidget()
+        }
 
     fun getHJEditor(editor: Editor) = editors.getOrPut(editor) { HJEditor(editor) }
 

@@ -5,6 +5,8 @@ package spacewaiker.helixjet.actions
 import com.intellij.codeInsight.actions.VcsFacade
 import com.intellij.codeInsight.daemon.impl.HighlightInfo
 import com.intellij.ide.BrowserUtil
+import com.intellij.ide.scratch.ScratchFileService
+import com.intellij.ide.scratch.ScratchRootType
 import com.intellij.lang.LanguageCommenters
 import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.openapi.actionSystem.ActionManager
@@ -18,7 +20,10 @@ import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.fileEditor.ex.FileEditorManagerEx
 import com.intellij.openapi.fileEditor.impl.EditorComposite
+import com.intellij.openapi.fileEditor.impl.EditorWindow
+import com.intellij.openapi.fileTypes.PlainTextLanguage
 import com.intellij.openapi.project.guessProjectDir
+import com.intellij.openapi.ui.Splitter
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ChangeListManager
@@ -37,8 +42,10 @@ import spacewaiker.helixjet.input.HJInputHandler
 import spacewaiker.helixjet.input.HJInputKey
 import spacewaiker.helixjet.ui.*
 import java.awt.Point
+import java.awt.Rectangle
 import java.awt.event.KeyEvent
 import java.util.*
+import javax.swing.JComponent
 import javax.swing.table.AbstractTableModel
 import kotlin.io.path.Path
 import kotlin.io.path.isDirectory
@@ -317,28 +324,28 @@ private val actionsRaw = arrayOf(
     HJAction("jump_view_left", "Jump to left split") { jumpViewImpl(it, HJNavDirection.Left) },
     HJAction("jump_view_up", "Jump to split above") { jumpViewImpl(it, HJNavDirection.Up) },
     HJAction("jump_view_down", "Jump to split below") { jumpViewImpl(it, HJNavDirection.Down) },
-    HJAction("swap_view_right", "Swap with right split"),
-    HJAction("swap_view_left", "Swap with left split"),
-    HJAction("swap_view_up", "Swap with split above"),
-    HJAction("swap_view_down", "Swap with split below"),
-    HJAction("transpose_view", "Transpose splits"),
-    HJAction("rotate_view", "Goto next window"),
-    HJAction("rotate_view_reverse", "Goto previous window"),
-    HJAction("hsplit", "Horizontal bottom split"),
-    HJAction("hsplit_new", "Horizontal bottom split scratch buffer"),
-    HJAction("vsplit", "Vertical right split"),
-    HJAction("vsplit_new", "Vertical right split scratch buffer"),
-    HJAction("wclose", "Close window"),
-    HJAction("wonly", "Close windows except current"),
-    HJAction("select_register", "Select register"),
-    HJAction("insert_register", "Insert register"),
-    HJAction("copy_between_registers", "Copy between two registers"),
+    HJAction("swap_view_right", "Swap with right split") { swapViewImpl(it, HJNavDirection.Right) },
+    HJAction("swap_view_left", "Swap with left split") { swapViewImpl(it, HJNavDirection.Left) },
+    HJAction("swap_view_up", "Swap with split above") { swapViewImpl(it, HJNavDirection.Up) },
+    HJAction("swap_view_down", "Swap with split below") { swapViewImpl(it, HJNavDirection.Down) },
+    HJAction("transpose_view", "Transpose splits") { transposeSplit(it) },
+    HJAction("rotate_view", "Goto next window") { rotateViewImpl(it, HJDirection.Forward) },
+    HJAction("rotate_view_reverse", "Goto previous window") { rotateViewImpl(it, HJDirection.Backward) },
+    HJAction("hsplit", "Horizontal bottom split") { splitBufferImpl(it, HJFileOpenLocation.HSplit, false) },
+    HJAction("hsplit_new", "Horizontal bottom split scratch buffer") { splitBufferImpl(it, HJFileOpenLocation.HSplit, true) },
+    HJAction("vsplit", "Vertical right split") { splitBufferImpl(it, HJFileOpenLocation.VSplit, false) },
+    HJAction("vsplit_new", "Vertical right split scratch buffer") { splitBufferImpl(it, HJFileOpenLocation.VSplit, true) },
+    HJAction("wclose", "Close window") { closeWindow(it) },
+    HJAction("wonly", "Close windows except current") { closeOtherWindows(it) },
+    HJAction("select_register", "Select register") { selectRegister(it) },
+    HJAction("insert_register", "Insert register") { insertRegister(it) },
+    HJAction("copy_between_registers", "Copy between two registers") { copyBetweenRegisters(it) },
     HJAction("align_view_middle", "Align view middle"),
     HJAction("align_view_top", "Align view top"),
     HJAction("align_view_center", "Align view center"),
     HJAction("align_view_bottom", "Align view bottom"),
-    HJAction("scroll_up", "Scroll view up"),
-    HJAction("scroll_down", "Scroll view down"),
+    HJAction("scroll_up", "Scroll view up") { scrollPageByLineImpl(it, HJDirection.Backward) },
+    HJAction("scroll_down", "Scroll view down") { scrollPageByLineImpl(it, HJDirection.Forward) },
     HJAction("match_brackets", "Goto matching bracket") { matchBrackets(it) },
     HJAction("surround_add", "Surround add") { surroundAdd(it) },
     HJAction("surround_replace", "Surround replace") { surroundReplace(it) },
@@ -361,16 +368,16 @@ private val actionsRaw = arrayOf(
     HJAction("goto_prev_entry", "Goto previous pairing"),
     HJAction("goto_next_paragraph", "Goto next paragraph"),
     HJAction("goto_prev_paragraph", "Goto previous paragraph"),
-    HJAction("dap_launch", "Launch debug target"),
-    HJAction("dap_restart", "Restart debugging session"),
-    HJAction("dap_toggle_breakpoint", "Toggle breakpoint"),
-    HJAction("dap_continue", "Continue program execution"),
-    HJAction("dap_pause", "Pause program execution"),
-    HJAction("dap_step_in", "Step in"),
-    HJAction("dap_step_out", "Step out"),
+    HJAction("dap_launch", "Launch debug target") { executeIdeAction(it, "Debug") },
+    HJAction("dap_restart", "Restart debugging session") { executeIdeAction(it, "Debug") },
+    HJAction("dap_toggle_breakpoint", "Toggle breakpoint") { executeIdeAction(it, "ToggleLineBreakpoint") },
+    HJAction("dap_continue", "Continue program execution") { executeIdeAction(it, "Resume") },
+    HJAction("dap_pause", "Pause program execution") { executeIdeAction(it, "Pause") },
+    HJAction("dap_step_in", "Step in") { executeIdeAction(it, "StepInto") },
+    HJAction("dap_step_out", "Step out") { executeIdeAction(it, "StepOut") },
     HJAction("dap_next", "Step to next"),
     HJAction("dap_variables", "List variables"),
-    HJAction("dap_terminate", "End debug session"),
+    HJAction("dap_terminate", "End debug session") { executeIdeAction(it, "Stop") },
     HJAction("dap_edit_condition", "Edit breakpoint condition on current line"),
     HJAction("dap_edit_log", "Edit breakpoint log message on current line"),
     HJAction("dap_switch_thread", "Switch current thread"),
@@ -383,9 +390,9 @@ private val actionsRaw = arrayOf(
     HJAction("shell_append_output", "Append shell command output after selections"),
     HJAction("shell_keep_pipe", "Filter selections with shell predicate"),
     HJAction("suspend", "Suspend and return to shell"),
-    HJAction("rename_symbol", "Rename symbol"),
-    HJAction("increment", "Increment item under cursor"),
-    HJAction("decrement", "Decrement item under cursor"),
+    HJAction("rename_symbol", "Rename symbol") { executeIdeAction(it, IdeActions.ACTION_RENAME) },
+    HJAction("increment", "Increment item under cursor") { incrementImpl(it, HJDirection.Forward) },
+    HJAction("decrement", "Decrement item under cursor") { incrementImpl(it, HJDirection.Backward) },
     HJAction("record_macro", "Record macro"),
     HJAction("replay_macro", "Replay macro"),
     HJAction("command_palette", "Open command palette") { commandPalette(it) },
@@ -626,8 +633,9 @@ fun yankMainSelectionImpl(cx: HJActionContext, register: HJRegister) {
     }
 }
 
-private fun pasteImpl(cx: HJActionContext, pasteBefore: Boolean) {
-    val registerContents = HJState.registers.read(cx.register ?: HJRegister.LastYank, cx.hjEditor) ?: return
+private fun pasteImpl(cx: HJActionContext, pasteBefore: Boolean, registerOverride: HJRegister? = null) {
+    val register = registerOverride ?: cx.register ?: HJRegister.LastYank
+    val registerContents = HJState.registers.read(register, cx.hjEditor) ?: return
 
     val transaction = cx.hjEditor.changeBySelectionIndexed { idx, range ->
         val pos = if (pasteBefore) range.from else range.to
@@ -884,6 +892,13 @@ private fun scrollPageImpl(cx: HJActionContext, multiplier: Float, direction: HJ
     val scrollModel = cx.hjEditor.editor.scrollingModel
     val area = scrollModel.visibleArea
     val deltaOffset = (area.height * multiplier).toInt()
+    val newOffset = scrollModel.verticalScrollOffset + deltaOffset * direction.value
+    scrollModel.scrollVertically(newOffset)
+}
+
+private fun scrollPageByLineImpl(cx: HJActionContext, direction: HJDirection) {
+    val scrollModel = cx.hjEditor.editor.scrollingModel
+    val deltaOffset = cx.hjEditor.editor.lineHeight
     val newOffset = scrollModel.verticalScrollOffset + deltaOffset * direction.value
     scrollModel.scrollVertically(newOffset)
 }
@@ -2454,41 +2469,289 @@ private fun reorderSelectionContents(cx: HJActionContext, strategy: HJReorderStr
     cx.hjEditor.apply(transaction)
 }
 
-fun jumpViewImpl(cx: HJActionContext, direction: HJNavDirection) {
+private fun getWindowInDirection(cx: HJActionContext, direction: HJNavDirection): EditorWindow? {
     val project = cx.hjEditor.editor.project!!
     val manager = FileEditorManagerEx.getInstanceEx(project)
-    val currentWindow = manager.currentWindow ?: return
-    val currentBounds = currentWindow.selectedComposite?.component?.bounds ?: return
+    val currentWindow = manager.currentWindow ?: return null
 
-    val targetWindow = manager.windows
-        .filter { it != currentWindow }
-        .minByOrNull { window ->
-            val bounds = window.selectedComposite?.component?.bounds ?: return@minByOrNull Int.MAX_VALUE
-            when (direction) {
-                HJNavDirection.Left -> {
-                    if (bounds.x < currentBounds.x) currentBounds.x - bounds.x
-                    else Int.MAX_VALUE
-                }
+    val getScreenBounds = getScreenBounds@{ window: EditorWindow ->
+        val component = window.selectedComposite?.component ?: return@getScreenBounds null
+        val location = component.locationOnScreen
+        Rectangle(location.x, location.y, component.width, component.height)
+    }
 
-                HJNavDirection.Right -> {
-                    if (bounds.x > currentBounds.x) bounds.x - currentBounds.x
-                    else Int.MAX_VALUE
-                }
+    val currentBounds = getScreenBounds(currentWindow) ?: return null
 
-                HJNavDirection.Up -> {
-                    if (bounds.y < currentBounds.y) currentBounds.y - bounds.y
-                    else Int.MAX_VALUE
-                }
-
-                HJNavDirection.Down -> {
-                    if (bounds.y > currentBounds.y) bounds.y - currentBounds.y
-                    else Int.MAX_VALUE
+    // find minimum by (dist, bounds.x, bounds.y) instead of just dist so that we have the first (topmost, leftmost)
+    // window when switching to a split. First we compute the bounds, then find min by above criteria
+    val result = manager.windows
+        .mapNotNull { window ->
+            val bounds = getScreenBounds(window) ?: return@mapNotNull null
+            Pair(window, bounds)
+        }
+        .minWithOrNull(
+            compareBy<Pair<EditorWindow, Rectangle>> { (window, bounds) ->
+                when (direction) {
+                    else if (window == currentWindow) -> Int.MAX_VALUE - 1 // set currentWindow as fallback
+                    HJNavDirection.Left -> if (bounds.x < currentBounds.x) currentBounds.x - bounds.x else Int.MAX_VALUE
+                    HJNavDirection.Right -> if (bounds.x > currentBounds.x) bounds.x - currentBounds.x else Int.MAX_VALUE
+                    HJNavDirection.Up -> if (bounds.y < currentBounds.y) currentBounds.y - bounds.y else Int.MAX_VALUE
+                    HJNavDirection.Down -> if (bounds.y > currentBounds.y) bounds.y - currentBounds.y else Int.MAX_VALUE
                 }
             }
-        } ?: return
+                .thenBy { (_, bounds) -> bounds.x }
+                .thenBy { (_, bounds) -> bounds.y }
+        )?.first
+
+    return if (result == currentWindow) null else result
+}
+
+private fun jumpViewImpl(cx: HJActionContext, direction: HJNavDirection) {
+    val targetWindow = getWindowInDirection(cx, direction) ?: return
 
     targetWindow.setAsCurrentWindow(true)
     targetWindow.selectedComposite?.selectedEditor?.let { fileEditor ->
         (fileEditor as? TextEditor)?.editor?.contentComponent?.requestFocusInWindow()
+    }
+}
+
+private fun swapViewImpl(cx: HJActionContext, direction: HJNavDirection) {
+    val project = cx.hjEditor.editor.project!!
+    val manager = FileEditorManagerEx.getInstanceEx(project)
+    val current = manager.currentWindow?.selectedComposite?.component?.parent as? JComponent ?: return
+    val target = getWindowInDirection(cx, direction)?.selectedComposite?.component?.parent as? JComponent ?: return
+
+    val currentParent = current.parent
+    val targetParent = target.parent
+
+    if (!(currentParent is Splitter && targetParent is Splitter)) {
+        HJActions.logger.error("Error in swapViewImpl: one of the parent components is not a splitter.")
+        return
+    }
+
+    if (currentParent == targetParent) {
+        // same splitter, just swap first and second components
+        val first = currentParent.firstComponent
+        val second = currentParent.secondComponent
+        currentParent.firstComponent = null
+        currentParent.secondComponent = null
+        currentParent.firstComponent = second
+        currentParent.secondComponent = first
+        currentParent.revalidate()
+        currentParent.repaint()
+
+        current.requestFocusInWindow()
+    } else {
+        // different splitters, swap across
+        val currentIsFirst = currentParent.firstComponent == current
+        val targetIsFirst = targetParent.firstComponent == target
+
+        // clear
+        if (currentIsFirst) {
+            currentParent.firstComponent = null
+        } else {
+            currentParent.secondComponent = null
+        }
+        if (targetIsFirst) {
+            targetParent.firstComponent = null
+        } else {
+            targetParent.secondComponent = null
+        }
+
+        // set
+        if (currentIsFirst) {
+            currentParent.firstComponent = target
+        } else {
+            currentParent.secondComponent = target
+        }
+        if (targetIsFirst) {
+            targetParent.firstComponent = current
+        } else {
+            targetParent.secondComponent = current
+        }
+
+        current.requestFocusInWindow()
+    }
+}
+
+private fun transposeSplit(cx: HJActionContext) {
+    val project = cx.hjEditor.editor.project!!
+    val manager = FileEditorManagerEx.getInstanceEx(project)
+    val current = manager.currentWindow?.selectedComposite?.component?.parent as? JComponent ?: return
+
+    val currentParent = current.parent as? Splitter ?: return
+    currentParent.orientation = !currentParent.orientation
+    currentParent.revalidate()
+    currentParent.repaint()
+}
+
+private fun rotateViewImpl(cx: HJActionContext, direction: HJDirection) {
+    val project = cx.hjEditor.editor.project!!
+    val manager = FileEditorManagerEx.getInstanceEx(project)
+    val currentWindow = manager.currentWindow ?: return
+
+    val currentIndex = manager.windows.indexOf(currentWindow)
+    val targetIndex = (currentIndex + direction.value).mod(manager.windows.size)
+    val targetWindow = manager.windows[targetIndex]
+
+    targetWindow.setAsCurrentWindow(true)
+    targetWindow.selectedComposite?.selectedEditor?.let { fileEditor ->
+        (fileEditor as? TextEditor)?.editor?.contentComponent?.requestFocusInWindow()
+    }
+}
+
+private fun splitBufferImpl(cx: HJActionContext, location: HJFileOpenLocation, openScratch: Boolean) {
+    val file = if (openScratch) {
+        val project = cx.hjEditor.editor.project!!
+        ScratchRootType.getInstance().createScratchFile(
+            project, "scratch", PlainTextLanguage.INSTANCE, "", ScratchFileService.Option.create_new_always
+        )
+    } else {
+        cx.hjEditor.editor.virtualFile
+    } ?: return
+
+    openFile(cx, file, location)
+}
+
+private fun closeWindow(cx: HJActionContext) {
+    quitWindows(cx) { manager ->
+        for (window in manager.windows) {
+            println(window)
+        }
+
+        manager.currentWindow?.let { listOf(it) } ?: emptyList()
+    }
+}
+
+private fun closeOtherWindows(cx: HJActionContext) {
+    quitWindows(cx) { manager ->
+        val windows = manager.windows.toMutableList()
+        manager.currentWindow?.let { windows.remove(it) }
+        windows
+    }
+}
+
+private fun registerHelpText(): List<Pair<String, String>> {
+    val helpText = mutableListOf<Pair<HJRegister, String>>()
+    val registers = HJState.registers.rawRegisters
+
+    // order:
+    // last yank
+    // any general purpose
+    // last command
+    // others
+    registers[HJRegister.LastYank]?.let { helpText.add(Pair(HJRegister.LastYank, it.first())) }
+    helpText.addAll(
+        registers
+            .filter { (reg, _) -> reg is HJRegister.GeneralPurpose }
+            .map { (reg, contents) -> Pair(reg, contents.first()) }
+            .toList()
+    )
+    registers[HJRegister.LastCmd]?.let { helpText.add(Pair(HJRegister.LastCmd, it.first())) }
+
+    helpText.addAll(
+        listOf(
+            Pair(HJRegister.Void, "<empty>"),
+            Pair(HJRegister.SelIdx, "<selection indices>"),
+            Pair(HJRegister.CurrSel, "<selection contents>"),
+            Pair(HJRegister.FileName, "<document path>"),
+            Pair(HJRegister.Clipboard, "<system clipboard>"),
+        )
+    )
+
+    return helpText.map { (reg, cont) -> Pair(reg.toString(), cont) }
+}
+
+private fun selectRegister(cx: HJActionContext) {
+    HJInputHandler.onNextKey { inputKey ->
+        if (inputKey is HJInputKey.Character) {
+            HJState.selectedRegister = HJRegister.fromChar(inputKey.char)
+        }
+    }
+
+    HJState.getOrCreateHelpWidget(cx.hjEditor.editor)
+        .setHelpContent("Select register", registerHelpText())
+}
+
+private fun insertRegister(cx: HJActionContext) {
+    HJInputHandler.onNextKey { inputKey ->
+        if (inputKey is HJInputKey.Character) {
+            val reg = HJRegister.fromChar(inputKey.char)
+            pasteImpl(cx, false, reg)
+        }
+    }
+
+    HJState.getOrCreateHelpWidget(cx.hjEditor.editor)
+        .setHelpContent("Insert register", registerHelpText())
+}
+
+private fun copyBetweenRegisters(cx: HJActionContext) {
+    HJInputHandler.onNextKey { inputKey ->
+        if (inputKey is HJInputKey.Character) {
+            val sourceReg = HJRegister.fromChar(inputKey.char)
+
+            val values = HJState.registers.read(sourceReg, cx.hjEditor)
+            if (values == null) {
+                cx.hjEditor.setError("Register $sourceReg is empty")
+                return@onNextKey
+            }
+
+            HJInputHandler.onNextKey { inputKey ->
+                if (inputKey is HJInputKey.Character) {
+                    val destReg = HJRegister.fromChar(inputKey.char)
+
+                    val nValues = values.size
+                    if (HJState.registers.write(destReg, values, cx.hjEditor)) {
+                        val plural = if (nValues == 1) "" else "s"
+                        cx.hjEditor.setStatus("Yanked $nValues value$plural from register $sourceReg to $destReg")
+                    }
+                }
+            }
+
+            HJState.getOrCreateHelpWidget(cx.hjEditor.editor)
+                .setHelpContent("Copy into register", registerHelpText())
+        }
+    }
+
+    HJState.getOrCreateHelpWidget(cx.hjEditor.editor)
+        .setHelpContent("Copy from register", registerHelpText())
+}
+
+private fun incrementImpl(cx: HJActionContext, direction: HJDirection) {
+    val sign = direction.value
+    var amount = sign * cx.count
+    // If the register is '#'/ selIdx, then increase or decrease the 'amount' by 1 per element
+    val increaseBy = if (cx.register is HJRegister.SelIdx) sign else 0
+
+    val selection = cx.hjEditor.selection
+
+    val newSelectionRanges = mutableListOf<HJRange>()
+    var cumulativeLengthDiff = 0
+    val changes = mutableListOf<HJChange>()
+
+    for (range in selection.ranges) {
+        val selectedText = range.slice(cx.doc) ?: continue
+        val newFrom = range.from + cumulativeLengthDiff
+        val incremented = listOf(::incrementInteger, ::incrementDatetime, ::incrementBool)
+            .firstNotNullOfOrNull { it(selectedText, amount) }
+
+        amount += increaseBy
+
+        if (incremented == null) {
+            val newRange = HJRange(newFrom, range.to + cumulativeLengthDiff)
+            newSelectionRanges.add(newRange)
+        } else {
+            val newRange = HJRange(newFrom, newFrom + incremented.length)
+            cumulativeLengthDiff += incremented.length - selectedText.length
+            newSelectionRanges.add(newRange)
+            changes.add(HJChange.Replace(range.from, range.to, incremented))
+        }
+    }
+
+    if (changes.isNotEmpty()) {
+        val newSelection = HJSelection(newSelectionRanges, selection.primaryIndex)
+        val transaction = HJTransaction(changes, newSelection)
+        cx.hjEditor.apply(transaction)
+        exitSelectMode(cx)
     }
 }

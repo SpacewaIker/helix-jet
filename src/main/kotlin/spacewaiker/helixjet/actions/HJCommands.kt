@@ -4,8 +4,6 @@ import com.intellij.lang.ASTNode
 import com.intellij.lang.tree.util.children
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.fileEditor.FileEditorManager
-import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiElement
 import spacewaiker.helixjet.editor.HJConfiguration
 import spacewaiker.helixjet.editor.HJRegister
@@ -110,7 +108,7 @@ private val helixCommands = arrayOf(
     },
     HJCommand("buffer-close", listOf("bc", "bclose"), "Close the current buffer.") { cx, _, _ ->
         // TODO: Does this close a modified but unsaved buffer?
-        closeFilesImpl(cx) { it.currentFile?.let { file -> listOf(file) } ?: emptyList() }
+        closeFiles(cx) { it.currentFile?.let { file -> listOf(file) } ?: emptyList() }
     },
     HJCommand(
         "buffer-close-others",
@@ -119,10 +117,16 @@ private val helixCommands = arrayOf(
         listOf("-s  don't close buffers that are visible")
     ) { cx, _, _ ->
         // TODO: don't close buffers that are visible
-        closeFilesImpl(cx) { it.openFiles.filterNot { file -> file == it.currentFile } }
+        closeFiles(cx) { it.openFiles.filterNot { file -> file == it.currentFile } }
     },
     HJCommand("buffer-close-all", listOf("bca", "bcloseall"), "Close all buffers without quitting.") { cx, _, _ ->
-        closeFilesImpl(cx) { it.openFiles.toList() }
+        closeFiles(cx) { it.openFiles.toList() }
+    },
+    HJCommand("quit", listOf("q"), "Close the current view.") { cx, _, _ ->
+        quitWindows(cx) { manager -> manager.currentWindow?.let { listOf(it) } ?: emptyList() }
+    },
+    HJCommand("quit-all", listOf("qa"), "Close all views") { cx, _, _ ->
+        quitWindows(cx) { manager -> manager.windows.toList() }
     },
     HJCommand(
         "yank-join",
@@ -236,12 +240,3 @@ private val debugCommands = arrayOf(
 
 private val commandsRaw =
     if (System.getProperty("idea.plugin.in.sandbox.mode") == "true") helixCommands + debugCommands else helixCommands
-
-private fun closeFilesImpl(cx: HJActionContext, selector: (FileEditorManager) -> List<VirtualFile>) {
-    val project = cx.hjEditor.editor.project!!
-    val fileEditorManager = FileEditorManager.getInstance(project)
-    for (file in selector(fileEditorManager)) {
-        fileEditorManager.closeFile(file)
-    }
-    fileEditorManager.selectedTextEditor?.contentComponent?.requestFocusInWindow()
-}

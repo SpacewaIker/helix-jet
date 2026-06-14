@@ -149,6 +149,21 @@ sealed class HJRegister {
     companion object {
         val logger = Logger.getInstance(this::class.java)
 
+        fun fromChar(char: Char): HJRegister {
+            return when (char) {
+                '/' -> LastSearch
+                ':' -> LastCmd
+                '"' -> LastYank
+                '@' -> LastMacro
+                '_' -> Void
+                '#' -> SelIdx
+                '.' -> CurrSel
+                '%' -> FileName
+                '+' -> Clipboard
+                else -> GeneralPurpose(char)
+            }
+        }
+
         fun selectionToRegister(hjEditor: HJEditor, selection: HJSelection, register: HJRegister): List<String>? {
             if (register.readOnly) {
                 hjEditor.setError("Register ${register.char} does not support writing")
@@ -182,4 +197,8 @@ sealed class HJRegister {
     }
 
     override fun toString() = char.toString()
+
+    override fun equals(other: Any?) = other is HJRegister && char == other.char
+
+    override fun hashCode() = char.hashCode()
 }

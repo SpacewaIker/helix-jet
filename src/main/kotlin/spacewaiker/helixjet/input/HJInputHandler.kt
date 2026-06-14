@@ -2,8 +2,6 @@
 
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Editor
-import com.intellij.openapi.editor.EditorFactory
-import com.intellij.openapi.wm.WindowManager
 import spacewaiker.helixjet.actions.HJActionContext
 import spacewaiker.helixjet.actions.HJKeyAction
 import spacewaiker.helixjet.editor.HJEditorMode
@@ -57,7 +55,7 @@ object HJInputHandler {
             onNextKeyCallback.remove().invoke(key)
             pendingActionKey = null
             minorModeName = null
-            updateInputWidget()
+            HJStatusBarInputWidget.updateInputWidget()
             return true
         }
 
@@ -69,7 +67,7 @@ object HJInputHandler {
         // if the key is a number, we're inputting an action count
         if (key is HJInputKey.Character && key.char.isDigit()) {
             actionCount += key.char
-            updateInputWidget()
+            HJStatusBarInputWidget.updateInputWidget()
             return true
         }
         val count = if (actionCount.isEmpty()) null else actionCount.toInt().coerceAtLeast(1)
@@ -87,7 +85,7 @@ object HJInputHandler {
                     minorModeMapping = null
                     pendingActionKey = null
                     minorModeName = null
-                    updateInputWidget()
+                    HJStatusBarInputWidget.updateInputWidget()
                 } else {
                     logger.info("Could not find an action corresponding to $key in mode ${HJState.mode}")
                 }
@@ -98,7 +96,7 @@ object HJInputHandler {
                 actionCount = ""
 
                 val hjEditor = HJState.getHJEditor(editor)
-                val cx = HJActionContext(hjEditor, count, null)
+                val cx = HJActionContext(hjEditor, count, HJState.selectedRegister)
                 keyAction.execute(cx)
 
                 // if action sets onNextKeyCallback, do not clear pending action key and minor mode name
@@ -106,13 +104,13 @@ object HJInputHandler {
                     pendingActionKey = null
                     minorModeName = null
                 }
-                updateInputWidget()
+                HJStatusBarInputWidget.updateInputWidget()
             }
 
             is HJKeyAction.HJMinorMode -> {
                 pendingActionKey = if (pendingActionKey == null) lastKey.toString() else pendingActionKey + lastKey
                 minorModeName = keyAction.name
-                updateInputWidget()
+                HJStatusBarInputWidget.updateInputWidget()
                 minorModeMapping = keyAction.mapping
 
                 HJState.getOrCreateHelpWidget(editor).setNewMinorMode(keyAction)
@@ -124,6 +122,8 @@ object HJInputHandler {
             }
         }
 
+        HJState.selectedRegister = null
+
         return true
     }
 
@@ -134,15 +134,9 @@ object HJInputHandler {
     fun onNextKey(callback: (HJInputKey) -> Unit) {
         onNextKeyCallback.add(callback)
 
-        lastKey?.let {
-            pendingActionKey += it.toString()
-            updateInputWidget()
-        }
-    }
-
-    private fun updateInputWidget() {
-        EditorFactory.getInstance().editorList.first().project?.let {
-            WindowManager.getInstance().getStatusBar(it)?.updateWidget(HJStatusBarInputWidget.ID)
+        lastKey?.let { lastKey ->
+            pendingActionKey = pendingActionKey?.let { it + lastKey.toString() } ?: lastKey.toString()
+            HJStatusBarInputWidget.updateInputWidget()
         }
     }
 }

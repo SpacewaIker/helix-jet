@@ -42,7 +42,7 @@ class HJHelpWidget(editor: Editor) : HJFloatingTextarea(editor) {
             }
         }
 
-        return sb.toString()
+        return sb.toString().removeSuffix("\n")
     }
 
     private fun formatMinorMode(minorMode: HJKeyAction.HJMinorMode): List<Pair<String, String>> {
