@@ -1,9 +1,11 @@
 ﻿package spacewaiker.helixjet.input
 
+import com.intellij.ide.IdeEventQueue
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Editor
 import spacewaiker.helixjet.actions.HJActionContext
 import spacewaiker.helixjet.actions.HJKeyAction
+import spacewaiker.helixjet.editor.HJEditor
 import spacewaiker.helixjet.editor.HJEditorMode
 import spacewaiker.helixjet.editor.HJState
 import spacewaiker.helixjet.input.HJInputHandler.actionCount
@@ -12,6 +14,7 @@ import spacewaiker.helixjet.input.HJInputHandler.minorModeName
 import spacewaiker.helixjet.input.HJInputHandler.onNextKeyCallback
 import spacewaiker.helixjet.input.HJInputHandler.pendingActionKey
 import spacewaiker.helixjet.ui.HJStatusBarInputWidget
+import java.awt.event.KeyEvent
 import java.util.*
 
 /**
@@ -40,8 +43,17 @@ object HJInputHandler {
      * Returns true if the key event was handled, false if it should be handled by the caller.
      */
     fun handle(editor: Editor, key: HJInputKey): Boolean {
-        if (HJState.mode == HJEditorMode.Insert && key is HJInputKey.Character) {
-            return false
+        // record all key presses, including insert mode presses
+        if (HJState.macroRecording != null) {
+            val keys = HJState.macroRecording!!.second
+            keys.add(key)
+        }
+
+        if (HJState.mode == HJEditorMode.Insert) {
+            HJState.lastInsertKeystrokes.add(key)
+            if (key is HJInputKey.Character) {
+                return false
+            }
         }
 
         lastKey = key
@@ -137,6 +149,36 @@ object HJInputHandler {
         lastKey?.let { lastKey ->
             pendingActionKey = pendingActionKey?.let { it + lastKey.toString() } ?: lastKey.toString()
             HJStatusBarInputWidget.updateInputWidget()
+        }
+    }
+
+    fun sendInputKeyKeyEvent(hjEditor: HJEditor, inputKey: HJInputKey) {
+        val eventQueue = IdeEventQueue.getInstance()
+
+        // key pressed for events intercepted by HelixJet
+        val keyPressedEvent = inputKey.toKeyEvent(hjEditor)
+        eventQueue.dispatchEvent(keyPressedEvent)
+
+        // key typed and released for typing characters in insert mode
+        if (inputKey is HJInputKey.Character) {
+            val keyTypedEvent = KeyEvent(
+                keyPressedEvent.component,
+                KeyEvent.KEY_TYPED,
+                System.currentTimeMillis(),
+                keyPressedEvent.modifiersEx,
+                0,
+                keyPressedEvent.keyChar,
+            )
+            eventQueue.dispatchEvent(keyTypedEvent)
+            val keyReleasedEvent = KeyEvent(
+                keyPressedEvent.component,
+                KeyEvent.KEY_RELEASED,
+                System.currentTimeMillis(),
+                keyPressedEvent.modifiersEx,
+                keyPressedEvent.keyCode,
+                keyPressedEvent.keyChar,
+            )
+            eventQueue.dispatchEvent(keyReleasedEvent)
         }
     }
 }

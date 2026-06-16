@@ -1,6 +1,7 @@
 ﻿package spacewaiker.helixjet.input
 
 import com.intellij.openapi.diagnostic.Logger
+import spacewaiker.helixjet.editor.HJEditor
 import java.awt.event.KeyEvent
 
 /**
@@ -102,6 +103,35 @@ sealed class HJInputKey(
         return result
     }
 
+    fun toKeyEvent(hjEditor: HJEditor): KeyEvent {
+        val component = hjEditor.editor.component
+
+        var modifiers = 0
+        if ((this is Character && char.isUpperCase()) || (this is Other && shift))
+            modifiers = modifiers or KeyEvent.SHIFT_DOWN_MASK
+        if (ctrl) modifiers = modifiers or KeyEvent.CTRL_DOWN_MASK
+        if (alt) modifiers = modifiers or KeyEvent.ALT_DOWN_MASK
+
+        val keyCode = when (this) {
+            is Character -> char.uppercaseChar().code
+            is Other -> code
+        }
+
+        val keyChar = when (this) {
+            is Character -> char
+            is Other -> code.toChar()
+        }
+
+        return KeyEvent(
+            component,
+            KeyEvent.KEY_PRESSED,
+            System.currentTimeMillis(),
+            modifiers,
+            keyCode,
+            keyChar,
+        )
+    }
+
     companion object {
         private val logger = Logger.getInstance(this::class.java)
 
@@ -157,6 +187,41 @@ sealed class HJInputKey(
                 else if keyString.length == 1 -> Character(keyString[0], ctrl, alt)
                 else -> null
             }
+        }
+
+        fun parseMacro(hjEditor: HJEditor, string: String): List<HJInputKey>? {
+            val keys = mutableListOf<HJInputKey>()
+
+            var i = 0
+            while (i < string.length) {
+                val s = string.substring(i)
+                val c = s[0]
+                if (c == '>') {
+                    hjEditor.setError("Unmatched '>'")
+                    return null
+                } else if (c != '<') {
+                    keys.add(Character(c, false, false))
+                    i++
+                } else {
+                    try {
+                        val end_i = s.indexOf('>')
+                        val keyString = s.substring(1, end_i)
+                        val inputKey = fromString(keyString)
+                        if (inputKey != null) {
+                            keys.add(inputKey)
+                            i += end_i + 1
+                        } else {
+                            hjEditor.setError("Unable to parse key '$keyString'")
+                            return null
+                        }
+                    } catch (e: IndexOutOfBoundsException) {
+                        hjEditor.setError("Unmatched '<'")
+                        return null
+                    }
+                }
+            }
+
+            return keys
         }
     }
 }

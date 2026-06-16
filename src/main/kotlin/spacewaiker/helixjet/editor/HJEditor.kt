@@ -120,14 +120,6 @@ class HJEditor {
         lastMotion = motion
     }
 
-    fun repeatLastMotion(count: Int) {
-        if (lastMotion != null) {
-            repeat(count) {
-                lastMotion?.invoke(this)
-            }
-        }
-    }
-
     /**
      * Generate an HJTransaction with a change per selection range
      */

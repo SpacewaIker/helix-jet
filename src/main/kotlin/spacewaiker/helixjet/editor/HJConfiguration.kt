@@ -359,6 +359,7 @@ private val defaultMappingNormal: Map<String, Any> = mapOf(
             "w" to "goto_word",
         )
     ),
+    "." to "repeat_last_insert",
     ":" to "command_mode",
     "i" to "insert_mode",
     "I" to "insert_at_line_start",

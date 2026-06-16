@@ -4,6 +4,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.util.TextRange
+import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.StringSelection
 
 class HJRegisters {
@@ -37,7 +38,8 @@ class HJRegisters {
             }
 
             HJRegister.Clipboard -> {
-                val contents = CopyPasteManager.getInstance().contents?.toString()
+                val contents =
+                    CopyPasteManager.getInstance().contents?.getTransferData(DataFlavor.stringFlavor) as? String
                 if (contents == null) {
                     editor.setError("Could not get system clipboard contents")
                     return false
@@ -83,7 +85,8 @@ class HJRegisters {
             HJRegister.Clipboard -> {
                 // If we're pasting the same values that we just yanked, re-use the saved values. This allows pasting
                 // multiple selections even when yanked to a clipboard
-                val contents = CopyPasteManager.getInstance().contents?.toString()
+                val contents =
+                    CopyPasteManager.getInstance().contents?.getTransferData(DataFlavor.stringFlavor) as? String
                 if (contents == null) {
                     editor.setError("Could not get system clipboard contents")
                     return null

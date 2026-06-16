@@ -12,6 +12,7 @@ import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.IdeActions
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.VisualPosition
@@ -138,7 +139,8 @@ private val actionsRaw = arrayOf(
     HJAction("find_prev_char", "Move to previous occurrence of char") { findChar(it,  HJDirection.Backward, true, false) },
     HJAction("extend_till_prev_char", "Extend till previous occurrence of char") { findChar(it,  HJDirection.Backward, false, true) },
     HJAction("extend_prev_char", "Extend to previous occurrence of char") { findChar(it,  HJDirection.Backward, true, true) },
-    HJAction("repeat_last_motion", "Repeat last motion") { it.hjEditor.repeatLastMotion(1) },
+    HJAction("repeat_last_motion", "Repeat last motion") { repeatLastMotion(it) },
+    HJAction("repeat_last_insert", "Repeat last insert") { repeatLastInsert(it) },
     HJAction("replace", "Replace with new char") { replace(it) },
     HJAction("switch_case", "Switch (toggle) case") { switchCaseImpl(it) { s -> s.map { c -> if (c.isLowerCase()) {c.uppercase()} else if (c.isUpperCase()) {c.lowercase()} else {c} }.joinToString(separator = "") } },
     HJAction("switch_to_uppercase", "Switch to uppercase") { switchCaseImpl(it) { s -> s.uppercase() } },
@@ -393,15 +395,15 @@ private val actionsRaw = arrayOf(
     HJAction("rename_symbol", "Rename symbol") { executeIdeAction(it, IdeActions.ACTION_RENAME) },
     HJAction("increment", "Increment item under cursor") { incrementImpl(it, HJDirection.Forward) },
     HJAction("decrement", "Decrement item under cursor") { incrementImpl(it, HJDirection.Backward) },
-    HJAction("record_macro", "Record macro"),
-    HJAction("replay_macro", "Replay macro"),
+    HJAction("record_macro", "Record macro") { recordMacro(it) },
+    HJAction("replay_macro", "Replay macro") { replayMacro(it) },
     HJAction("command_palette", "Open command palette") { commandPalette(it) },
     HJAction("goto_word", "Jump to a two-character label") { jumpToWord(it, false) },
     HJAction("extend_to_word", "Extend to a two-character label") { jumpToWord(it, true) },
     HJAction("goto_next_tabstop", "Goto next snippet placeholder"),
     HJAction("goto_prev_tabstop", "Goto next snippet placeholder"),
-    HJAction("rotate_selections_first", "Make the first selection your primary one"),
-    HJAction("rotate_selections_last", "Make the last selection your primary one"),
+    HJAction("rotate_selections_first", "Make the first selection your primary one") { rotateSelectionsFirstLast(it, HJDirection.Backward) },
+    HJAction("rotate_selections_last", "Make the last selection your primary one") { rotateSelectionsFirstLast(it, HJDirection.Forward) },
 )
 // @formatter:on
 
@@ -470,6 +472,7 @@ fun exitSelectMode(cx: HJActionContext) {
 }
 
 private fun insertMode(cx: HJActionContext, append: Boolean) {
+    HJState.lastInsertKeystrokes.clear()
     val selection = cx.hjEditor.selection.clone().transform {
         val cursor = if (append) it.to else it.from
         HJRange.point(cursor)
@@ -2431,6 +2434,12 @@ private fun rotateSelections(cx: HJActionContext, direction: HJDirection) {
     cx.hjEditor.setNewSelection(selection)
 }
 
+private fun rotateSelectionsFirstLast(cx: HJActionContext, direction: HJDirection) {
+    val selection = cx.hjEditor.selection.clone()
+    selection.primaryIndex = if (direction == HJDirection.Backward) 0 else selection.len - 1
+    cx.hjEditor.setNewSelection(selection)
+}
+
 private enum class HJReorderStrategy {
     RotateForward, RotateBackward, Reverse,
 }
@@ -2636,10 +2645,12 @@ private fun registerHelpText(): List<Pair<String, String>> {
     val registers = HJState.registers.rawRegisters
 
     // order:
+    // macro
     // last yank
     // any general purpose
     // last command
     // others
+    registers[HJRegister.LastMacro]?.let { helpText.add(Pair(HJRegister.LastMacro, it.first())) }
     registers[HJRegister.LastYank]?.let { helpText.add(Pair(HJRegister.LastYank, it.first())) }
     helpText.addAll(
         registers
@@ -2753,5 +2764,78 @@ private fun incrementImpl(cx: HJActionContext, direction: HJDirection) {
         val transaction = HJTransaction(changes, newSelection)
         cx.hjEditor.apply(transaction)
         exitSelectMode(cx)
+    }
+}
+
+private fun recordMacro(cx: HJActionContext) {
+    if (HJState.macroRecording != null) {
+        val (reg, keys) = HJState.macroRecording!!
+        // Remove the keypress which ends the recording
+        keys.removeLast()
+        val s = keys.joinToString(separator = "") { it.toString() }
+        if (HJState.registers.write(reg, listOf(s), cx.hjEditor)) {
+            cx.hjEditor.setStatus("Recorded to register [$reg]")
+        }
+    } else {
+        val reg = cx.register ?: HJRegister.LastMacro
+        HJState.macroRecording = Pair(reg, mutableListOf())
+        cx.hjEditor.setStatus("Recording to register [$reg]")
+    }
+}
+
+private fun replayMacro(cx: HJActionContext) {
+    val reg = cx.register ?: HJRegister.LastMacro
+
+    if (HJState.macroReplaying.contains(reg)) {
+        cx.hjEditor.setError("Cannot replay from register [$reg] because already replaying from same register.")
+        return
+    }
+
+    val registerString = HJState.registers.read(reg, cx.hjEditor)?.let { if (it.size == 1) it.first() else null }
+    val keys = if (registerString != null) {
+        HJInputKey.parseMacro(cx.hjEditor, registerString) ?: return
+    } else {
+        cx.hjEditor.setError("Register [$reg] empty")
+        return
+    }
+
+    // Once the macro has been fully validated, it's marked as being under replay to ensure we don't fall into infinite recursion
+    HJState.macroReplaying.add(reg)
+
+    ApplicationManager.getApplication().invokeLater {
+        repeat(cx.count) {
+            for (key in keys) {
+                HJInputHandler.sendInputKeyKeyEvent(cx.hjEditor, key)
+            }
+        }
+    }
+
+    HJState.macroReplaying.removeLast()
+}
+
+// TODO: does this consider all motions?
+private fun repeatLastMotion(cx: HJActionContext) {
+    val lastMotion = cx.hjEditor.lastMotion ?: return
+    repeat(cx.count) {
+        lastMotion.invoke(cx.hjEditor)
+    }
+}
+
+private fun repeatLastInsert(cx: HJActionContext) {
+    val lastInsertKeystrokes = mutableListOf<HJInputKey>()
+    lastInsertKeystrokes.addAll(HJState.lastInsertKeystrokes)
+
+    ApplicationManager.getApplication().invokeLater {
+        insertMode(cx, false)
+
+        repeat(cx.count) {
+            for (key in lastInsertKeystrokes) {
+                HJInputHandler.sendInputKeyKeyEvent(cx.hjEditor, key)
+            }
+        }
+
+        switchToMode(cx, HJEditorMode.Normal)
+        HJState.lastInsertKeystrokes.clear()
+        HJState.lastInsertKeystrokes.addAll(lastInsertKeystrokes)
     }
 }
