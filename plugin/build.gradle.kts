@@ -29,7 +29,10 @@ dependencies {
     implementation("com.akuleshov7:ktoml-file:0.7.1")
 
     implementation("io.github.tree-sitter:ktreesitter:0.25.0")
-    implementation(project(":grammars"))
+
+    rootProject.childProjects["grammars"]?.childProjects?.values?.forEach {
+        implementation(project(":grammars:${it.name}"))
+    }
 }
 
 intellijPlatform {

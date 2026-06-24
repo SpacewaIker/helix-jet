@@ -13,6 +13,7 @@
 - goto last accessed file, last modified file, last modification
 - file explorer?
 - scroll with cursor
+- settings.gradle.kts: clone repos in parallel
 
 Fix:
 
