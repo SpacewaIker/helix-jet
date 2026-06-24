@@ -38,10 +38,12 @@ import com.intellij.openapi.wm.WindowManager
 import com.intellij.psi.util.endOffset
 import com.intellij.psi.util.startOffset
 import com.intellij.ui.JBColor
+import io.github.treesitter.ktreesitter.Parser
 import spacewaiker.helixjet.actions.HJKeyAction.HJAction
 import spacewaiker.helixjet.editor.*
 import spacewaiker.helixjet.input.HJInputHandler
 import spacewaiker.helixjet.input.HJInputKey
+import spacewaiker.helixjet.treesitter.gotoTreesitterObject
 import spacewaiker.helixjet.ui.*
 import java.awt.Point
 import java.awt.Rectangle
@@ -355,20 +357,20 @@ private val actionsRaw = arrayOf(
     HJAction("surround_delete", "Surround delete") { surroundDelete(it) },
     HJAction("select_textobject_around", "Select around object") { selectTextObject(it, HJTextObject.TextObject.Around) },
     HJAction("select_textobject_inner", "Select inside object") { selectTextObject(it, HJTextObject.TextObject.Inside) },
-    HJAction("goto_next_function", "Goto next function"),
-    HJAction("goto_prev_function", "Goto previous function"),
-    HJAction("goto_next_class", "Goto next type definition"),
-    HJAction("goto_prev_class", "Goto previous type definition"),
-    HJAction("goto_next_parameter", "Goto next parameter"),
-    HJAction("goto_prev_parameter", "Goto previous parameter"),
-    HJAction("goto_next_comment", "Goto next comment"),
-    HJAction("goto_prev_comment", "Goto previous comment"),
-    HJAction("goto_next_test", "Goto next test"),
-    HJAction("goto_prev_test", "Goto previous test"),
-    HJAction("goto_next_xml_element", "Goto next (X)HTML element"),
-    HJAction("goto_prev_xml_element", "Goto previous (X)HTML element"),
-    HJAction("goto_next_entry", "Goto next pairing"),
-    HJAction("goto_prev_entry", "Goto previous pairing"),
+    HJAction("goto_next_function", "Goto next function") { gotoTsObjectImpl(it, "function", HJDirection.Forward) },
+    HJAction("goto_prev_function", "Goto previous function") { gotoTsObjectImpl(it, "function", HJDirection.Backward) },
+    HJAction("goto_next_class", "Goto next type definition") { gotoTsObjectImpl(it, "class", HJDirection.Forward) },
+    HJAction("goto_prev_class", "Goto previous type definition") { gotoTsObjectImpl(it, "class", HJDirection.Backward) },
+    HJAction("goto_next_parameter", "Goto next parameter") { gotoTsObjectImpl(it, "parameter", HJDirection.Forward) },
+    HJAction("goto_prev_parameter", "Goto previous parameter") { gotoTsObjectImpl(it, "parameter", HJDirection.Backward) },
+    HJAction("goto_next_comment", "Goto next comment") { gotoTsObjectImpl(it, "comment", HJDirection.Forward) },
+    HJAction("goto_prev_comment", "Goto previous comment") { gotoTsObjectImpl(it, "comment", HJDirection.Backward) },
+    HJAction("goto_next_test", "Goto next test") { gotoTsObjectImpl(it, "test", HJDirection.Forward) },
+    HJAction("goto_prev_test", "Goto previous test") { gotoTsObjectImpl(it, "test", HJDirection.Backward) },
+    HJAction("goto_next_xml_element", "Goto next (X)HTML element") { gotoTsObjectImpl(it, "xml-element", HJDirection.Forward) },
+    HJAction("goto_prev_xml_element", "Goto previous (X)HTML element") { gotoTsObjectImpl(it, "xml-element", HJDirection.Backward) },
+    HJAction("goto_next_entry", "Goto next pairing") { gotoTsObjectImpl(it, "entry", HJDirection.Forward) },
+    HJAction("goto_prev_entry", "Goto previous pairing") { gotoTsObjectImpl(it, "entry", HJDirection.Backward) },
     HJAction("goto_next_paragraph", "Goto next paragraph"),
     HJAction("goto_prev_paragraph", "Goto previous paragraph"),
     HJAction("dap_launch", "Launch debug target") { executeIdeAction(it, "Debug") },
@@ -1216,6 +1218,33 @@ private fun gotoWindowImpl(cx: HJActionContext, align: HJAlignment) {
     val selection = cx.hjEditor.selection.clone()
         .transform { it.putCursor(cx.doc, offset, HJState.mode == HJEditorMode.Select) }
     cx.hjEditor.setNewSelection(selection)
+}
+
+private fun gotoTsObjectImpl(cx: HJActionContext, tsObject: String, direction: HJDirection) {
+    cx.hjEditor.applyMotion { hjEditor ->
+        val syntax = hjEditor.tsSyntax
+        if (syntax == null) {
+            hjEditor.setStatus("Syntax tree is not available in current buffer")
+            return@applyMotion
+        }
+
+        // TODO: incremental parsing
+        val parser = Parser(syntax.language)
+        val tree = parser.parse(hjEditor.editor.document.text)
+        val root = tree.rootNode
+
+        val selection = hjEditor.selection.clone().transform { range ->
+            val newRange = gotoTreesitterObject(hjEditor.editor, range, tsObject, direction, root, syntax, cx.count)
+
+            if (HJState.mode == HJEditorMode.Select) {
+                val head = if (newRange.head < range.anchor) newRange.anchor else newRange.head
+                HJRange(range.anchor, head)
+            } else newRange.withDirection(direction)
+        }
+
+        // TODO: push jump
+        hjEditor.setNewSelection(selection)
+    }
 }
 
 private fun jumpToWord(cx: HJActionContext, extend: Boolean) {

@@ -14,8 +14,10 @@
 - file explorer?
 - scroll with cursor
 - settings.gradle.kts: clone repos in parallel
+- plugin/src/main/resources/runtime: have list of files be tied to something, not hardcoded
 
 Fix:
 
 - HJJumpLabelOverlay: folds in editor means text isn't visible and shouldn't be considered
 - ctrl shift U in picker with preview doesn't scroll up
+    - check that wherever i use visualposition doesn't mess things up with folds

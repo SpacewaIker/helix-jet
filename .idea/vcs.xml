@@ -2,7 +2,9 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/grammars/cpp/tree-sitter-cpp" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/grammars/java/tree-sitter-java" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/grammars/kotlin/tree-sitter-kotlin" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/grammars/rust/tree-sitter-rust" vcs="Git" />
   </component>
 </project>

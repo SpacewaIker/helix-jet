@@ -13,7 +13,13 @@ object HJTextObject {
     val logger = Logger.getInstance(HJTextObject::class.java)
 
     enum class TextObject {
-        Around, Inside, Movement
+        Around, Inside, Movement;
+
+        override fun toString() = when (this) {
+            Around -> "around"
+            Inside -> "inside"
+            Movement -> "movement"
+        }
     }
 
     /**

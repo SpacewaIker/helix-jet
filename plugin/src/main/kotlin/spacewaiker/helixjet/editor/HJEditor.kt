@@ -12,6 +12,7 @@ import com.intellij.psi.PlainTextTokenTypes
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.codeStyle.CodeStyleManager
 import com.intellij.psi.util.elementType
+import spacewaiker.helixjet.treesitter.HJSyntaxLoader
 import spacewaiker.helixjet.ui.HJJumpLabelOverlay
 import java.awt.event.MouseWheelListener
 
@@ -53,8 +54,12 @@ class HJEditor {
         }
     val codeStyleManager get() = editor.project?.let { CodeStyleManager.getInstance(it) }
     val ast get() = psiFile?.node?.let { if (it.elementType == PlainTextTokenTypes.PLAIN_TEXT_FILE) null else it }
+
+    // TODO: change all this for treesitter
     val syntax
         get() = psiFile?.language?.id?.lowercase()?.let { HJLanguageSyntaxProvider.syntaxes.getOrDefault(it, null) }
+    val tsSyntax
+        get() = psiFile?.language?.id?.lowercase()?.let { HJSyntaxLoader.getLanguageSyntax(it) }
 
     val selectionIsLinewise
         get() = selection.ranges.all { range ->

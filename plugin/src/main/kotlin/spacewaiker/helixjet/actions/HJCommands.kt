@@ -295,6 +295,7 @@ private val debugCommands = arrayOf(
             println()
             println(node.type)
             println(node.text())
+            println(node.startPoint)
         }
     },
     HJCommand("print-ts-dot", doc = "Print DOT representation of TreeSitter tree") { cx, _, _ ->
