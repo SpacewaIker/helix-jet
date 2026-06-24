@@ -5,13 +5,14 @@
 - should probably use TS after all. AST is unusable in some languages/IDEs. Look at TS integration for textobjects
   and other places that currently use JB AST.
 - open empty buffer when all are closed to maintain functionality?
-- jumplist
 - HJPicker: additional mappings (A-Enter for open in background, C-t toggle preview)
 - xp doesn't set the selection on the right line
-- open file in background/vsplit/hsplit (refactor into openFile function)
 - bc in a split on last buffer doesn't close split and instead opens another buffer
-- Remove actions in submode which aren't implemented
-- . to repeat/reinsert isn't a command in helix??
+- Jumplist: add to jumplist when necessary, picker, forward/backward, manual add
+- last picker
+- goto last accessed file, last modified file, last modification
+- file explorer?
+- scroll with cursor
 
 Fix:
 
