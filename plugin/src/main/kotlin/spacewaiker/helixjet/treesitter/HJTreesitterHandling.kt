@@ -69,7 +69,7 @@ object HJTreesitterHandling {
             val pos = range.cursor
 
             val capName = { t: HJTextObject.TextObject -> "$objectName.$t" }
-            val nodess = captureNodesAny(
+            val nodes = captureNodesAny(
                 query,
                 listOf(
                     capName(HJTextObject.TextObject.Movement),
@@ -78,7 +78,6 @@ object HJTreesitterHandling {
                 ),
                 sliceTree
             )
-            val nodes = nodess.toList()
 
             val node = when (dir) {
                 HJDirection.Forward -> nodes
@@ -154,7 +153,7 @@ object HJTreesitterHandling {
     }
 
     fun syntaxSymbolPicker(cx: HJActionContext) {
-        val syntax = cx.hjEditor.tsSyntax
+        val syntax = cx.hjEditor.syntax
         if (syntax == null) {
             cx.hjEditor.setError("TS syntax tree is not available on this buffer")
             return
@@ -249,11 +248,11 @@ object HJTreesitterHandling {
         }
     }
 
-    private fun captureNodes(query: Query, captureName: String, node: Node): Sequence<Node> {
+    fun captureNodes(query: Query, captureName: String, node: Node): Sequence<Node> {
         return captureNodesAny(query, listOf(captureName), node)
     }
 
-    private fun captureNodesAny(query: Query, captureNames: List<String>, node: Node): Sequence<Node> {
+    fun captureNodesAny(query: Query, captureNames: List<String>, node: Node): Sequence<Node> {
         return query(node).captures()
             .mapNotNull { (idx, match) ->
                 val capture = match.captures[idx.toInt()]

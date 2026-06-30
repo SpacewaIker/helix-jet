@@ -1,10 +1,11 @@
 ﻿package spacewaiker.helixjet.actions
 
-import com.intellij.lang.FileASTNode
 import com.intellij.openapi.editor.Document
+import com.intellij.openapi.editor.Editor
 import fleet.fastutil.skip
 import spacewaiker.helixjet.editor.HJRange
 import spacewaiker.helixjet.editor.HJSelection
+import spacewaiker.helixjet.treesitter.HJLanguageSyntax
 import kotlin.math.max
 import kotlin.math.min
 
@@ -15,14 +16,20 @@ object HJSurround {
      * `ch` can be either closing or opening pair. If 'ch' is null, surround pairs are automatically detected around each
      * cursor (note that this may result in them selecting different surrounding characters for each selection)
      */
-    fun getSurroundPos(ast: FileASTNode?, doc: Document, selection: HJSelection, ch: Char?, skip: Int): List<Int>? {
+    fun getSurroundPos(
+        syntax: HJLanguageSyntax?,
+        editor: Editor,
+        selection: HJSelection,
+        ch: Char?,
+        skip: Int,
+    ): List<Int>? {
         val changePos = mutableListOf<Int>()
 
         for (range in selection.ranges) {
             val rangeRaw = if (ch != null) {
-                findNthPairsPos(ast, doc, ch, range, skip)
+                findNthPairsPos(syntax, editor, ch, range, skip)
             } else {
-                findNthClosestPairsPos(ast, doc, range, skip)
+                findNthClosestPairsPos(syntax, editor, range, skip)
             } ?: return null
             val openPos = min(rangeRaw.first, rangeRaw.second)
             val closePos = max(rangeRaw.first, rangeRaw.second)
@@ -42,7 +49,8 @@ object HJSurround {
      * Find the position of surround pairs of `ch` which can be either a closing or opening pair. `n` will skip n - 1
      * pairs (e.g. n = 2 will discard the first pair found and keep looking)
      */
-    fun findNthPairsPos(ast: FileASTNode?, doc: Document, ch: Char, range: HJRange, n: Int): Pair<Int, Int>? {
+    fun findNthPairsPos(syntax: HJLanguageSyntax?, editor: Editor, ch: Char, range: HJRange, n: Int): Pair<Int, Int>? {
+        val doc = editor.document
         if (doc.textLength < 2) return null
         if (range.to >= doc.textLength) return null
 
@@ -54,8 +62,8 @@ object HJSurround {
                 // Cursor is directly on match character for which the opening and closing pairs are the same.
                 // This is potentially ambiguous, because there's no way to know which side of the char we should be searching on
                 val matchingPairsPos = (
-                        if (ast == null) HJMatchBrackets.findMatchingBracketPlaintext(doc.text, pos)
-                        else HJMatchBrackets.findMatchingBracketFuzzy(ast, doc, pos)
+                        if (syntax == null) HJMatchBrackets.findMatchingBracketPlaintext(doc.text, pos)
+                        else HJMatchBrackets.findMatchingBracketFuzzy(syntax, editor, pos)
                         ) ?: return null
                 if (matchingPairsPos > pos) {
                     Pair(pos, matchingPairsPos)
@@ -87,20 +95,25 @@ object HJSurround {
     /**
      * Finds the position of surround paris of any `HJMatchBrackets.pairs` using PSI when possible.
      */
-    fun findNthClosestPairsPos(ast: FileASTNode?, doc: Document, range: HJRange, skip: Int): Pair<Int, Int>? {
-        return if (ast != null) findNthClosestPairsAst(ast, doc, range, skip)
-        else findNthClosestPairsPlain(doc, range, skip)
+    fun findNthClosestPairsPos(syntax: HJLanguageSyntax?, editor: Editor, range: HJRange, skip: Int): Pair<Int, Int>? {
+        return if (syntax != null) findNthClosestPairsAst(syntax, editor, range, skip)
+        else findNthClosestPairsPlain(editor.document, range, skip)
     }
 
-    private fun findNthClosestPairsAst(ast: FileASTNode, doc: Document, range: HJRange, skip: Int): Pair<Int, Int>? {
+    private fun findNthClosestPairsAst(
+        syntax: HJLanguageSyntax,
+        editor: Editor,
+        range: HJRange,
+        skip: Int,
+    ): Pair<Int, Int>? {
         var opening = range.from
         // we want to expand the selection if we are already on the found pair, otherwise we would need to subtract 1 from range.to
         var closing = range.to
         var skip = skip
 
         while (skip > 0) {
-            closing = HJMatchBrackets.findMatchingBracketFuzzy(ast, doc, closing) ?: return null
-            opening = HJMatchBrackets.findMatchingBracket(ast, doc, closing) ?: return null
+            closing = HJMatchBrackets.findMatchingBracketFuzzy(syntax, editor, closing) ?: return null
+            opening = HJMatchBrackets.findMatchingBracket(syntax, editor, closing) ?: return null
 
             // if we're already in a closing bracket, findMatchingBracketFuzzy will return the position of the opening bracket
             if (closing < opening) {
@@ -109,11 +122,11 @@ object HJSurround {
 
             // in case found brackets are partially inside current selection
             if (range.from < opening || closing < range.to - 1) {
-                closing = nextGraphemeBoundary(doc, closing)
+                closing = nextGraphemeBoundary(editor.document, closing)
             } else {
                 skip--
                 if (skip != 0) {
-                    closing = nextGraphemeBoundary(doc, closing)
+                    closing = nextGraphemeBoundary(editor.document, closing)
                 }
             }
         }

@@ -409,8 +409,10 @@ fun incrementBool(selectedText: String, amount: Int): String? {
 
     val newValue = if (amount % 2 == 0) value else !value
 
-    return if (selectedText.all(Char::isUpperCase)) newValue.toString().uppercase()
-    else if (selectedText[0].isUpperCase() && selectedText.substring(1).all(Char::isLowerCase)) {
-        if (newValue) "True" else "False" // easiest way of capitalizing...
-    } else newValue.toString()
+    return if (selectedText.all(Char::isUpperCase))
+        newValue.toString().uppercase()
+    else if (selectedText[0].isUpperCase() && selectedText.substring(1).all(Char::isLowerCase))
+        newValue.toString().lowercase().replaceFirstChar(Char::uppercase)
+    else
+        newValue.toString()
 }

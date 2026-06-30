@@ -19,6 +19,7 @@
 - workspace syntax symbol picker: parsing 1500 files ~ 2s. Not bad if done in background thread.
     - Could check last file update time to see if a file needs reparsing to keep up to date?
     - How to determine which directories to search? -> use .gitignore/.p4ignore + custom ignore
+- file type detector from extension glob
 
 Fix:
 

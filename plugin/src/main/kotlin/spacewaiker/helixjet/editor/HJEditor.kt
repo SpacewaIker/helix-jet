@@ -56,13 +56,9 @@ class HJEditor {
             if (it.elementType == PlainTextTokenTypes.PLAIN_TEXT_FILE || it.elementType?.toString() == "TextMate") null else it
         }
     val codeStyleManager get() = editor.project?.let { CodeStyleManager.getInstance(it) }
-    val ast get() = psiFile?.node?.let { if (it.elementType == PlainTextTokenTypes.PLAIN_TEXT_FILE) null else it }
-
-    // TODO: change all this for treesitter
     val syntax
-        get() = psiFile?.language?.id?.lowercase()?.let { HJLanguageSyntaxProvider.syntaxes.getOrDefault(it, null) }
-    val tsSyntax
         get() = editor.virtualFile.extension?.let {
+            // TODO: this but actually
             val name = when (it) {
                 "kt" -> "kotlin"
                 "cpp" -> "cpp"

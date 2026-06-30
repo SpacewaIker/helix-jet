@@ -36,8 +36,6 @@ import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileVisitor
 import com.intellij.openapi.wm.WindowManager
-import com.intellij.psi.util.endOffset
-import com.intellij.psi.util.startOffset
 import com.intellij.ui.JBColor
 import spacewaiker.helixjet.actions.HJKeyAction.HJAction
 import spacewaiker.helixjet.editor.*
@@ -1223,7 +1221,7 @@ private fun gotoWindowImpl(cx: HJActionContext, align: HJAlignment) {
 
 private fun gotoTsObjectImpl(cx: HJActionContext, tsObject: String, direction: HJDirection) {
     cx.hjEditor.applyMotion { hjEditor ->
-        val syntax = hjEditor.tsSyntax
+        val syntax = hjEditor.syntax
         if (syntax == null) {
             hjEditor.setStatus("Syntax tree is not available in current buffer")
             return@applyMotion
@@ -1255,7 +1253,7 @@ private fun gotoTsObjectImpl(cx: HJActionContext, tsObject: String, direction: H
 
 private fun moveNodeBoundImpl(cx: HJActionContext, direction: HJDirection, extend: Boolean) {
     cx.hjEditor.applyMotion { hjEditor ->
-        hjEditor.tsSyntax?.let { syntax ->
+        hjEditor.syntax?.let { syntax ->
             val currentSelection = hjEditor.selection
 
             val selection = HJTreesitterHandling.moveParentNodeEnd(
@@ -1273,7 +1271,7 @@ private fun moveNodeBoundImpl(cx: HJActionContext, direction: HJDirection, exten
 
 private fun expandSelection(cx: HJActionContext) {
     cx.hjEditor.applyMotion { hjEditor ->
-        hjEditor.tsSyntax?.let { syntax ->
+        hjEditor.syntax?.let { syntax ->
             val currentSelection = hjEditor.selection
             val selection = HJTreesitterHandling.expandSelection(syntax, hjEditor.editor, currentSelection.clone())
 
@@ -1304,7 +1302,7 @@ private fun shrinkSelection(cx: HJActionContext) {
         }
 
         // if not previous selection, shrink to first child
-        hjEditor.tsSyntax?.let { syntax ->
+        hjEditor.syntax?.let { syntax ->
             val selection = HJTreesitterHandling.shrinkSelection(syntax, hjEditor.editor, currentSelection.clone())
             hjEditor.setNewSelection(selection)
         }
@@ -1313,7 +1311,7 @@ private fun shrinkSelection(cx: HJActionContext) {
 
 private fun selectSiblingImpl(cx: HJActionContext, siblingFn: (HJLanguageSyntax, Editor, HJSelection) -> HJSelection) {
     cx.hjEditor.applyMotion { hjEditor ->
-        hjEditor.tsSyntax?.let { syntax ->
+        hjEditor.syntax?.let { syntax ->
             val currentSelection = hjEditor.selection
             val selection = siblingFn(syntax, hjEditor.editor, currentSelection.clone())
             hjEditor.setNewSelection(selection)
@@ -1322,7 +1320,7 @@ private fun selectSiblingImpl(cx: HJActionContext, siblingFn: (HJLanguageSyntax,
 }
 
 private fun selectAllImpl(cx: HJActionContext, selectFn: (HJLanguageSyntax, Editor, HJSelection) -> HJSelection) {
-    cx.hjEditor.tsSyntax?.let { syntax ->
+    cx.hjEditor.syntax?.let { syntax ->
         val currentSelection = cx.hjEditor.selection
         val selection = selectFn(syntax, cx.hjEditor.editor, currentSelection.clone())
         cx.hjEditor.setNewSelection(selection)
@@ -1604,13 +1602,13 @@ private fun open(cx: HJActionContext, openBelow: Boolean, commentContinuationEna
 
 private fun matchBrackets(cx: HJActionContext) {
     val isSelection = HJState.mode == HJEditorMode.Select
-    val ast = cx.hjEditor.ast
+    val syntax = cx.hjEditor.syntax
 
     val selection = cx.hjEditor.selection.clone().transform { range ->
         val pos = range.cursor
 
-        val matchedPos = if (ast == null) HJMatchBrackets.findMatchingBracketPlaintext(cx.doc.text, pos)
-        else HJMatchBrackets.findMatchingBracketFuzzy(ast, cx.doc, pos)
+        val matchedPos = if (syntax == null) HJMatchBrackets.findMatchingBracketPlaintext(cx.doc.text, pos)
+        else HJMatchBrackets.findMatchingBracketFuzzy(syntax, cx.hjEditor.editor, pos)
 
         if (matchedPos != null) range.putCursor(cx.doc, matchedPos, isSelection)
         else range
@@ -1672,10 +1670,11 @@ private fun surroundReplace(cx: HJActionContext) {
             is HJInputKey.Other if inputKey.code == KeyEvent.VK_ENTER -> '\n'
             else -> return@onNextKey
         }
-        val ast = cx.hjEditor.ast
+        val syntax = cx.hjEditor.syntax
 
         val changePos =
-            HJSurround.getSurroundPos(ast, cx.doc, cx.hjEditor.selection, surroundCh, cx.count) ?: return@onNextKey
+            HJSurround.getSurroundPos(syntax, cx.hjEditor.editor, cx.hjEditor.selection, surroundCh, cx.count)
+                ?: return@onNextKey
         val selection = cx.hjEditor.selection.clone()
         val ranges = changePos.map { p -> HJRange.point(p) }
         cx.hjEditor.setNewSelection(HJSelection(ranges, selection.primaryIndex * 2))
@@ -1725,10 +1724,11 @@ private fun surroundDelete(cx: HJActionContext) {
             is HJInputKey.Other if inputKey.code == KeyEvent.VK_ENTER -> '\n'
             else -> return@onNextKey
         }
-        val ast = cx.hjEditor.ast
+        val syntax = cx.hjEditor.syntax
 
         val changePos =
-            HJSurround.getSurroundPos(ast, cx.doc, cx.hjEditor.selection, surroundCh, cx.count) ?: return@onNextKey
+            HJSurround.getSurroundPos(syntax, cx.hjEditor.editor, cx.hjEditor.selection, surroundCh, cx.count)
+                ?: return@onNextKey
 
         val transaction = HJTransaction(changePos.map { HJChange.Delete(it, it + 1) })
         cx.hjEditor.apply(transaction)
@@ -1845,12 +1845,9 @@ private fun selectTextObject(cx: HJActionContext, objtype: HJTextObject.TextObje
     HJInputHandler.onNextKey { inputKey ->
         if (inputKey !is HJInputKey.Character) return@onNextKey
         cx.hjEditor.applyMotion { hjEditor ->
-            val ast = hjEditor.ast
-            val syntax = hjEditor.syntax
-
-            val astTextObject = { range: HJRange, astObject: HJAstObject ->
-                if (ast == null || syntax == null) range
-                else HJTextObject.textObjectAst(range, objtype, astObject, ast, syntax)
+            val textobjectTreesitter = textobjectTreesitter@{ objName: String, range: HJRange ->
+                val syntax = hjEditor.syntax ?: return@textobjectTreesitter range
+                HJTextObject.textobjectTreesitter(cx.hjEditor.editor, range, objtype, objName, syntax)
             }
 
             val textObjectChange = textObjectChange@{ range: HJRange ->
@@ -1862,17 +1859,20 @@ private fun selectTextObject(cx: HJActionContext, objtype: HJTextObject.TextObje
                 when (inputKey.char) {
                     'w' -> HJTextObject.textObjectWord(cx.doc, range, objtype, false)
                     'W' -> HJTextObject.textObjectWord(cx.doc, range, objtype, true)
-                    't' -> astTextObject(range, HJAstObject.TYPE_DEF)
-                    'f' -> astTextObject(range, HJAstObject.FUNCTION)
-                    'a' -> astTextObject(range, HJAstObject.ARGUMENT)
-                    'c' -> astTextObject(range, HJAstObject.COMMENT)
-                    'e' -> astTextObject(range, HJAstObject.ENTRY)
-                    'x' -> astTextObject(range, HJAstObject.XML_ELEMENT)
+                    't' -> textobjectTreesitter("class", range)
+                    'f' -> textobjectTreesitter("function", range)
+                    'a' -> textobjectTreesitter("parameter", range)
+                    'c' -> textobjectTreesitter("comment", range)
+                    'e' -> textobjectTreesitter("test", range)
+                    'x' -> textobjectTreesitter("xml-element", range)
                     'p' -> HJTextObject.textObjectParagraph(cx.doc, range, objtype, cx.count)
-                    'm' -> HJTextObject.textObjectPairSurroundClosest(ast, cx.doc, range, objtype, cx.count)
+                    'm' -> HJTextObject.textObjectPairSurroundClosest(
+                        cx.hjEditor.syntax, cx.hjEditor.editor, range, objtype, cx.count
+                    )
+
                     'g' -> textObjectChange(range)
                     else if !inputKey.char.isLetterOrDigit() -> HJTextObject.textObjectPairSurround(
-                        ast, cx.doc, range, objtype, inputKey.char, cx.count
+                        cx.hjEditor.syntax, cx.hjEditor.editor, range, objtype, inputKey.char, cx.count
                     )
 
                     else -> range
@@ -2227,10 +2227,9 @@ private fun bufferPicker(cx: HJActionContext) {
 }
 
 private fun symbolPicker(cx: HJActionContext) {
-    val project = cx.hjEditor.editor.project!!
     val psiFile = cx.hjEditor.psiFile ?: return
 
-    getStructureElements(project, psiFile) { data ->
+    getStructureElements(cx.hjEditor.editor, psiFile) { data ->
         val model = object : AbstractTableModel() {
             override fun getRowCount() = data.size
             override fun getColumnCount() = 3
@@ -2251,14 +2250,14 @@ private fun symbolPicker(cx: HJActionContext) {
         }
 
         val previewSelector = { rowIdx: Int ->
-            val psiElement = data[rowIdx].psiElement
-            Pair(psiElement.containingFile.virtualFile, Pair(psiElement.startOffset, psiElement.endOffset))
+            val tag = data[rowIdx]
+            Pair(tag.file, Pair(tag.startOffset, tag.endOffset))
         }
 
         HJPickerWithPreview(cx.hjEditor.editor, "Symbol Picker", model, previewSelector) callback@{ rowIdx ->
-            val psiElement = data[rowIdx].psiElement
-            val start = psiElement.startOffset
-            val end = psiElement.endOffset
+            val tag = data[rowIdx]
+            val start = tag.startOffset
+            val end = tag.endOffset
 
             cx.hjEditor.setNewSelection(HJSelection(HJRange(start, end)))
         }.show()
