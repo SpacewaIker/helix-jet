@@ -82,6 +82,37 @@ class HJSelection {
     }
 
     /**
+     * Map selections over a set of changes. Useful for adjusting the selection position after applying changes to a document.
+     */
+    fun map(changes: List<HJChange>): HJSelection {
+        return mapNoNormalize(changes).normalize()
+    }
+
+    /**
+     * Map selections over a set of changes. Useful for adjusting the selection position after applying changes to a document.
+     * Doesn't normalize the selection.
+     */
+    fun mapNoNormalize(changes: List<HJChange>): HJSelection {
+        if (changes.isEmpty()) return this
+
+        val positionsToMap = ranges.flatMap { range ->
+            range.oldVisualPosition = null
+            when (val cmp = range.anchor.compareTo(range.head)) {
+                /* equal */ 0 -> listOf(
+                range.anchor,
+                range.head
+            )
+                /* less than */ else if cmp < 0 -> listOf(range.anchor, range.head)
+                /* greater than */ else -> listOf(range.head, range.anchor)
+            }
+        }
+
+//        changes.updatePositions(positionsToMap)
+        // return this
+        TODO() // need to implement the above function O.O'
+    }
+
+    /**
      * Normalizes an HJSelection
      *
      * Ranges are sorted by HJRange.from, with overlapping ranges merged.

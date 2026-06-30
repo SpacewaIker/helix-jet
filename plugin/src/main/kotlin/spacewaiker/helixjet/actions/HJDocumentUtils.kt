@@ -2,6 +2,7 @@
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.editor.Document
+import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.fileEditor.ex.FileEditorManagerEx
@@ -15,6 +16,7 @@ import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiFile
 import com.intellij.psi.codeStyle.CodeStyleManager
+import spacewaiker.helixjet.editor.HJJump
 import spacewaiker.helixjet.editor.HJState
 import java.nio.file.Path
 import java.time.LocalDate
@@ -130,12 +132,22 @@ private fun getPathRegex(prefix: String, postfix: String, matchSingleFile: Boole
     return Regex(pathRegex)
 }
 
-fun openFile(cx: HJActionContext, path: String, openLocation: HJFileOpenLocation = HJFileOpenLocation.InPlace) {
+fun openFile(
+    cx: HJActionContext,
+    path: String,
+    openLocation: HJFileOpenLocation = HJFileOpenLocation.InPlace,
+    pushJump: Boolean = true,
+): FileEditor? {
     val path = Path(path)
-    openFile(cx, path, openLocation)
+    return openFile(cx, path, openLocation, pushJump)
 }
 
-fun openFile(cx: HJActionContext, path: Path, openLocation: HJFileOpenLocation = HJFileOpenLocation.InPlace) {
+fun openFile(
+    cx: HJActionContext,
+    path: Path,
+    openLocation: HJFileOpenLocation = HJFileOpenLocation.InPlace,
+    pushJump: Boolean = true,
+): FileEditor? {
     // resolve WRT cx file path
     val cxPath = cx.hjEditor.editor.virtualFile.toNioPath()
     val filePath = cxPath.resolve(path)
@@ -152,18 +164,27 @@ fun openFile(cx: HJActionContext, path: Path, openLocation: HJFileOpenLocation =
 
     if (file == null) {
         cx.hjEditor.setError("Could not find file $path")
-        return
+        return null
     }
 
-    openFile(cx, file, openLocation)
+    return openFile(cx, file, openLocation, pushJump)
 }
 
-fun openFile(cx: HJActionContext, file: VirtualFile, openLocation: HJFileOpenLocation = HJFileOpenLocation.InPlace) {
+fun openFile(
+    cx: HJActionContext,
+    file: VirtualFile,
+    openLocation: HJFileOpenLocation = HJFileOpenLocation.InPlace,
+    pushJump: Boolean = true,
+): FileEditor? {
     val project = cx.hjEditor.editor.project!!
 
-    when (openLocation) {
+    if (pushJump) {
+        HJState.jumps.push(HJJump(cx.hjEditor.editor.virtualFile, cx.hjEditor.selection))
+    }
+
+    return when (openLocation) {
         HJFileOpenLocation.InPlace -> {
-            FileEditorManager.getInstance(project).openFile(file, true)
+            FileEditorManager.getInstance(project).openFile(file, true).first()
         }
 
         HJFileOpenLocation.BackgroundTab -> {
@@ -171,7 +192,7 @@ fun openFile(cx: HJActionContext, file: VirtualFile, openLocation: HJFileOpenLoc
 
             // "false" parameter should open in background but doesn't...
             // so we need to manually re-focus the old editor. Not great but only workaround found so far
-            fileEditorManagerEx.openFile(file, false)
+            val openedEditor = fileEditorManagerEx.openFile(file, false).first()
 
             val currentTextEditor = TextEditorProvider.getInstance().getTextEditor(cx.hjEditor.editor)
             var composite: EditorComposite? = null
@@ -183,14 +204,17 @@ fun openFile(cx: HJActionContext, file: VirtualFile, openLocation: HJFileOpenLoc
                     } else false
                 }
             }?.setSelectedComposite(composite!!, true)
+
+            openedEditor
         }
 
         HJFileOpenLocation.HSplit, HJFileOpenLocation.VSplit -> {
             val fileEditorManagerEx = FileEditorManagerEx.getInstanceEx(project)
-            val currentWindow = fileEditorManagerEx.currentWindow ?: return
+            val currentWindow = fileEditorManagerEx.currentWindow ?: return null
             val orientation =
                 if (openLocation == HJFileOpenLocation.HSplit) JSplitPane.VERTICAL_SPLIT else JSplitPane.HORIZONTAL_SPLIT
-            currentWindow.split(orientation, true, file, true)
+            val editorWindow = currentWindow.split(orientation, true, file, true)
+            editorWindow?.selectedComposite?.selectedEditor
         }
     }
 }

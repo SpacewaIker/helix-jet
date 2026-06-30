@@ -1,8 +1,12 @@
 ﻿package spacewaiker.helixjet.editor
 
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.fileEditor.TextEditor
+import com.intellij.openapi.vfs.VirtualFile
+import spacewaiker.helixjet.actions.HJActionContext
+import spacewaiker.helixjet.actions.HJFileOpenLocation
+import spacewaiker.helixjet.actions.openFile
 import spacewaiker.helixjet.config.HJConfiguration
-import spacewaiker.helixjet.editor.HJState.allEditors
 import spacewaiker.helixjet.editor.HJState.config
 import spacewaiker.helixjet.editor.HJState.mode
 import spacewaiker.helixjet.editor.HJState.typedHandlerBlock
@@ -20,7 +24,6 @@ enum class HJEditorMode {
  *
  * @property mode The current HJEditorMode of the plugin
  * @property config The HJConfiguration in use
- * @property allEditors Get list of all Editors
  * @property typedHandlerBlock If the typedHandler should be blocked from processing keys. Used during the transition to insert mode
  */
 object HJState {
@@ -30,7 +33,6 @@ object HJState {
     private val editors: MutableMap<Editor, HJEditor> = mutableMapOf()
     val registers = HJRegisters()
     val allRegisterContents get() = registers.rawRegisters.toList()
-    val allEditors get() = editors.keys
     var activePrompt: HJPrompt? = null
     var helpWidget: HJHelpWidget? = null
     var typedHandlerBlock = false
@@ -42,9 +44,10 @@ object HJState {
     var macroRecording: Pair<HJRegister, MutableList<HJInputKey>>? = null
     val macroReplaying: MutableList<HJRegister> = mutableListOf()
     val lastInsertKeystrokes: MutableList<HJInputKey> = mutableListOf()
+    val jumps = HJJumpList()
 
     fun getHJEditor(editor: Editor) = editors[editor]
-    
+
     fun initEditor(editor: Editor) {
         if (!editors.containsKey(editor))
             editors[editor] = HJEditor(editor)
@@ -63,5 +66,29 @@ object HJState {
         }
 
         return helpWidget!!
+    }
+
+    // TODO: Should probably not be here if we have one jumplist per view
+    fun jumpForward(hjEditor: HJEditor, count: Int) {
+        jumps.forward(count)?.copy()?.let { (file, selection) ->
+            jumpTo(hjEditor, file, selection)
+        }
+    }
+
+    fun jumpBackward(hjEditor: HJEditor, count: Int) {
+        jumps.backward(hjEditor, count)?.copy()?.let { (file, selection) ->
+            jumpTo(hjEditor, file, selection)
+        }
+    }
+
+    private fun jumpTo(hjEditor: HJEditor, file: VirtualFile, selection: HJSelection) {
+        val oldDoc = hjEditor.editor.virtualFile
+        if (oldDoc != file) {
+            val cx = HJActionContext(hjEditor)
+            openFile(cx, file, HJFileOpenLocation.InPlace, false)?.let { fileEditor ->
+                val editor = (fileEditor as TextEditor).editor
+                getHJEditor(editor)?.setNewSelection(selection)
+            }
+        }
     }
 }

@@ -22,6 +22,7 @@
 - language configuration class
     - parse file types, comment tokens?
 - Read only files: doesn't prompt for clearing read-only, instead triggers an exception
+- jumplist: should be one jumplist per view, not one
 
 Fix:
 

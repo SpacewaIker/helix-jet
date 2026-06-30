@@ -381,7 +381,13 @@ private val debugCommands = arrayOf(
         else NotificationType.INFORMATION
 
         cx.hjEditor.notify(args.joinToString(separator = " "), type)
-    }
+    },
+    HJCommand("print-jumplist") { _, _, _ ->
+        for (jump in HJState.jumps.jumps) {
+            println(jump)
+        }
+    },
+    HJCommand("clear-jumplist") { _, _, _ -> HJState.jumps.jumps.clear() },
 )
 
 private val commandsRaw =
