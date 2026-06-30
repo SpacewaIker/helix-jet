@@ -43,6 +43,9 @@ data class HJTransaction(
     val selection: HJSelection? = null,
 )
 
+/**
+ * @property objectSelections Used to store previous selections of treesitter objects
+ */
 class HJEditor {
     val logger = Logger.getInstance(this::class.java)
     val editor: Editor
@@ -59,7 +62,15 @@ class HJEditor {
     val syntax
         get() = psiFile?.language?.id?.lowercase()?.let { HJLanguageSyntaxProvider.syntaxes.getOrDefault(it, null) }
     val tsSyntax
-        get() = psiFile?.language?.id?.lowercase()?.let { HJSyntaxLoader.getLanguageSyntax(it) }
+        get() = editor.virtualFile.extension?.let {
+            val name = when (it) {
+                "kt" -> "kotlin"
+                "cpp" -> "cpp"
+                else -> it
+            }
+            HJSyntaxLoader.getLanguageSyntax(name, editor.document.text)
+        }
+    val objectSelections = mutableListOf<HJSelection>()
 
     val selectionIsLinewise
         get() = selection.ranges.all { range ->

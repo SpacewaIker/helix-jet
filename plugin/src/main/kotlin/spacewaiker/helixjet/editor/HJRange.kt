@@ -2,10 +2,14 @@
 
 import com.intellij.openapi.editor.Caret
 import com.intellij.openapi.editor.Document
+import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.util.TextRange
+import io.github.treesitter.ktreesitter.Node
 import spacewaiker.helixjet.actions.HJDirection
 import spacewaiker.helixjet.actions.nextGraphemeBoundary
 import spacewaiker.helixjet.actions.prevGraphemeBoundary
+import spacewaiker.helixjet.treesitter.getEndOffset
+import spacewaiker.helixjet.treesitter.getStartOffset
 import kotlin.math.max
 import kotlin.math.min
 
@@ -177,5 +181,11 @@ class HJRange {
 
     companion object {
         fun point(head: Int) = HJRange(head, head)
+
+        fun fromNode(node: Node, editor: Editor, direction: HJDirection): HJRange {
+            val from = node.getStartOffset(editor)
+            val to = node.getEndOffset(editor)
+            return HJRange(from, to).withDirection(direction)
+        }
     }
 }

@@ -1,11 +1,12 @@
 ﻿package spacewaiker.helixjet.ui
 
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.editor.ScrollType
+import com.intellij.openapi.editor.colors.EditorFontType
 import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.openapi.editor.highlighter.EditorHighlighterFactory
-import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.ui.popup.JBPopupListener
 import com.intellij.openapi.ui.popup.LightweightWindowEvent
@@ -37,7 +38,7 @@ private val DefaultSize = Dimension(800, 600)
 private const val WindowPadding = 200
 
 open class HJPicker(
-    protected val project: Project,
+    protected val editor: Editor,
     title: String,
     model: AbstractTableModel,
     columnColors: List<Pair<Int, (String) -> JBColor?>> = listOf(),
@@ -92,7 +93,9 @@ open class HJPicker(
             columnModel.getColumn(colIdx).cellRenderer = renderer
         }
     }
-    private val tableScrollPane = JBScrollPane(table)
+    private val tableScrollPane = JBScrollPane(table).apply {
+        font = editor.colorsScheme.getFont(EditorFontType.PLAIN)
+    }
     protected val searchField = SearchTextField(false).apply {
         addMappings(textEditor.getInputMap(JComponent.WHEN_FOCUSED), textEditor.actionMap)
 
@@ -173,25 +176,25 @@ open class HJPicker(
         actionMap.put("scroll_down", selectDownAction(scrollAmount))
     }
 
-    fun show(project: Project) {
-        popup.showCenteredInCurrentWindow(project)
+    fun show() {
+        popup.showCenteredInCurrentWindow(editor.project!!)
 
         resizeColumnsToFit(table, table.model)
     }
 
-    protected fun computeSize() = WindowManager.getInstance().getIdeFrame(project)?.component?.size?.let {
+    protected fun computeSize() = WindowManager.getInstance().getIdeFrame(editor.project!!)?.component?.size?.let {
         Dimension(it.width - 2 * WindowPadding, it.height - 2 * WindowPadding)
     } ?: DefaultSize
 }
 
 class HJPickerWithPreview(
-    project: Project,
+    editor: Editor,
     title: String,
     model: AbstractTableModel,
     private val previewSelector: (Int) -> Pair<VirtualFile, Pair<Int, Int>?>?,
     columnColors: List<Pair<Int, (String) -> JBColor?>> = listOf(),
     callback: (Int) -> Unit,
-) : HJPicker(project, title, model, columnColors, callback) {
+) : HJPicker(editor, title, model, columnColors, callback) {
     private val scrollPreviewAction = { direction: HJDirection ->
         object : AbstractAction() {
             override fun actionPerformed(e: ActionEvent) {
@@ -212,7 +215,7 @@ class HJPickerWithPreview(
     }
 
     private val previewDocument = EditorFactory.getInstance().createDocument("")
-    private val previewEditor = EditorFactory.getInstance().createEditor(previewDocument, project).apply {
+    private val previewEditor = EditorFactory.getInstance().createEditor(previewDocument, editor.project!!).apply {
         settings.apply {
             isLineNumbersShown = true
             isLineMarkerAreaShown = false
@@ -288,7 +291,7 @@ class HJPickerWithPreview(
             }
 
             // set syntax highlighting / file type
-            val highlighter = EditorHighlighterFactory.getInstance().createEditorHighlighter(project, file)
+            val highlighter = EditorHighlighterFactory.getInstance().createEditorHighlighter(editor.project!!, file)
             (previewEditor as? EditorEx)?.highlighter = highlighter
 
             // set scroll

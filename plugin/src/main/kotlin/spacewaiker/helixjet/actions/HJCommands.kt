@@ -4,6 +4,9 @@ import com.intellij.lang.ASTNode
 import com.intellij.lang.tree.util.children
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.project.guessProjectDir
+import com.intellij.openapi.vfs.readText
+import com.intellij.openapi.vfs.resolveFromRootOrRelative
 import com.intellij.psi.PsiElement
 import io.github.treesitter.ktreesitter.Language
 import io.github.treesitter.ktreesitter.Parser
@@ -12,6 +15,8 @@ import io.github.treesitter.ktreesitter.kotlin.TreeSitterKotlin
 import spacewaiker.helixjet.editor.HJConfiguration
 import spacewaiker.helixjet.editor.HJRegister
 import spacewaiker.helixjet.editor.HJState
+import spacewaiker.helixjet.treesitter.HJSyntaxLoader
+import kotlin.system.measureTimeMillis
 
 class HJCommand(
     val name: String,
@@ -318,6 +323,36 @@ private val debugCommands = arrayOf(
         }
 
         println("digraph AST {\n$decl$edges}")
+    },
+    HJCommand("test-ts") { cx, args, _ ->
+        val path = args.getOrNull(0) ?: return@HJCommand
+        val project = cx.hjEditor.editor.project!!
+        val dir = project.guessProjectDir()!!.resolveFromRootOrRelative(path) ?: return@HJCommand
+
+        val stack = mutableListOf(dir)
+        var count = 0
+
+        HJSyntaxLoader.loadAll()
+        val time = measureTimeMillis {
+            while (stack.isNotEmpty()) {
+                val file = stack.removeLast()
+                if (file.isDirectory) stack.addAll(file.children)
+                else {
+                    val type = when (file.extension) {
+                        "kt" -> "kotlin"
+                        "java" -> "java"
+                        "cpp" -> "cpp"
+                        "rs" -> "rust"
+                        else -> continue
+                    }
+
+                    val syntax = HJSyntaxLoader.getLanguageSyntax(type, file.readText()) ?: continue
+
+                    count++
+                }
+            }
+        }
+        println("Took $time ms to parse $count files")
     },
     HJCommand(
         "notify",

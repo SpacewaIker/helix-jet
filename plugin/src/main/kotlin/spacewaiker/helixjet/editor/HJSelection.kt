@@ -4,6 +4,7 @@ import com.intellij.openapi.editor.CaretModel
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.util.TextRange
 import spacewaiker.helixjet.actions.regex
+import spacewaiker.helixjet.utils.isSubset
 
 /**
  * A selection consists of one or more selection ranges.
@@ -22,6 +23,8 @@ class HJSelection {
             ranges[primaryIndex] = rangeIndex0
             return ranges
         }
+    val rangeBounds
+        get() = ranges.map { it.from until it.to }
 
     constructor(ranges: List<HJRange>, primaryIndex: Int) {
         this.ranges.addAll(ranges.map { it.copy() })
@@ -139,12 +142,27 @@ class HJSelection {
     }
 
     /**
+     * Returns true if this is a subset or equal to other
+     */
+    fun contains(other: HJSelection) = isSubset(this.rangeBounds.iterator(), other.rangeBounds.iterator(), true)
+
+    /**
      * Takes a function and maps each HJRange over the function
      */
     fun transform(f: (HJRange) -> HJRange): HJSelection {
         for (i in ranges.indices) {
             ranges[i] = f(ranges[i])
         }
+        return this.normalize()
+    }
+
+    /**
+     * Takes a function and maps each HJRange over the function to multiple HJRanges
+     */
+    fun transformIter(f: (HJRange) -> Iterable<HJRange>): HJSelection {
+        val newRanges = ranges.flatMap(f)
+        ranges.clear()
+        ranges.addAll(newRanges)
         return this.normalize()
     }
 

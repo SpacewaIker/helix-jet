@@ -15,6 +15,7 @@ import com.intellij.openapi.actionSystem.IdeActions
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Document
+import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.VisualPosition
 import com.intellij.openapi.editor.ex.util.EditorUtil
 import com.intellij.openapi.fileEditor.FileEditor
@@ -38,12 +39,12 @@ import com.intellij.openapi.wm.WindowManager
 import com.intellij.psi.util.endOffset
 import com.intellij.psi.util.startOffset
 import com.intellij.ui.JBColor
-import io.github.treesitter.ktreesitter.Parser
 import spacewaiker.helixjet.actions.HJKeyAction.HJAction
 import spacewaiker.helixjet.editor.*
 import spacewaiker.helixjet.input.HJInputHandler
 import spacewaiker.helixjet.input.HJInputKey
-import spacewaiker.helixjet.treesitter.gotoTreesitterObject
+import spacewaiker.helixjet.treesitter.HJLanguageSyntax
+import spacewaiker.helixjet.treesitter.HJTreesitterHandling
 import spacewaiker.helixjet.ui.*
 import java.awt.Point
 import java.awt.Rectangle
@@ -118,8 +119,8 @@ private val actionsRaw = arrayOf(
     HJAction("move_prev_sub_word_start", "Move to start of previous sub word") { moveWordImpl(it, HJWordMotionTarget.PrevSubWordStart, false) },
     HJAction("move_next_sub_word_end", "Move to end of next sub word") { moveWordImpl(it, HJWordMotionTarget.NextSubWordEnd, false) },
     HJAction("move_prev_sub_word_end", "Move to end of previous sub word") { moveWordImpl(it, HJWordMotionTarget.PrevSubWordEnd, false) },
-    HJAction("move_parent_node_end", "Move to end of the parent node"),
-    HJAction("move_parent_node_start", "Move to beginning of the parent node"),
+    HJAction("move_parent_node_end", "Move to end of the parent node") { moveNodeBoundImpl(it, HJDirection.Forward, false) },
+    HJAction("move_parent_node_start", "Move to beginning of the parent node") { moveNodeBoundImpl(it, HJDirection.Backward, false) },
     HJAction("extend_next_word_start", "Extend to start of next word") { moveWordImpl(it, HJWordMotionTarget.NextWordStart, true) },
     HJAction("extend_prev_word_start", "Extend to start of previous word") { moveWordImpl(it, HJWordMotionTarget.PrevWordStart, true) },
     HJAction("extend_next_word_end", "Extend to end of next word") { moveWordImpl(it, HJWordMotionTarget.NextWordEnd, true) },
@@ -132,8 +133,8 @@ private val actionsRaw = arrayOf(
     HJAction("extend_prev_sub_word_start", "Extend to start of previous sub word") { moveWordImpl(it, HJWordMotionTarget.PrevSubWordStart, true) },
     HJAction("extend_next_sub_word_end", "Extend to end of next sub word") { moveWordImpl(it, HJWordMotionTarget.NextSubWordEnd, true) },
     HJAction("extend_prev_sub_word_end", "Extend to end of prev sub word") { moveWordImpl(it, HJWordMotionTarget.PrevSubWordEnd, true) },
-    HJAction("extend_parent_node_end", "Extend to end of the parent node"),
-    HJAction("extend_parent_node_start", "Extend to beginning of the parent node"),
+    HJAction("extend_parent_node_end", "Extend to end of the parent node") { moveNodeBoundImpl(it, HJDirection.Forward, true) },
+    HJAction("extend_parent_node_start", "Extend to beginning of the parent node") { moveNodeBoundImpl(it, HJDirection.Backward, true) },
     HJAction("find_till_char", "Move till next occurrence of char") { findChar(it,  HJDirection.Forward, false, false) },
     HJAction("find_next_char", "Move to next occurrence of char") { findChar(it,  HJDirection.Forward, true, false) },
     HJAction("extend_till_char", "Extend till next occurrence of char") { findChar(it,  HJDirection.Forward, false, true) },
@@ -199,10 +200,10 @@ private val actionsRaw = arrayOf(
     HJAction("buffer_picker", "Open buffer picker") { bufferPicker(it) },
     HJAction("jumplist_picker", "Open jumplist picker"),
     HJAction("symbol_picker", "Open symbol picker") { symbolPicker(it) },
-    HJAction("syntax_symbol_picker", "Open symbol picker from syntax information"),
-    HJAction("lsp_or_syntax_symbol_picker", "Open symbol picker from LSP or syntax information"),
+    HJAction("syntax_symbol_picker", "Open symbol picker from syntax information") { HJTreesitterHandling.syntaxSymbolPicker(it) },
+    HJAction("lsp_or_syntax_symbol_picker", "Open symbol picker from LSP or syntax information"), // TODO: is LSP better than TS?
     HJAction("changed_file_picker", "Open changed file picker") { changedFilePicker(it) },
-    HJAction("select_references_to_symbol_under_cursor", "Select symbol references"),
+    HJAction("select_references_to_symbol_under_cursor", "Select symbol references") { executeIdeAction(it, "HighlightUsagesInFile") },
     HJAction("workspace_symbol_picker", "Open workspace symbol picker") { executeIdeAction(it, "GotoSymbol") },
     HJAction("syntax_workspace_symbol_picker", "Open workspace symbol picker from syntax information"),
     HJAction("lsp_or_syntax_workspace_symbol_picker", "Open workspace symbol picker from LSP or syntax information"),
@@ -316,12 +317,12 @@ private val actionsRaw = arrayOf(
     HJAction("rotate_selection_contents_forward", "Rotate selection contents forward") { reorderSelectionContents(it, HJReorderStrategy.RotateForward) },
     HJAction("rotate_selection_contents_backward", "Rotate selection contents backward") { reorderSelectionContents(it, HJReorderStrategy.RotateBackward) },
     HJAction("reverse_selection_contents", "Reverse selections contents") { reorderSelectionContents(it, HJReorderStrategy.Reverse) },
-    HJAction("expand_selection", "Expand selection to parent syntax node"),
-    HJAction("shrink_selection", "Shrink selection to previously expanded syntax node"),
-    HJAction("select_next_sibling", "Select next sibling in the syntax tree"),
-    HJAction("select_prev_sibling", "Select previous sibling the in syntax tree"),
-    HJAction("select_all_siblings", "Select all siblings of the current node"),
-    HJAction("select_all_children", "Select all children of the current node"),
+    HJAction("expand_selection", "Expand selection to parent syntax node") { expandSelection(it) },
+    HJAction("shrink_selection", "Shrink selection to previously expanded syntax node") { shrinkSelection(it) },
+    HJAction("select_next_sibling", "Select next sibling in the syntax tree") { selectSiblingImpl(it, HJTreesitterHandling::selectNextSibling) },
+    HJAction("select_prev_sibling", "Select previous sibling the in syntax tree") { selectSiblingImpl(it, HJTreesitterHandling::selectPrevSibling) },
+    HJAction("select_all_siblings", "Select all siblings of the current node") { selectAllImpl(it, HJTreesitterHandling::selectAllSiblings) },
+    HJAction("select_all_children", "Select all children of the current node") { selectAllImpl(it, HJTreesitterHandling::selectAllChildren) },
     HJAction("jump_forward", "Jump forward on jumplist"),
     HJAction("jump_backward", "Jump backward on jumplist"),
     HJAction("save_selection", "Save current selection to jumplist"),
@@ -1228,13 +1229,18 @@ private fun gotoTsObjectImpl(cx: HJActionContext, tsObject: String, direction: H
             return@applyMotion
         }
 
-        // TODO: incremental parsing
-        val parser = Parser(syntax.language)
-        val tree = parser.parse(hjEditor.editor.document.text)
-        val root = tree.rootNode
+        val root = syntax.tree.rootNode
 
         val selection = hjEditor.selection.clone().transform { range ->
-            val newRange = gotoTreesitterObject(hjEditor.editor, range, tsObject, direction, root, syntax, cx.count)
+            val newRange = HJTreesitterHandling.gotoTreesitterObject(
+                hjEditor.editor,
+                range,
+                tsObject,
+                direction,
+                root,
+                syntax,
+                cx.count
+            )
 
             if (HJState.mode == HJEditorMode.Select) {
                 val head = if (newRange.head < range.anchor) newRange.anchor else newRange.head
@@ -1244,6 +1250,82 @@ private fun gotoTsObjectImpl(cx: HJActionContext, tsObject: String, direction: H
 
         // TODO: push jump
         hjEditor.setNewSelection(selection)
+    }
+}
+
+private fun moveNodeBoundImpl(cx: HJActionContext, direction: HJDirection, extend: Boolean) {
+    cx.hjEditor.applyMotion { hjEditor ->
+        hjEditor.tsSyntax?.let { syntax ->
+            val currentSelection = hjEditor.selection
+
+            val selection = HJTreesitterHandling.moveParentNodeEnd(
+                syntax,
+                hjEditor.editor,
+                currentSelection.clone(),
+                direction,
+                extend
+            )
+
+            hjEditor.setNewSelection(selection)
+        }
+    }
+}
+
+private fun expandSelection(cx: HJActionContext) {
+    cx.hjEditor.applyMotion { hjEditor ->
+        hjEditor.tsSyntax?.let { syntax ->
+            val currentSelection = hjEditor.selection
+            val selection = HJTreesitterHandling.expandSelection(syntax, hjEditor.editor, currentSelection.clone())
+
+            // check if selection is different from the last one
+            if (currentSelection != selection) {
+                // save current selection so it can be restored using shrink_selection
+                hjEditor.objectSelections.add(currentSelection.clone())
+
+                hjEditor.setNewSelection(selection)
+            }
+        }
+    }
+}
+
+private fun shrinkSelection(cx: HJActionContext) {
+    cx.hjEditor.applyMotion { hjEditor ->
+        val currentSelection = hjEditor.selection
+
+        // try to restore previous selection
+        hjEditor.objectSelections.removeLastOrNull()?.let { prevSelection ->
+            if (currentSelection.contains(prevSelection)) {
+                hjEditor.setNewSelection(prevSelection)
+                return@applyMotion
+            } else {
+                // clear existing selection as they can't be shrunk to anyway
+                hjEditor.objectSelections.clear()
+            }
+        }
+
+        // if not previous selection, shrink to first child
+        hjEditor.tsSyntax?.let { syntax ->
+            val selection = HJTreesitterHandling.shrinkSelection(syntax, hjEditor.editor, currentSelection.clone())
+            hjEditor.setNewSelection(selection)
+        }
+    }
+}
+
+private fun selectSiblingImpl(cx: HJActionContext, siblingFn: (HJLanguageSyntax, Editor, HJSelection) -> HJSelection) {
+    cx.hjEditor.applyMotion { hjEditor ->
+        hjEditor.tsSyntax?.let { syntax ->
+            val currentSelection = hjEditor.selection
+            val selection = siblingFn(syntax, hjEditor.editor, currentSelection.clone())
+            hjEditor.setNewSelection(selection)
+        }
+    }
+}
+
+private fun selectAllImpl(cx: HJActionContext, selectFn: (HJLanguageSyntax, Editor, HJSelection) -> HJSelection) {
+    cx.hjEditor.tsSyntax?.let { syntax ->
+        val currentSelection = cx.hjEditor.selection
+        val selection = selectFn(syntax, cx.hjEditor.editor, currentSelection.clone())
+        cx.hjEditor.setNewSelection(selection)
     }
 }
 
@@ -1425,12 +1507,12 @@ private fun commandPalette(cx: HJActionContext) {
         }
     }
 
-    HJPicker(cx.hjEditor.editor.project!!, "HelixJet Commands", model) { rowIdx ->
+    HJPicker(cx.hjEditor.editor, "HelixJet Commands", model) { rowIdx ->
         when (val act = data[rowIdx].first) {
             is HJAction -> act.execute(cx)
             is HJCommand -> act.execute(cx, listOf(), listOf())
         }
-    }.show(cx.hjEditor.editor.project!!)
+    }.show()
 }
 
 private fun mergeSelections(cx: HJActionContext) {
@@ -1850,10 +1932,10 @@ private fun filePickerImpl(cx: HJActionContext, title: String, directory: Virtua
 
     val previewSelector = { rowIdx: Int -> Pair(data[rowIdx], null) }
 
-    HJPickerWithPreview(project, title, model, previewSelector) { rowIdx ->
+    HJPickerWithPreview(cx.hjEditor.editor, title, model, previewSelector) { rowIdx ->
         val file = data[rowIdx]
         FileEditorManager.getInstance(project).openFile(file, true)
-    }.show(project)
+    }.show()
 }
 
 private fun changedFilePicker(cx: HJActionContext) {
@@ -1896,10 +1978,10 @@ private fun changedFilePicker(cx: HJActionContext) {
         }
     )
 
-    HJPicker(project, "Changed File Picker", model, columnColors) callback@{ rowIdx ->
+    HJPicker(cx.hjEditor.editor, "Changed File Picker", model, columnColors) callback@{ rowIdx ->
         val file = data[rowIdx].virtualFile ?: return@callback
         FileEditorManager.getInstance(project).openFile(file, true)
-    }.show(project)
+    }.show()
 }
 
 private fun filePickerProjectRoot(cx: HJActionContext) {
@@ -2127,7 +2209,7 @@ private fun bufferPicker(cx: HJActionContext) {
 
     val previewSelector = { rowIdx: Int -> Pair(data[rowIdx].file, null) }
 
-    HJPickerWithPreview(project, "Buffer Picker", model, previewSelector) callback@{ rowIdx ->
+    HJPickerWithPreview(cx.hjEditor.editor, "Buffer Picker", model, previewSelector) callback@{ rowIdx ->
         val fileEditor = data[rowIdx]
         var composite: EditorComposite? = null
 
@@ -2141,7 +2223,7 @@ private fun bufferPicker(cx: HJActionContext) {
         } ?: return@callback
 
         window.setSelectedComposite(composite!!, true)
-    }.show(project)
+    }.show()
 }
 
 private fun symbolPicker(cx: HJActionContext) {
@@ -2173,13 +2255,13 @@ private fun symbolPicker(cx: HJActionContext) {
             Pair(psiElement.containingFile.virtualFile, Pair(psiElement.startOffset, psiElement.endOffset))
         }
 
-        HJPickerWithPreview(project, "Symbol Picker", model, previewSelector) callback@{ rowIdx ->
+        HJPickerWithPreview(cx.hjEditor.editor, "Symbol Picker", model, previewSelector) callback@{ rowIdx ->
             val psiElement = data[rowIdx].psiElement
             val start = psiElement.startOffset
             val end = psiElement.endOffset
 
             cx.hjEditor.setNewSelection(HJSelection(HJRange(start, end)))
-        }.show(project)
+        }.show()
     }
 }
 
@@ -2217,10 +2299,10 @@ private fun diagnosticPicker(cx: HJActionContext) {
     val previewSelector =
         { rowIdx: Int -> Pair(cx.hjEditor.editor.virtualFile, Pair(data[rowIdx].startOffset, data[rowIdx].endOffset)) }
 
-    HJPickerWithPreview(project, "Diagnostic Picker", model, previewSelector) { rowIdx ->
+    HJPickerWithPreview(cx.hjEditor.editor, "Diagnostic Picker", model, previewSelector) { rowIdx ->
         val info = data[rowIdx]
         cx.hjEditor.setNewSelection(HJSelection(HJRange(info.startOffset, info.endOffset)))
-    }.show(project)
+    }.show()
 }
 
 private fun diagnosticPickerWorkspace(cx: HJActionContext) {
@@ -2269,7 +2351,7 @@ private fun diagnosticPickerWorkspace(cx: HJActionContext) {
     }
 
     HJPickerWithPreview(
-        project, "Workspace Diagnostic Picker (Opened and Analyzed Files)", model, previewSelector
+        cx.hjEditor.editor, "Workspace Diagnostic Picker (Opened and Analyzed Files)", model, previewSelector
     ) { rowIdx ->
         val (fileEditor, info) = data[rowIdx]
 
@@ -2288,7 +2370,7 @@ private fun diagnosticPickerWorkspace(cx: HJActionContext) {
         // set selection
         val hjEditor = HJState.getHJEditor((fileEditor as TextEditor).editor)
         hjEditor.setNewSelection(HJSelection(HJRange(info.startOffset, info.endOffset)))
-    }.show(project)
+    }.show()
 }
 
 private fun addNewlineImpl(cx: HJActionContext, above: Boolean) {
