@@ -26,7 +26,7 @@ class HJEditorListener : FileEditorManagerListener {
 
     companion object {
         fun handleNewEditor(editor: Editor) {
-            HJState.getHJEditor(editor)
+            HJState.initEditor(editor)
             editor.addEditorMouseListener(HJMouseListener())
         }
     }

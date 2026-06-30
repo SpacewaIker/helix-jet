@@ -119,7 +119,7 @@ object HJInputHandler {
                 if (usingMinorMode && !minorModeIsSticky) minorModeMapping = null
                 actionCount = ""
 
-                val hjEditor = HJState.getHJEditor(editor)
+                val hjEditor = HJState.getHJEditor(editor)!!
                 val cx = HJActionContext(hjEditor, count, HJState.selectedRegister)
                 keyAction.execute(cx)
 

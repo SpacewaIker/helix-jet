@@ -3,10 +3,12 @@
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.fileEditor.ex.FileEditorManagerEx
 import com.intellij.openapi.fileEditor.impl.EditorComposite
 import com.intellij.openapi.fileEditor.impl.EditorWindow
 import com.intellij.openapi.fileEditor.impl.text.TextEditorProvider
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.VfsUtil
@@ -416,3 +418,10 @@ fun incrementBool(selectedText: String, amount: Int): String? {
     else
         newValue.toString()
 }
+
+val Project.focusedEditor
+    get() = (FileEditorManager.getInstance(this).focusedEditor as? TextEditor)?.editor
+        ?.let { if (it.contentComponent.hasFocus()) it else null }
+
+val Project.focusedHJEditor
+    get() = focusedEditor?.let { HJState.getHJEditor(it) }

@@ -25,7 +25,7 @@ class HJTypedHandler(private val originalHandler: TypedActionHandler) : TypedAct
             || !HJState.keymappingEnabled
         ) {
             originalHandler.execute(editor, c, context)
-            HJState.getHJEditor(editor).setNewSelection(HJSelection(editor.caretModel))
+            HJState.getHJEditor(editor)?.setNewSelection(HJSelection(editor.caretModel))
         }
     }
 }

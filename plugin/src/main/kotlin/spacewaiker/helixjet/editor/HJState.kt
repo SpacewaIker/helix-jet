@@ -43,8 +43,12 @@ object HJState {
     val macroReplaying: MutableList<HJRegister> = mutableListOf()
     val lastInsertKeystrokes: MutableList<HJInputKey> = mutableListOf()
 
-    fun getHJEditor(editor: Editor) = editors.getOrPut(editor) { HJEditor(editor) }
-    fun getExistingHJEditor(editor: Editor) = editors[editor]
+    fun getHJEditor(editor: Editor) = editors[editor]
+    
+    fun initEditor(editor: Editor) {
+        if (!editors.containsKey(editor))
+            editors[editor] = HJEditor(editor)
+    }
 
     fun releaseEditor(editor: Editor) = editors.remove(editor) != null
 

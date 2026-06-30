@@ -12,7 +12,8 @@ import io.github.treesitter.ktreesitter.Language
 import io.github.treesitter.ktreesitter.Parser
 import io.github.treesitter.ktreesitter.Query
 import io.github.treesitter.ktreesitter.kotlin.TreeSitterKotlin
-import spacewaiker.helixjet.editor.HJConfiguration
+import spacewaiker.helixjet.config.HJConfiguration
+import spacewaiker.helixjet.config.HJFileGlobMatcher
 import spacewaiker.helixjet.editor.HJRegister
 import spacewaiker.helixjet.editor.HJState
 import spacewaiker.helixjet.treesitter.HJSyntaxLoader
@@ -152,6 +153,18 @@ private val helixCommands = arrayOf(
     ) { cx, args, _ ->
         val separator = args.getOrNull(0) ?: "\n"
         yankJoinedImpl(cx, separator, HJRegister.Clipboard)
+    },
+    HJCommand(
+        "set-language",
+        listOf("lang"),
+        "Set the language of current buffer (show current language if no value is specified)."
+    ) { cx, args, _ ->
+        if (args.isEmpty()) {
+            cx.hjEditor.setStatus("File type/Language: ${cx.hjEditor.language ?: "text"}")
+        } else {
+            val language = args[0]
+            cx.hjEditor.language = HJState.config.languagesToml[language]
+        }
     },
 )
 
@@ -353,6 +366,10 @@ private val debugCommands = arrayOf(
             }
         }
         println("Took $time ms to parse $count files")
+    },
+    HJCommand("test-file-type") { _, args, _ ->
+        val path = args.getOrNull(0) ?: return@HJCommand
+        println(HJFileGlobMatcher.match(path))
     },
     HJCommand(
         "notify",

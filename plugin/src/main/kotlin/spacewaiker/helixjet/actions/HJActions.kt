@@ -785,8 +785,7 @@ private fun replace(cx: HJActionContext) {
         }
 
         if (char != null) {
-            val hjEditor = HJState.getHJEditor(cx.hjEditor.editor)
-            val transaction = hjEditor.changeBySelection { range ->
+            val transaction = cx.hjEditor.changeBySelection { range ->
                 if (range.isEmpty) {
                     // no change
                     null
@@ -795,7 +794,7 @@ private fun replace(cx: HJActionContext) {
                     HJChange.Replace(range.from, range.to, new)
                 }
             }
-            hjEditor.apply(transaction)
+            cx.hjEditor.apply(transaction)
             switchToMode(cx, HJEditorMode.Normal)
         }
     }
@@ -2369,7 +2368,7 @@ private fun diagnosticPickerWorkspace(cx: HJActionContext) {
 
         // set selection
         val hjEditor = HJState.getHJEditor((fileEditor as TextEditor).editor)
-        hjEditor.setNewSelection(HJSelection(HJRange(info.startOffset, info.endOffset)))
+        hjEditor?.setNewSelection(HJSelection(HJRange(info.startOffset, info.endOffset)))
     }.show()
 }
 

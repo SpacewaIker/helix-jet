@@ -16,7 +16,7 @@ class HJMouseListener : EditorMouseListener {
     override fun mouseClicked(event: EditorMouseEvent) {
         val editor = event.editor
 
-        val cx = HJActionContext(HJState.getHJEditor(editor))
+        val cx = HJActionContext(HJState.getHJEditor(editor) ?: return)
         if (HJState.mode == HJEditorMode.Select) switchToMode(cx, HJEditorMode.Normal)
 
         // override range with block-corrected location
@@ -25,7 +25,7 @@ class HJMouseListener : EditorMouseListener {
         // if clicked left of center between chars, i.e. if actually pressed on prev char
         if (event.mouseEvent.point.x < center.x) {
             val selection = HJSelection(HJRange.point(head - 1))
-            HJState.getHJEditor(editor).setNewSelection(selection)
+            cx.hjEditor.setNewSelection(selection)
         }
     }
 
@@ -43,7 +43,7 @@ class HJMouseListener : EditorMouseListener {
         head = offset
 
         val selection = HJSelection(HJRange(anchor, head))
-        HJState.getHJEditor(editor).setNewSelection(selection)
+        HJState.getHJEditor(editor)?.setNewSelection(selection)
 
         // set focus back to HJPrompt, if applicable
         HJState.activePrompt?.requestFocus()
