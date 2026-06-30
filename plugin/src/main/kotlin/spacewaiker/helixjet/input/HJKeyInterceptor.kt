@@ -1,6 +1,9 @@
 ﻿package spacewaiker.helixjet.input
 
 import com.intellij.ide.IdeEventQueue
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.TextEditor
+import com.intellij.openapi.project.Project
 import spacewaiker.helixjet.editor.HJState
 import java.awt.AWTEvent
 import java.awt.event.KeyEvent
@@ -10,13 +13,14 @@ import java.awt.event.KeyEvent
  *
  * Forwards valid inputs to HJInputHandler, or leaves HJTypedHandler handle Insert mode key presses.
  */
-class HJKeyInterceptor : IdeEventQueue.EventDispatcher {
+class HJKeyInterceptor(private val project: Project) : IdeEventQueue.EventDispatcher {
     override fun dispatch(e: AWTEvent): Boolean {
         if (!HJState.keymappingEnabled) return false
         if (e !is KeyEvent) return false
         if (e.id != KeyEvent.KEY_PRESSED) return false
         // get currently focused editor, or return if there are no currently focused editors
-        val focusedEditor = HJState.focusedEditor ?: return false
+        val focusedEditor =
+            (FileEditorManager.getInstance(project).selectedEditor as? TextEditor)?.editor ?: return false
 
         // don't respond to those key pressed by themselves
         if (e.keyCode == KeyEvent.VK_CONTROL || e.keyCode == KeyEvent.VK_ALT || e.keyCode == KeyEvent.VK_SHIFT) return false

@@ -2,6 +2,7 @@ plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm")
     id("org.jetbrains.intellij.platform") version "2.10.2"
+    kotlin("plugin.serialization") version "2.3.10"
 }
 
 group = "spacewaiker"

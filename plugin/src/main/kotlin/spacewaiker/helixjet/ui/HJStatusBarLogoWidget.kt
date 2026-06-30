@@ -11,7 +11,7 @@ import com.intellij.openapi.wm.StatusBar
 import com.intellij.openapi.wm.StatusBarWidget
 import com.intellij.util.Consumer
 import com.intellij.vcsUtil.showAbove
-import spacewaiker.helixjet.editor.HJConfiguration
+import spacewaiker.helixjet.config.HJConfiguration
 import spacewaiker.helixjet.editor.HJState
 import java.awt.event.MouseEvent
 import javax.swing.Icon

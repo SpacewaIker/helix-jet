@@ -10,7 +10,7 @@ class HJStatusBarInputWidgetFactory : StatusBarWidgetFactory {
     override fun getId() = HJStatusBarInputWidget.ID
     override fun getDisplayName() = "HelixJet Input"
     override fun isAvailable(project: Project) = true
-    override fun createWidget(project: Project) = HJStatusBarInputWidget()
+    override fun createWidget(project: Project) = HJStatusBarInputWidget(project)
     override fun disposeWidget(widget: StatusBarWidget) = Disposer.dispose(widget)
     override fun canBeEnabledOn(statusBar: StatusBar) = true
 }

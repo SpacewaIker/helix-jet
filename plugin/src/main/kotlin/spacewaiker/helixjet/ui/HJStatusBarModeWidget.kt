@@ -34,3 +34,6 @@ class HJStatusBarModeWidget : StatusBarWidget, StatusBarWidget.TextPresentation 
         statusBar = null
     }
 }
+
+
+

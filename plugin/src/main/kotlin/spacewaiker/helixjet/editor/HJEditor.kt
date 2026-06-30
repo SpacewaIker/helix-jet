@@ -12,8 +12,11 @@ import com.intellij.psi.PlainTextTokenTypes
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.codeStyle.CodeStyleManager
 import com.intellij.psi.util.elementType
+import spacewaiker.helixjet.config.HJFileGlobMatcher
+import spacewaiker.helixjet.config.HJLanguage
 import spacewaiker.helixjet.treesitter.HJSyntaxLoader
 import spacewaiker.helixjet.ui.HJJumpLabelOverlay
+import spacewaiker.helixjet.ui.HJStatusBarFileTypeWidget
 import java.awt.event.MouseWheelListener
 
 private val JUMP_OVERLAY_KEY = Key.create<HJJumpLabelOverlay>("helixjet.gotoword.inlays")
@@ -56,16 +59,13 @@ class HJEditor {
             if (it.elementType == PlainTextTokenTypes.PLAIN_TEXT_FILE || it.elementType?.toString() == "TextMate") null else it
         }
     val codeStyleManager get() = editor.project?.let { CodeStyleManager.getInstance(it) }
-    val syntax
-        get() = editor.virtualFile.extension?.let {
-            // TODO: this but actually
-            val name = when (it) {
-                "kt" -> "kotlin"
-                "cpp" -> "cpp"
-                else -> it
-            }
-            HJSyntaxLoader.getLanguageSyntax(name, editor.document.text)
+    var language: HJLanguage? = null
+        set(value) {
+            field = value
+            HJStatusBarFileTypeWidget.updateFileTypeWidget()
         }
+    val syntax
+        get() = language?.let { HJSyntaxLoader.getLanguageSyntax(it.grammarOrName, editor.document.text) }
     val objectSelections = mutableListOf<HJSelection>()
 
     val selectionIsLinewise
@@ -78,6 +78,7 @@ class HJEditor {
 
     constructor(editor: Editor) {
         this.editor = editor
+        this.language = HJFileGlobMatcher.match(editor.virtualFile.path)
         this.selection = HJSelection(editor.caretModel)
 
         logger.debug("Created HJEditor with selection: $selection")

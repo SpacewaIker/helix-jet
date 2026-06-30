@@ -14,7 +14,7 @@ import spacewaiker.helixjet.input.HJTypedHandler
 class HJStartupActivity : ProjectActivity {
     override suspend fun execute(project: Project) {
         // key interceptor
-        val interceptor = HJKeyInterceptor()
+        val interceptor = HJKeyInterceptor(project)
         IdeEventQueue.getInstance().addDispatcher(interceptor, null)
 
         // typed handler

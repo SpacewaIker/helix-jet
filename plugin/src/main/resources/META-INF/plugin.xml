@@ -29,6 +29,8 @@
                                 id="HelixModeWidget" order="first"/>
         <statusBarWidgetFactory implementation="spacewaiker.helixjet.ui.HJStatusBarLogoWidgetFactory"
                                 id="HelixLogoWidget" order="first"/>
+        <statusBarWidgetFactory implementation="spacewaiker.helixjet.ui.HJStatusBarFileTypeWidgetFactory"
+                                id="HelixFileTypeWidget" order="first"/>
         <notificationGroup id="HelixJet Notifications" displayType="BALLOON" isLogByDefault="false"/>
     </extensions>
 

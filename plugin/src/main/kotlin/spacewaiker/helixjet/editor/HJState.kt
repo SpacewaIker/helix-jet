@@ -1,9 +1,9 @@
 ﻿package spacewaiker.helixjet.editor
 
 import com.intellij.openapi.editor.Editor
+import spacewaiker.helixjet.config.HJConfiguration
 import spacewaiker.helixjet.editor.HJState.allEditors
 import spacewaiker.helixjet.editor.HJState.config
-import spacewaiker.helixjet.editor.HJState.focusedEditor
 import spacewaiker.helixjet.editor.HJState.mode
 import spacewaiker.helixjet.editor.HJState.typedHandlerBlock
 import spacewaiker.helixjet.input.HJInputKey
@@ -21,7 +21,6 @@ enum class HJEditorMode {
  * @property mode The current HJEditorMode of the plugin
  * @property config The HJConfiguration in use
  * @property allEditors Get list of all Editors
- * @property focusedEditor Get the currently focused Editor, if there is one
  * @property typedHandlerBlock If the typedHandler should be blocked from processing keys. Used during the transition to insert mode
  */
 object HJState {
@@ -34,22 +33,6 @@ object HJState {
     val allEditors get() = editors.keys
     var activePrompt: HJPrompt? = null
     var helpWidget: HJHelpWidget? = null
-
-    private var cachedFocusedEditor: Editor? = null
-    val focusedEditor: Editor?
-        get() {
-            // try to use cached editor
-            if (cachedFocusedEditor != null && cachedFocusedEditor!!.contentComponent.hasFocus()) return cachedFocusedEditor
-
-            for (editor in allEditors) {
-                if (editor.contentComponent.hasFocus()) {
-                    cachedFocusedEditor = editor
-                    return editor
-                }
-            }
-            cachedFocusedEditor = null
-            return null
-        }
     var typedHandlerBlock = false
     var selectedRegister: HJRegister? = null
         set(value) {
@@ -61,6 +44,7 @@ object HJState {
     val lastInsertKeystrokes: MutableList<HJInputKey> = mutableListOf()
 
     fun getHJEditor(editor: Editor) = editors.getOrPut(editor) { HJEditor(editor) }
+    fun getExistingHJEditor(editor: Editor) = editors[editor]
 
     fun releaseEditor(editor: Editor) = editors.remove(editor) != null
 

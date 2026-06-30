@@ -1534,7 +1534,7 @@ private fun open(cx: HJActionContext, openBelow: Boolean, commentContinuationEna
         if (language != null) {
             val commenter = LanguageCommenters.INSTANCE.forLanguage(language)
             commenter?.lineCommentPrefixes
-        } else null
+        } else cx.hjEditor.language?.commentTokens
     } else null
 
     var transaction = cx.hjEditor.changeBySelection { range ->
@@ -1554,7 +1554,8 @@ private fun open(cx: HJActionContext, openBelow: Boolean, commentContinuationEna
         val line = cx.doc.getLine(currLineNum)!!
         val indent = when (val pos = firstNonWhitespaceChar(line)) {
             is Int if continueCommentToken != null -> line.substring(0, pos)
-            else -> cx.hjEditor.codeStyleManager?.getLineIndent(cx.doc, cx.doc.getLineStartOffset(currLineNum)) ?: ""
+            else -> cx.hjEditor.codeStyleManager?.getLineIndent(cx.doc, cx.doc.getLineStartOffset(currLineNum))
+                ?: (cx.hjEditor.language?.indent?.unit ?: "")
         }
 
         val builder = StringBuilder()
