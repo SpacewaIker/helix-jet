@@ -20,6 +20,7 @@ import com.intellij.ui.SearchTextField
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.table.JBTable
 import spacewaiker.helixjet.actions.HJDirection
+import spacewaiker.helixjet.editor.HJState
 import java.awt.BorderLayout
 import java.awt.Component
 import java.awt.Dimension
@@ -37,12 +38,41 @@ import kotlin.math.max
 private val DefaultSize = Dimension(800, 600)
 private const val WindowPadding = 200
 
+open class HJTableModel<T>(
+    data: List<T>,
+    val columns: List<String>,
+    private val selector: (T, Int) -> String,
+) : AbstractTableModel() {
+    protected val data = data.toMutableList()
+    val tableData
+        get() = this.data.toList()
+
+    override fun getRowCount() = data.size
+    override fun getColumnCount() = columns.size
+    override fun getColumnName(column: Int) = columns[column]
+    override fun getValueAt(rowIndex: Int, columnIndex: Int) = selector(data[rowIndex], columnIndex)
+}
+
+class HJStreamingTableModel<T>(
+    columns: List<String>,
+    selector: (T, Int) -> String,
+) : HJTableModel<T>(emptyList(), columns, selector) {
+    fun addRows(rows: List<T>) {
+        if (rows.isEmpty()) return
+        ApplicationManager.getApplication().invokeLater {
+            val startIndex = data.size
+            data.addAll(rows)
+            fireTableRowsInserted(startIndex, data.size - 1)
+        }
+    }
+}
+
 open class HJPicker(
     protected val editor: Editor,
-    title: String,
-    model: AbstractTableModel,
-    columnColors: List<Pair<Int, (String) -> JBColor?>> = listOf(),
-    val callback: (Int) -> Unit,
+    private val title: String,
+    private val model: AbstractTableModel,
+    private val columnColors: List<Pair<Int, (String) -> JBColor?>> = listOf(),
+    private val callback: (Int) -> Unit,
 ) {
     private val confirmAction = object : AbstractAction() {
         override fun actionPerformed(e: ActionEvent) {
@@ -140,7 +170,27 @@ open class HJPicker(
 
     init {
         selectFirstRow()
+
+        ApplicationManager.getApplication().invokeLater {
+            val thisPicker = this
+            popup.addListener(object : JBPopupListener {
+                override fun onClosed(event: LightweightWindowEvent) {
+                    val lastPicker = if (thisPicker is HJPickerWithPreview)
+                        HJPickerWithPreview(editor, title, model, previewSelector, columnColors, callback)
+                    else HJPicker(editor, title, model, columnColors, callback)
+
+                    val row = thisPicker.table.selectedRow
+                    if (row >= 0) {
+                        lastPicker.table.setRowSelectionInterval(row, row)
+                        lastPicker.table.scrollRectToVisible(table.getCellRect(row, 0, true))
+                    }
+
+                    HJState.lastPicker = lastPicker
+                }
+            })
+        }
     }
+
 
     private fun selectFirstRow() {
         if (table.rowCount > 0)
@@ -191,7 +241,7 @@ class HJPickerWithPreview(
     editor: Editor,
     title: String,
     model: AbstractTableModel,
-    private val previewSelector: (Int) -> Pair<VirtualFile, Pair<Int, Int>?>?,
+    val previewSelector: (Int) -> Pair<VirtualFile, Pair<Int, Int>?>?,
     columnColors: List<Pair<Int, (String) -> JBColor?>> = listOf(),
     callback: (Int) -> Unit,
 ) : HJPicker(editor, title, model, columnColors, callback) {
@@ -202,15 +252,6 @@ class HJPickerWithPreview(
                 val newOffset = previewEditor.scrollingModel.verticalScrollOffset + scrollAmount * direction.value
                 previewEditor.scrollingModel.scrollVertically(newOffset)
             }
-        }
-    }
-
-    init {
-        table.selectionModel.addListSelectionListener { selectionEvent ->
-            if (selectionEvent.valueIsAdjusting) return@addListSelectionListener
-            val row = table.selectedRow.takeIf { it >= 0 } ?: return@addListSelectionListener
-            val modelRow = table.convertRowIndexToModel(row)
-            updatePreviewForRow(modelRow)
         }
     }
 
@@ -251,6 +292,15 @@ class HJPickerWithPreview(
                 }
             })
         }
+
+    init {
+        table.selectionModel.addListSelectionListener { selectionEvent ->
+            if (selectionEvent.valueIsAdjusting) return@addListSelectionListener
+            val row = table.selectedRow.takeIf { it >= 0 } ?: return@addListSelectionListener
+            val modelRow = table.convertRowIndexToModel(row)
+            updatePreviewForRow(modelRow)
+        }
+    }
 
     override fun addMappings(inputMap: InputMap, actionMap: ActionMap) {
         super.addMappings(inputMap, actionMap)
@@ -311,7 +361,7 @@ class HJPickerWithPreview(
 
 private const val ColumnPadding = 8
 
-fun resizeColumnsToFit(table: JBTable, model: TableModel) {
+private fun resizeColumnsToFit(table: JBTable, model: TableModel) {
     val columnModel = table.columnModel
     val columnWidths = IntArray(model.columnCount)
     val tableWidth = table.width.takeIf { it > 0 } ?: return

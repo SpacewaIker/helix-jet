@@ -2,6 +2,7 @@
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.editor.Document
+import com.intellij.openapi.editor.LogicalPosition
 import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.TextEditor
@@ -12,8 +13,11 @@ import com.intellij.openapi.fileEditor.impl.text.TextEditorProvider
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.util.TextRange
+import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vfs.VfsUtil
+import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.VirtualFileVisitor
 import com.intellij.psi.PsiFile
 import com.intellij.psi.codeStyle.CodeStyleManager
 import spacewaiker.helixjet.editor.HJJump
@@ -449,3 +453,32 @@ val Project.focusedEditor
 
 val Project.focusedHJEditor
     get() = focusedEditor?.let { HJState.getHJEditor(it) }
+
+/**
+ * Get a list of all files in the project, ignoring files specified in .gitignore, .p4ignore, etc.
+ */
+fun getAllProjectFiles(project: Project, directory: VirtualFile? = null): List<VirtualFile> {
+    val changeListManager = ChangeListManager.getInstance(project)
+    val dir = directory ?: project.guessProjectDir() ?: return listOf()
+    return buildList {
+        VfsUtilCore.visitChildrenRecursively(dir, object : VirtualFileVisitor<Unit>() {
+            override fun visitFile(file: VirtualFile): Boolean {
+                if (changeListManager.isIgnoredFile(file)) return false
+                if (!file.isDirectory) add(file)
+                return true
+            }
+        })
+    }
+}
+
+fun Document.offsetToLogicalPosition(offset: Int): LogicalPosition {
+    val line = getLineNumber(offset)
+    val lineStart = getLineStartOffset(line)
+    val column = offset - lineStart
+    return LogicalPosition(line, column)
+}
+
+fun Document.logicalPositionToOffset(position: LogicalPosition): Int {
+    val lineStart = getLineStartOffset(position.line)
+    return lineStart + position.column
+}

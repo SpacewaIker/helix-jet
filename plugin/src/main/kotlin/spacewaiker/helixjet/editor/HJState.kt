@@ -12,6 +12,7 @@ import spacewaiker.helixjet.editor.HJState.mode
 import spacewaiker.helixjet.editor.HJState.typedHandlerBlock
 import spacewaiker.helixjet.input.HJInputKey
 import spacewaiker.helixjet.ui.HJHelpWidget
+import spacewaiker.helixjet.ui.HJPicker
 import spacewaiker.helixjet.ui.HJPrompt
 import spacewaiker.helixjet.ui.HJStatusBarInputWidget
 
@@ -45,6 +46,7 @@ object HJState {
     val macroReplaying: MutableList<HJRegister> = mutableListOf()
     val lastInsertKeystrokes: MutableList<HJInputKey> = mutableListOf()
     val jumps = HJJumpList()
+    var lastPicker: HJPicker? = null
 
     fun getHJEditor(editor: Editor) = editors[editor]
 

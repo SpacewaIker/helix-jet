@@ -1,16 +1,19 @@
 ﻿package spacewaiker.helixjet.treesitter
 
-import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.LogicalPosition
+import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.util.concurrency.AppExecutorUtil
 import io.github.treesitter.ktreesitter.*
-import spacewaiker.helixjet.actions.HJActionContext
-import spacewaiker.helixjet.actions.HJDirection
-import spacewaiker.helixjet.actions.HJTextObject
+import spacewaiker.helixjet.actions.*
+import spacewaiker.helixjet.config.HJFileGlobMatcher
 import spacewaiker.helixjet.editor.HJRange
 import spacewaiker.helixjet.editor.HJSelection
 import spacewaiker.helixjet.ui.HJPickerWithPreview
-import javax.swing.table.AbstractTableModel
+import spacewaiker.helixjet.ui.HJStreamingTableModel
+import spacewaiker.helixjet.ui.HJTableModel
 
 data class HJTag(
     val kind: String,
@@ -26,13 +29,13 @@ data class HJTag(
 val Point.logicalPosition: LogicalPosition
     get() = LogicalPosition(row.toInt(), column.toInt())
 
-fun Node.getStartOffset(editor: Editor) = editor.logicalPositionToOffset(startPoint.logicalPosition)
-fun Node.getEndOffset(editor: Editor) = editor.logicalPositionToOffset(endPoint.logicalPosition)
+fun Node.getStartOffset(document: Document) = document.logicalPositionToOffset(startPoint.logicalPosition)
+fun Node.getEndOffset(document: Document) = document.logicalPositionToOffset(endPoint.logicalPosition)
 
 val LogicalPosition.point: Point
     get() = Point(line.toUInt(), column.toUInt())
 
-fun offsetToPoint(editor: Editor, offset: Int) = editor.offsetToLogicalPosition(offset).point
+fun offsetToPoint(document: Document, offset: Int) = document.offsetToLogicalPosition(offset).point
 
 fun TreeCursor.gotoParentWith(predicate: (Node) -> Boolean): Boolean {
     while (gotoParent()) {
@@ -56,7 +59,7 @@ fun TreeCursor.resetToPointRange(tree: Tree, start: Point, end: Point) {
 
 object HJTreesitterHandling {
     fun gotoTreesitterObject(
-        editor: Editor,
+        document: Document,
         range: HJRange,
         objectName: String,
         dir: HJDirection,
@@ -81,17 +84,17 @@ object HJTreesitterHandling {
 
             val node = when (dir) {
                 HJDirection.Forward -> nodes
-                    .filter { it.getStartOffset(editor) > pos }
+                    .filter { it.getStartOffset(document) > pos }
                     .minWithOrNull(compareBy<Node> { n -> n.startByte }.thenByDescending { n -> n.endByte })
 
                 HJDirection.Backward -> nodes
-                    .filter { it.getEndOffset(editor) < pos }
+                    .filter { it.getEndOffset(document) < pos }
                     .maxWithOrNull(compareBy<Node> { n -> n.endByte }.thenByDescending { n -> n.startByte })
             } ?: return@getRange null
 
-            val len = editor.document.textLength
-            val startOffset = node.getStartOffset(editor)
-            val endOffset = node.getEndOffset(editor)
+            val len = document.textLength
+            val startOffset = node.getStartOffset(document)
+            val endOffset = node.getEndOffset(document)
             if (startOffset >= len || endOffset >= len) return@getRange null
 
             HJRange(startOffset, endOffset)
@@ -110,31 +113,31 @@ object HJTreesitterHandling {
 
     fun moveParentNodeEnd(
         syntax: HJLanguageSyntax,
-        editor: Editor,
+        document: Document,
         selection: HJSelection,
         direction: HJDirection,
         extend: Boolean,
     ): HJSelection {
         return selection.transform { range ->
-            val startFromPoint = offsetToPoint(editor, range.from)
-            val startToPoint = offsetToPoint(editor, range.to)
+            val startFromPoint = offsetToPoint(document, range.from)
+            val startToPoint = offsetToPoint(document, range.to)
 
             var node = namedDescendantForPointRange(syntax, startFromPoint, startToPoint) ?: return@transform range
 
             var endHead = when (direction) {
                 // moving forward, we always want to move one past the end of the current node, so use the end of the current
                 // node, which is an exclusive end of the range
-                HJDirection.Forward -> node.getEndOffset(editor)
+                HJDirection.Forward -> node.getEndOffset(document)
 
                 // moving backward, we want the cursor to land on the start char of the current node, or if it is already
                 // at the start of a node, to traverse up to the parent
                 HJDirection.Backward -> {
-                    val endHead = node.getStartOffset(editor)
+                    val endHead = node.getStartOffset(document)
 
                     // if we're already at the beginning, look up to the parent
                     if (endHead == range.cursor) {
                         node = findParentStart(node) ?: node
-                        node.getStartOffset(editor)
+                        node.getStartOffset(document)
                     } else endHead
                 }
             }
@@ -159,23 +162,12 @@ object HJTreesitterHandling {
             return
         }
 
-        val data = tagsIter(syntax, cx.hjEditor.editor).toList()
-
-        val model = object : AbstractTableModel() {
-            override fun getRowCount() = data.size
-            override fun getColumnCount() = 3
-
-            override fun getValueAt(rowIndex: Int, columnIndex: Int) = when (columnIndex) {
-                0 -> data[rowIndex].kind
-                1 -> data[rowIndex].name
-                2 -> data[rowIndex].container
-                else -> ""
-            }
-
-            override fun getColumnName(column: Int) = when (column) {
-                0 -> "Kind"
-                1 -> "Name"
-                2 -> "Container"
+        val data = tagsIter(syntax, cx.hjEditor.editor.document, cx.hjEditor.editor.virtualFile).toList()
+        val model = HJTableModel(data, listOf("Kind", "Name", "Container")) { tag, col ->
+            when (col) {
+                0 -> tag.kind
+                1 -> tag.name
+                2 -> tag.container
                 else -> ""
             }
         }
@@ -187,12 +179,57 @@ object HJTreesitterHandling {
 
         HJPickerWithPreview(cx.hjEditor.editor, "Syntax Symbol Picker", model, previewSelector) callback@{ rowIdx ->
             val tag = data[rowIdx]
+            openFile(cx, tag.file) // necessary in case the picker is reopened from elsewhere
             cx.hjEditor.setNewSelection(HJSelection(HJRange(tag.startOffset, tag.endOffset)))
         }.show()
     }
 
-    fun expandSelection(syntax: HJLanguageSyntax, editor: Editor, selection: HJSelection): HJSelection {
-        return selectNodeImpl(syntax, editor, selection, null) { cursor ->
+    fun syntaxWorkspaceSymbolPicker(cx: HJActionContext) {
+        val tag = HJTag(
+            "test",
+            "test",
+            "",
+            0,
+            0,
+            0,
+            0,
+            cx.hjEditor.editor.virtualFile
+        )
+        val model = HJStreamingTableModel<HJTag>(listOf("Kind", "Name", "Container")) { tag, col ->
+            when (col) {
+                0 -> tag.kind
+                1 -> tag.name
+                2 -> tag.container
+                else -> ""
+            }
+        }
+
+        AppExecutorUtil.getAppExecutorService().submit {
+            val documentManager = FileDocumentManager.getInstance()
+            getAllProjectFiles(cx.hjEditor.editor.project!!).forEach { file ->
+                ReadAction.compute<Unit, Throwable> {
+                    val document = documentManager.getDocument(file) ?: return@compute
+                    val language = HJFileGlobMatcher.match(file.path) ?: return@compute
+                    val syntax = HJSyntaxLoader.getLanguageSyntax(language.name, document.text) ?: return@compute
+                    model.addRows(tagsIter(syntax, document, file).toList())
+                }
+            }
+        }
+
+        val previewSelector = { rowIdx: Int ->
+            val tag = model.tableData[rowIdx]
+            Pair(tag.file, Pair(tag.startOffset, tag.endOffset))
+        }
+
+        HJPickerWithPreview(cx.hjEditor.editor, "Syntax Symbol Picker", model, previewSelector) callback@{ rowIdx ->
+            val tag = model.tableData[rowIdx]
+            openFile(cx, tag.file)
+            cx.hjEditor.setNewSelection(HJSelection(HJRange(tag.startOffset, tag.endOffset)))
+        }.show()
+    }
+
+    fun expandSelection(syntax: HJLanguageSyntax, document: Document, selection: HJSelection): HJSelection {
+        return selectNodeImpl(syntax, document, selection, null) { cursor ->
             val range = cursor.currentNode.range
             while (cursor.currentNode.range == range) {
                 if (!cursor.gotoParent()) break
@@ -200,23 +237,23 @@ object HJTreesitterHandling {
         }
     }
 
-    fun shrinkSelection(syntax: HJLanguageSyntax, editor: Editor, selection: HJSelection): HJSelection {
-        return selectNodeImpl(syntax, editor, selection, null) { it.gotoFirstChild() }
+    fun shrinkSelection(syntax: HJLanguageSyntax, document: Document, selection: HJSelection): HJSelection {
+        return selectNodeImpl(syntax, document, selection, null) { it.gotoFirstChild() }
     }
 
-    fun selectNextSibling(syntax: HJLanguageSyntax, editor: Editor, selection: HJSelection): HJSelection {
-        return selectNodeImpl(syntax, editor, selection, HJDirection.Forward) { cursor ->
+    fun selectNextSibling(syntax: HJLanguageSyntax, document: Document, selection: HJSelection): HJSelection {
+        return selectNodeImpl(syntax, document, selection, HJDirection.Forward) { cursor ->
             while (!cursor.gotoNextSibling()) {
                 if (!cursor.gotoParent()) break
             }
         }
     }
 
-    fun selectAllSiblings(syntax: HJLanguageSyntax, editor: Editor, selection: HJSelection): HJSelection {
+    fun selectAllSiblings(syntax: HJLanguageSyntax, document: Document, selection: HJSelection): HJSelection {
         val cursor = syntax.tree.walk()
         return selection.transformIter { range ->
-            val fromPoint = offsetToPoint(editor, range.from)
-            val toPoint = offsetToPoint(editor, range.to)
+            val fromPoint = offsetToPoint(document, range.from)
+            val toPoint = offsetToPoint(document, range.to)
 
             cursor.resetToPointRange(syntax.tree, fromPoint, toPoint)
 
@@ -224,24 +261,24 @@ object HJTreesitterHandling {
                 return@transformIter listOf(range)
             }
 
-            selectChildren(cursor, editor, range)
+            selectChildren(cursor, document, range)
         }
     }
 
-    fun selectAllChildren(syntax: HJLanguageSyntax, editor: Editor, selection: HJSelection): HJSelection {
+    fun selectAllChildren(syntax: HJLanguageSyntax, document: Document, selection: HJSelection): HJSelection {
         val cursor = syntax.tree.walk()
         return selection.transformIter { range ->
-            val fromPoint = offsetToPoint(editor, range.from)
-            val toPoint = offsetToPoint(editor, range.to)
+            val fromPoint = offsetToPoint(document, range.from)
+            val toPoint = offsetToPoint(document, range.to)
 
             cursor.resetToPointRange(syntax.tree, fromPoint, toPoint)
 
-            selectChildren(cursor, editor, range)
+            selectChildren(cursor, document, range)
         }
     }
 
-    fun selectPrevSibling(syntax: HJLanguageSyntax, editor: Editor, selection: HJSelection): HJSelection {
-        return selectNodeImpl(syntax, editor, selection, HJDirection.Forward) { cursor ->
+    fun selectPrevSibling(syntax: HJLanguageSyntax, document: Document, selection: HJSelection): HJSelection {
+        return selectNodeImpl(syntax, document, selection, HJDirection.Forward) { cursor ->
             while (!cursor.gotoPreviousSibling()) {
                 if (!cursor.gotoParent()) break
             }
@@ -277,16 +314,16 @@ object HJTreesitterHandling {
         return node
     }
 
-    private fun tagsIter(syntax: HJLanguageSyntax, editor: Editor): Sequence<HJTag> {
+    private fun tagsIter(syntax: HJLanguageSyntax, document: Document, file: VirtualFile): Sequence<HJTag> {
         return syntax.tagQuery(syntax.tree.rootNode).captures()
             .map { (idx, match) ->
                 val capture = match.captures[idx.toInt()]
 
                 val kind = capture.name.removePrefix("definition.")
 
-                val startOffset = capture.node.getStartOffset(editor)
-                val endOffset = capture.node.getEndOffset(editor)
-                val name = editor.document.text.substring(startOffset, endOffset)
+                val startOffset = capture.node.getStartOffset(document)
+                val endOffset = capture.node.getEndOffset(document)
+                val name = document.text.substring(startOffset, endOffset)
 
                 HJTag(
                     kind,
@@ -294,16 +331,16 @@ object HJTreesitterHandling {
                     "",
                     startOffset,
                     endOffset,
-                    editor.document.getLineNumber(startOffset),
-                    editor.document.getLineNumber(endOffset),
-                    editor.virtualFile,
+                    document.getLineNumber(startOffset),
+                    document.getLineNumber(endOffset),
+                    file,
                 )
             }
     }
 
     private fun selectNodeImpl(
         syntax: HJLanguageSyntax,
-        editor: Editor,
+        document: Document,
         selection: HJSelection,
         direction: HJDirection?,
         motion: (TreeCursor) -> Unit,
@@ -311,25 +348,25 @@ object HJTreesitterHandling {
         val cursor = syntax.tree.walk()
 
         return selection.transform { range ->
-            val fromPoint = offsetToPoint(editor, range.from)
-            val toPoint = offsetToPoint(editor, range.to)
+            val fromPoint = offsetToPoint(document, range.from)
+            val toPoint = offsetToPoint(document, range.to)
 
             cursor.resetToPointRange(syntax.tree, fromPoint, toPoint)
 
             motion(cursor)
 
             val node = cursor.currentNode
-            val from = node.getStartOffset(editor)
-            val to = node.getEndOffset(editor)
+            val from = node.getStartOffset(document)
+            val to = node.getEndOffset(document)
 
             HJRange(to, from).withDirection(direction ?: range.direction)
         }
     }
 
-    private fun selectChildren(cursor: TreeCursor, editor: Editor, range: HJRange): List<HJRange> {
+    private fun selectChildren(cursor: TreeCursor, document: Document, range: HJRange): List<HJRange> {
         val children = cursor.currentNode.children
             .filter(Node::isNamed)
-            .map { HJRange.fromNode(it, editor, range.direction) }
+            .map { HJRange.fromNode(it, document, range.direction) }
 
         return children.ifEmpty { listOf(range) }
     }

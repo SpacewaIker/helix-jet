@@ -1,6 +1,6 @@
 ﻿package spacewaiker.helixjet.actions
 
-import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.Document
 import io.github.treesitter.ktreesitter.Node
 import spacewaiker.helixjet.treesitter.HJLanguageSyntax
 import spacewaiker.helixjet.treesitter.getStartOffset
@@ -53,10 +53,10 @@ object HJMatchBrackets {
      *
      * If no matching bracket is found, null is returned
      */
-    fun findMatchingBracket(syntax: HJLanguageSyntax, editor: Editor, pos: Int): Int? {
-        if (pos >= editor.document.textLength || !isValidPair(editor.document.charsSequence[pos])) return null
+    fun findMatchingBracket(syntax: HJLanguageSyntax, document: Document, pos: Int): Int? {
+        if (pos >= document.textLength || !isValidPair(document.charsSequence[pos])) return null
 
-        return findPair(syntax, editor, pos, false)
+        return findPair(syntax, document, pos, false)
     }
 
     /**
@@ -69,12 +69,12 @@ object HJMatchBrackets {
      *
      * If no surrounding scope is found, the function returns null
      */
-    fun findMatchingBracketFuzzy(syntax: HJLanguageSyntax, editor: Editor, pos: Int): Int? {
-        return findPair(syntax, editor, pos, true)
+    fun findMatchingBracketFuzzy(syntax: HJLanguageSyntax, document: Document, pos: Int): Int? {
+        return findPair(syntax, document, pos, true)
     }
 
-    private fun findPair(syntax: HJLanguageSyntax, editor: Editor, pos: Int, traverseParents: Boolean): Int? {
-        val posPoint = offsetToPoint(editor, pos)
+    private fun findPair(syntax: HJLanguageSyntax, document: Document, pos: Int, traverseParents: Boolean): Int? {
+        val posPoint = offsetToPoint(document, pos)
         val root = syntax.tree.rootNode
         var node = root.descendant(posPoint, posPoint) ?: return null
 
@@ -83,8 +83,8 @@ object HJMatchBrackets {
                 val open = node.child(0u)!!
                 val close = node.child(node.childCount - 1u)!!
 
-                val startCh = asChar(editor, open)
-                val endCh = asChar(editor, close)
+                val startCh = asChar(document, open)
+                val endCh = asChar(document, close)
                 if (startCh != null && endCh != null) {
                     val (startPos, open) = startCh
                     val (endPos, close) = endCh
@@ -104,18 +104,18 @@ object HJMatchBrackets {
             }
             // this node itself wasn't a pair but maybe its siblings are
 
-            val closePair = asClosePair(editor, node)
+            val closePair = asClosePair(document, node)
             if (closePair != null) {
                 val (startChar, endChar) = closePair
-                val pairStart = findPairEnd(editor, node.prevSibling, startChar, endChar, HJDirection.Backward)
+                val pairStart = findPairEnd(document, node.prevSibling, startChar, endChar, HJDirection.Backward)
                 if (pairStart != null) {
                     return pairStart
                 }
             }
-            val openPair = asOpenPair(editor, node)
+            val openPair = asOpenPair(document, node)
             if (openPair != null) {
                 val (startChar, endChar) = openPair
-                val pairEnd = findPairEnd(editor, node.nextSibling, startChar, endChar, HJDirection.Forward)
+                val pairEnd = findPairEnd(document, node.nextSibling, startChar, endChar, HJDirection.Forward)
                 if (pairEnd != null) {
                     return pairEnd
                 }
@@ -123,9 +123,9 @@ object HJMatchBrackets {
 
             if (traverseParents) {
                 for (sibling in generateSequence(node.nextSibling, Node::nextSibling).take(MATCH_LIMIT)) {
-                    val (startChar, endChar) = asClosePair(editor, sibling) ?: continue
-                    if (findPairEnd(editor, sibling.prevSibling, startChar, endChar, HJDirection.Backward) != null) {
-                        return sibling.getStartOffset(editor)
+                    val (startChar, endChar) = asClosePair(document, sibling) ?: continue
+                    if (findPairEnd(document, sibling.prevSibling, startChar, endChar, HJDirection.Backward) != null) {
+                        return sibling.getStartOffset(document)
                     }
                 }
             } else if (node.isNamed) {
@@ -134,9 +134,9 @@ object HJMatchBrackets {
 
             node = node.parent ?: break
         }
-        val node_ = root.namedDescendant(posPoint, offsetToPoint(editor, pos + 1)) ?: return null
+        val node_ = root.namedDescendant(posPoint, offsetToPoint(document, pos + 1)) ?: return null
         if (node_.children.count() != 0) return null
-        val nodeStart = node_.getStartOffset(editor)
+        val nodeStart = node_.getStartOffset(document)
         val nodeText = node_.text()?.toString() ?: ""
         return findMatchingBracketPlaintext(nodeText, pos - nodeStart)?.let { it + nodeStart }
     }
@@ -190,17 +190,17 @@ object HJMatchBrackets {
     /**
      * If node is a single char, return it and its char position
      */
-    private fun asChar(editor: Editor, node: Node): Pair<Int, Char>? {
+    private fun asChar(document: Document, node: Node): Pair<Int, Char>? {
         if (node.endByte - node.startByte != 1u) return null
-        val pos = node.getStartOffset(editor)
-        return Pair(pos, editor.document.charsSequence[pos])
+        val pos = node.getStartOffset(document)
+        return Pair(pos, document.charsSequence[pos])
     }
 
     /**
      * Tests if this node is a pair close char and returns the expected open char and close char contained in this node
      */
-    private fun asClosePair(editor: Editor, node: Node): Pair<Char, Char>? {
-        val close = asChar(editor, node)?.second ?: return null
+    private fun asClosePair(document: Document, node: Node): Pair<Char, Char>? {
+        val close = asChar(document, node)?.second ?: return null
 
         return pairs.find { (_, close_) -> close_ == close }
             ?.let { (open, close) -> Pair(close, open) }
@@ -212,7 +212,7 @@ object HJMatchBrackets {
      * @returns The position of the found node or null otherwise
      */
     private fun findPairEnd(
-        editor: Editor,
+        document: Document,
         node: Node?,
         startChar: Char,
         endChar: Char,
@@ -226,7 +226,7 @@ object HJMatchBrackets {
         generateSequence(node, advance)
             .take(MATCH_LIMIT)
             .find { node ->
-                val (pos, c) = asChar(editor, node) ?: return@find false
+                val (pos, c) = asChar(document, node) ?: return@find false
                 if (c == endChar) {
                     if (depth == 0) {
                         return pos
@@ -244,8 +244,8 @@ object HJMatchBrackets {
     /**
      * Tests if this node is a pair open char and returns the expected close char and open char contained in this node
      */
-    private fun asOpenPair(editor: Editor, node: Node): Pair<Char, Char>? {
-        val open = asChar(editor, node)?.second ?: return null
+    private fun asOpenPair(document: Document, node: Node): Pair<Char, Char>? {
+        val open = asChar(document, node)?.second ?: return null
 
         return pairs.find { (open_, _) -> open_ == open }
     }

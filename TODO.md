@@ -23,6 +23,8 @@
     - parse file types, comment tokens?
 - Read only files: doesn't prompt for clearing read-only, instead triggers an exception
 - jumplist: should be one jumplist per view, not one
+- configuration: some kind of ignore for file analysis. Per project?
+- workspace symbol syntax picker: don't re-parse files if they haven't changed
 
 Fix:
 

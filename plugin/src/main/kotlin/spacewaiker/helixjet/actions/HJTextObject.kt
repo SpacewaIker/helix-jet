@@ -2,7 +2,6 @@
 
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Document
-import com.intellij.openapi.editor.Editor
 import com.intellij.rml.dfa.utils.toInt
 import spacewaiker.helixjet.editor.HJRange
 import spacewaiker.helixjet.treesitter.HJLanguageSyntax
@@ -27,7 +26,7 @@ object HJTextObject {
      * Transform the given range to select text objects based on treesitter.
      */
     fun textobjectTreesitter(
-        editor: Editor, range: HJRange, textobject: TextObject, objectName: String, syntax: HJLanguageSyntax,
+        document: Document, range: HJRange, textobject: TextObject, objectName: String, syntax: HJLanguageSyntax,
     ): HJRange {
         val root = syntax.tree.rootNode
         val textobjectQuery = syntax.textobjectQuery
@@ -35,11 +34,11 @@ object HJTextObject {
         val pos = range.cursor
         val captureName = "$objectName.$textobject"
         val node = captureNodes(textobjectQuery, captureName, root)
-            .filter { (it.getStartOffset(editor) until it.getEndOffset(editor)).contains(pos) }
+            .filter { (it.getStartOffset(document) until it.getEndOffset(document)).contains(pos) }
             .minByOrNull { it.endByte - it.startByte } ?: return range
 
-        val startOffset = node.getStartOffset(editor)
-        val endOffset = node.getEndOffset(editor)
+        val startOffset = node.getStartOffset(document)
+        val endOffset = node.getEndOffset(document)
         return HJRange(startOffset, endOffset)
     }
 
@@ -199,46 +198,46 @@ object HJTextObject {
 
     fun textObjectPairSurround(
         syntax: HJLanguageSyntax?,
-        editor: Editor,
+        document: Document,
         range: HJRange,
         textObject: TextObject,
         ch: Char,
         count: Int,
     ): HJRange {
-        return textObjectPairSurroundImpl(syntax, editor, range, textObject, ch, count)
+        return textObjectPairSurroundImpl(syntax, document, range, textObject, ch, count)
     }
 
     fun textObjectPairSurroundClosest(
         syntax: HJLanguageSyntax?,
-        editor: Editor,
+        document: Document,
         range: HJRange,
         textObject: TextObject,
         count: Int,
     ): HJRange {
-        return textObjectPairSurroundImpl(syntax, editor, range, textObject, null, count)
+        return textObjectPairSurroundImpl(syntax, document, range, textObject, null, count)
     }
 
     private fun textObjectPairSurroundImpl(
         syntax: HJLanguageSyntax?,
-        editor: Editor,
+        document: Document,
         range: HJRange,
         textObject: TextObject,
         ch: Char?,
         count: Int,
     ): HJRange {
-        val pairPos = if (ch != null) HJSurround.findNthPairsPos(syntax, editor, ch, range, count)
-        else HJSurround.findNthClosestPairsPos(syntax, editor, range, count)
+        val pairPos = if (ch != null) HJSurround.findNthPairsPos(syntax, document, ch, range, count)
+        else HJSurround.findNthClosestPairsPos(syntax, document, range, count)
 
         return pairPos?.let { (anchor, head) ->
             when (textObject) {
                 TextObject.Inside -> {
-                    if (anchor < head) HJRange(nextGraphemeBoundary(editor.document, anchor), head)
-                    else HJRange(anchor, nextGraphemeBoundary(editor.document, head))
+                    if (anchor < head) HJRange(nextGraphemeBoundary(document, anchor), head)
+                    else HJRange(anchor, nextGraphemeBoundary(document, head))
                 }
 
                 TextObject.Around -> {
-                    if (anchor < head) HJRange(anchor, nextGraphemeBoundary(editor.document, head))
-                    else HJRange(nextGraphemeBoundary(editor.document, anchor), head)
+                    if (anchor < head) HJRange(anchor, nextGraphemeBoundary(document, head))
+                    else HJRange(nextGraphemeBoundary(document, anchor), head)
                 }
 
                 TextObject.Movement -> {

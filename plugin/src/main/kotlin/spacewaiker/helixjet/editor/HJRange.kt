@@ -2,7 +2,6 @@
 
 import com.intellij.openapi.editor.Caret
 import com.intellij.openapi.editor.Document
-import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.util.TextRange
 import io.github.treesitter.ktreesitter.Node
 import spacewaiker.helixjet.actions.HJDirection
@@ -182,9 +181,9 @@ class HJRange {
     companion object {
         fun point(head: Int) = HJRange(head, head)
 
-        fun fromNode(node: Node, editor: Editor, direction: HJDirection): HJRange {
-            val from = node.getStartOffset(editor)
-            val to = node.getEndOffset(editor)
+        fun fromNode(node: Node, document: Document, direction: HJDirection): HJRange {
+            val from = node.getStartOffset(document)
+            val to = node.getEndOffset(document)
             return HJRange(from, to).withDirection(direction)
         }
     }

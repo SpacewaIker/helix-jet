@@ -15,10 +15,9 @@ import com.intellij.openapi.actionSystem.IdeActions
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Document
-import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.LogicalPosition
 import com.intellij.openapi.editor.VisualPosition
 import com.intellij.openapi.editor.ex.util.EditorUtil
-import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.fileEditor.ex.FileEditorManagerEx
 import com.intellij.openapi.fileEditor.impl.EditorComposite
@@ -29,16 +28,12 @@ import com.intellij.openapi.ui.Splitter
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ChangeListManager
-import com.intellij.openapi.vcs.changes.VcsIgnoreManager
 import com.intellij.openapi.vfs.VfsUtil
-import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.openapi.vfs.VirtualFileVisitor
 import com.intellij.openapi.wm.WindowManager
 import com.intellij.ui.JBColor
 import spacewaiker.helixjet.actions.HJKeyAction.HJAction
 import spacewaiker.helixjet.editor.*
-import spacewaiker.helixjet.editor.HJState.getHJEditor
 import spacewaiker.helixjet.input.HJInputHandler
 import spacewaiker.helixjet.input.HJInputKey
 import spacewaiker.helixjet.treesitter.HJLanguageSyntax
@@ -147,14 +142,14 @@ private val actionsRaw = arrayOf(
     HJAction("switch_case", "Switch (toggle) case") { switchCaseImpl(it) { s -> s.map { c -> if (c.isLowerCase()) {c.uppercase()} else if (c.isUpperCase()) {c.lowercase()} else {c} }.joinToString(separator = "") } },
     HJAction("switch_to_uppercase", "Switch to uppercase") { switchCaseImpl(it) { s -> s.uppercase() } },
     HJAction("switch_to_lowercase", "Switch to lowercase") { switchCaseImpl(it) { s -> s.lowercase() } },
-    HJAction("page_up", "Move page up") { scrollPageImpl(it, 1.0f, HJDirection.Backward) },
-    HJAction("page_down", "Move page down") { scrollPageImpl(it, 1.0f, HJDirection.Forward) },
-    HJAction("half_page_up", "Move half page up") { scrollPageImpl(it, 0.5f, HJDirection.Backward) },
-    HJAction("half_page_down", "Move half page down") { scrollPageImpl(it, 0.5f, HJDirection.Forward) },
-    HJAction("page_cursor_up", "Move page and cursor up"),
-    HJAction("page_cursor_down", "Move page and cursor down"),
-    HJAction("page_cursor_half_up", "Move page and cursor half up"),
-    HJAction("page_cursor_half_down", "Move page and cursor half down"),
+    HJAction("page_up", "Move page up") { scrollPageImpl(it, 1.0f, HJDirection.Backward, false) },
+    HJAction("page_down", "Move page down") { scrollPageImpl(it, 1.0f, HJDirection.Forward, false) },
+    HJAction("half_page_up", "Move half page up") { scrollPageImpl(it, 0.5f, HJDirection.Backward, false) },
+    HJAction("half_page_down", "Move half page down") { scrollPageImpl(it, 0.5f, HJDirection.Forward, false) },
+    HJAction("page_cursor_up", "Move page and cursor up") { scrollPageImpl(it, 1.0f, HJDirection.Backward, true) },
+    HJAction("page_cursor_down", "Move page and cursor down") { scrollPageImpl(it, 1.0f, HJDirection.Forward, true) },
+    HJAction("page_cursor_half_up", "Move page and cursor half up") { scrollPageImpl(it, 0.5f, HJDirection.Backward, true) },
+    HJAction("page_cursor_half_down", "Move page and cursor half down") { scrollPageImpl(it, 0.5f, HJDirection.Forward, true) },
     HJAction("select_all", "Select whole document") { selectAll(it) },
     HJAction("select_regex", "Select all regex matches inside selections") { selectRegex(it) },
     HJAction("split_selection", "Split selections on regex matches") { splitSelection(it) },
@@ -203,11 +198,11 @@ private val actionsRaw = arrayOf(
     HJAction("changed_file_picker", "Open changed file picker") { changedFilePicker(it) },
     HJAction("select_references_to_symbol_under_cursor", "Select symbol references") { executeIdeAction(it, "HighlightUsagesInFile") },
     HJAction("workspace_symbol_picker", "Open workspace symbol picker") { executeIdeAction(it, "GotoSymbol") },
-    HJAction("syntax_workspace_symbol_picker", "Open workspace symbol picker from syntax information"),
+    HJAction("syntax_workspace_symbol_picker", "Open workspace symbol picker from syntax information") { HJTreesitterHandling.syntaxWorkspaceSymbolPicker(it) },
     HJAction("lsp_or_syntax_workspace_symbol_picker", "Open workspace symbol picker from LSP or syntax information"),
     HJAction("diagnostics_picker", "Open diagnostic picker") { diagnosticPicker(it) },
     HJAction("workspace_diagnostics_picker", "Open workspace diagnostic picker") { diagnosticPickerWorkspace(it) },
-    HJAction("last_picker", "Open last picker"),
+    HJAction("last_picker", "Open last picker") { lastPicker(it) },
     HJAction("insert_at_line_start", "Insert at start of line") { insertWithIndent(it, true) },
     HJAction("insert_at_line_end", "Insert at end of line") { insertWithIndent(it, false) },
     HJAction("open_below", "Open new line below selection") { open(it, true, true) },
@@ -902,12 +897,30 @@ private fun switchCaseImpl(cx: HJActionContext, switchFun: (String) -> String) {
     switchToMode(cx, HJEditorMode.Normal)
 }
 
-private fun scrollPageImpl(cx: HJActionContext, multiplier: Float, direction: HJDirection) {
+private fun scrollPageImpl(cx: HJActionContext, multiplier: Float, direction: HJDirection, moveCursor: Boolean) {
+    collapseSelection(cx)
+    val selection = cx.hjEditor.selection.clone()
+
     val scrollModel = cx.hjEditor.editor.scrollingModel
     val area = scrollModel.visibleArea
-    val deltaOffset = (area.height * multiplier).toInt()
-    val newOffset = scrollModel.verticalScrollOffset + deltaOffset * direction.value
+    val deltaOffset = (area.height * multiplier * direction.value).toInt()
+    val newOffset = scrollModel.verticalScrollOffset + deltaOffset
     scrollModel.scrollVertically(newOffset)
+
+    if (moveCursor) {
+        val linesScrolled = deltaOffset / cx.hjEditor.editor.lineHeight
+        val moveLine = { offset: Int ->
+            val logical = cx.hjEditor.editor.offsetToLogicalPosition(offset)
+            val line = (logical.line + linesScrolled).coerceIn(0, cx.hjEditor.editor.document.lineCount - 1)
+            cx.hjEditor.editor.logicalPositionToOffset(LogicalPosition(line, logical.column))
+        }
+        selection.transform { range ->
+            range.anchor = moveLine(range.anchor)
+            range.head = moveLine(range.head)
+            range
+        }
+        cx.hjEditor.setNewSelection(selection)
+    }
 }
 
 private fun scrollPageByLineImpl(cx: HJActionContext, direction: HJDirection) {
@@ -1240,7 +1253,7 @@ private fun gotoTsObjectImpl(cx: HJActionContext, tsObject: String, direction: H
 
         val selection = hjEditor.selection.clone().transform { range ->
             val newRange = HJTreesitterHandling.gotoTreesitterObject(
-                hjEditor.editor,
+                hjEditor.editor.document,
                 range,
                 tsObject,
                 direction,
@@ -1267,7 +1280,7 @@ private fun moveNodeBoundImpl(cx: HJActionContext, direction: HJDirection, exten
 
             val selection = HJTreesitterHandling.moveParentNodeEnd(
                 syntax,
-                hjEditor.editor,
+                hjEditor.editor.document,
                 currentSelection.clone(),
                 direction,
                 extend
@@ -1282,7 +1295,8 @@ private fun expandSelection(cx: HJActionContext) {
     cx.hjEditor.applyMotion { hjEditor ->
         hjEditor.syntax?.let { syntax ->
             val currentSelection = hjEditor.selection
-            val selection = HJTreesitterHandling.expandSelection(syntax, hjEditor.editor, currentSelection.clone())
+            val selection =
+                HJTreesitterHandling.expandSelection(syntax, hjEditor.editor.document, currentSelection.clone())
 
             // check if selection is different from the last one
             if (currentSelection != selection) {
@@ -1312,26 +1326,30 @@ private fun shrinkSelection(cx: HJActionContext) {
 
         // if not previous selection, shrink to first child
         hjEditor.syntax?.let { syntax ->
-            val selection = HJTreesitterHandling.shrinkSelection(syntax, hjEditor.editor, currentSelection.clone())
+            val selection =
+                HJTreesitterHandling.shrinkSelection(syntax, hjEditor.editor.document, currentSelection.clone())
             hjEditor.setNewSelection(selection)
         }
     }
 }
 
-private fun selectSiblingImpl(cx: HJActionContext, siblingFn: (HJLanguageSyntax, Editor, HJSelection) -> HJSelection) {
+private fun selectSiblingImpl(
+    cx: HJActionContext,
+    siblingFn: (HJLanguageSyntax, Document, HJSelection) -> HJSelection,
+) {
     cx.hjEditor.applyMotion { hjEditor ->
         hjEditor.syntax?.let { syntax ->
             val currentSelection = hjEditor.selection
-            val selection = siblingFn(syntax, hjEditor.editor, currentSelection.clone())
+            val selection = siblingFn(syntax, hjEditor.editor.document, currentSelection.clone())
             hjEditor.setNewSelection(selection)
         }
     }
 }
 
-private fun selectAllImpl(cx: HJActionContext, selectFn: (HJLanguageSyntax, Editor, HJSelection) -> HJSelection) {
+private fun selectAllImpl(cx: HJActionContext, selectFn: (HJLanguageSyntax, Document, HJSelection) -> HJSelection) {
     cx.hjEditor.syntax?.let { syntax ->
         val currentSelection = cx.hjEditor.selection
-        val selection = selectFn(syntax, cx.hjEditor.editor, currentSelection.clone())
+        val selection = selectFn(syntax, cx.doc, currentSelection.clone())
         cx.hjEditor.setNewSelection(selection)
     }
 }
@@ -1618,7 +1636,7 @@ private fun matchBrackets(cx: HJActionContext) {
         val pos = range.cursor
 
         val matchedPos = if (syntax == null) HJMatchBrackets.findMatchingBracketPlaintext(cx.doc.text, pos)
-        else HJMatchBrackets.findMatchingBracketFuzzy(syntax, cx.hjEditor.editor, pos)
+        else HJMatchBrackets.findMatchingBracketFuzzy(syntax, cx.doc, pos)
 
         if (matchedPos != null) range.putCursor(cx.doc, matchedPos, isSelection)
         else range
@@ -1683,7 +1701,7 @@ private fun surroundReplace(cx: HJActionContext) {
         val syntax = cx.hjEditor.syntax
 
         val changePos =
-            HJSurround.getSurroundPos(syntax, cx.hjEditor.editor, cx.hjEditor.selection, surroundCh, cx.count)
+            HJSurround.getSurroundPos(syntax, cx.doc, cx.hjEditor.selection, surroundCh, cx.count)
                 ?: return@onNextKey
         val selection = cx.hjEditor.selection.clone()
         val ranges = changePos.map { p -> HJRange.point(p) }
@@ -1737,7 +1755,7 @@ private fun surroundDelete(cx: HJActionContext) {
         val syntax = cx.hjEditor.syntax
 
         val changePos =
-            HJSurround.getSurroundPos(syntax, cx.hjEditor.editor, cx.hjEditor.selection, surroundCh, cx.count)
+            HJSurround.getSurroundPos(syntax, cx.doc, cx.hjEditor.selection, surroundCh, cx.count)
                 ?: return@onNextKey
 
         val transaction = HJTransaction(changePos.map { HJChange.Delete(it, it + 1) })
@@ -1857,7 +1875,7 @@ private fun selectTextObject(cx: HJActionContext, objtype: HJTextObject.TextObje
         cx.hjEditor.applyMotion { hjEditor ->
             val textobjectTreesitter = textobjectTreesitter@{ objName: String, range: HJRange ->
                 val syntax = hjEditor.syntax ?: return@textobjectTreesitter range
-                HJTextObject.textobjectTreesitter(cx.hjEditor.editor, range, objtype, objName, syntax)
+                HJTextObject.textobjectTreesitter(cx.doc, range, objtype, objName, syntax)
             }
 
             val textObjectChange = textObjectChange@{ range: HJRange ->
@@ -1877,12 +1895,12 @@ private fun selectTextObject(cx: HJActionContext, objtype: HJTextObject.TextObje
                     'x' -> textobjectTreesitter("xml-element", range)
                     'p' -> HJTextObject.textObjectParagraph(cx.doc, range, objtype, cx.count)
                     'm' -> HJTextObject.textObjectPairSurroundClosest(
-                        cx.hjEditor.syntax, cx.hjEditor.editor, range, objtype, cx.count
+                        cx.hjEditor.syntax, cx.doc, range, objtype, cx.count
                     )
 
                     'g' -> textObjectChange(range)
                     else if !inputKey.char.isLetterOrDigit() -> HJTextObject.textObjectPairSurround(
-                        cx.hjEditor.syntax, cx.hjEditor.editor, range, objtype, inputKey.char, cx.count
+                        cx.hjEditor.syntax, cx.doc, range, objtype, inputKey.char, cx.count
                     )
 
                     else -> range
@@ -1920,24 +1938,10 @@ private fun selectTextObject(cx: HJActionContext, objtype: HJTextObject.TextObje
 private fun filePickerImpl(cx: HJActionContext, title: String, directory: VirtualFile) {
     val project = cx.hjEditor.editor.project!!
 
-    val vcsIgnoreManager = VcsIgnoreManager.getInstance(project)
-    val data = buildList {
-        VfsUtilCore.visitChildrenRecursively(directory, object : VirtualFileVisitor<Unit>() {
-            override fun visitFile(file: VirtualFile): Boolean {
-                if (vcsIgnoreManager.isPotentiallyIgnoredFile(file)) return false
-                if (!file.isDirectory) add(file)
-                return true
-            }
-        })
-    }
+    val data = getAllProjectFiles(project, directory)
 
     val directoryPathLength = directory.path.length
-    val model = object : AbstractTableModel() {
-        override fun getRowCount() = data.size
-        override fun getColumnCount() = 1
-        override fun getValueAt(rowIndex: Int, columnIndex: Int) = data[rowIndex].path.drop(directoryPathLength)
-        override fun getColumnName(column: Int) = "File"
-    }
+    val model = HJTableModel(data, listOf("File")) { file, _ -> file.path.drop(directoryPathLength) }
 
     val previewSelector = { rowIdx: Int -> Pair(data[rowIdx], null) }
 
@@ -1954,24 +1958,16 @@ private fun changedFilePicker(cx: HJActionContext) {
     val data = changeListManager.allChanges.distinctBy { it.virtualFile }
 
     val projectRoot = project.guessProjectDir()?.path ?: ""
-    val model = object : AbstractTableModel() {
-        override fun getRowCount() = data.size
-        override fun getColumnCount() = 2
-        override fun getValueAt(rowIndex: Int, columnIndex: Int) = when (columnIndex) {
-            0 -> when (data[rowIndex].type) {
+    val model = HJTableModel(data, listOf("Change", "Path")) { change, col ->
+        when (col) {
+            0 -> when (change.type) {
                 Change.Type.NEW -> "Added"
                 Change.Type.DELETED -> "Deleted"
                 Change.Type.MODIFICATION -> "Modified"
                 Change.Type.MOVED -> "Moved"
             }
 
-            1 -> data[rowIndex].virtualFile?.path?.removePrefix(projectRoot) ?: ""
-            else -> ""
-        }
-
-        override fun getColumnName(column: Int) = when (column) {
-            0 -> "Change"
-            1 -> "Path"
+            1 -> change.virtualFile?.path?.removePrefix(projectRoot) ?: ""
             else -> ""
         }
     }
@@ -2200,18 +2196,10 @@ private fun bufferPicker(cx: HJActionContext) {
     val data = fileEditorManager.allEditors.toList()
     val rootDir = project.guessProjectDir()?.path ?: ""
 
-    val model = object : AbstractTableModel() {
-        override fun getRowCount() = data.size
-        override fun getColumnCount() = 2
-        override fun getValueAt(rowIndex: Int, columnIndex: Int) = when (columnIndex) {
-            0 -> if (data[rowIndex].isModified) "*" else ""
-            1 -> data[rowIndex].file.path.removePrefix(rootDir)
-            else -> ""
-        }
-
-        override fun getColumnName(column: Int) = when (column) {
-            0 -> "Flags"
-            1 -> "Path"
+    val model = HJTableModel(data, listOf("Flags", "Path")) { fileEditor, col ->
+        when (col) {
+            0 -> if (fileEditor.isModified) "*" else ""
+            1 -> fileEditor.file.path.removePrefix(rootDir)
             else -> ""
         }
     }
@@ -2239,21 +2227,11 @@ private fun symbolPicker(cx: HJActionContext) {
     val psiFile = cx.hjEditor.psiFile ?: return
 
     getStructureElements(cx.hjEditor.editor, psiFile) { data ->
-        val model = object : AbstractTableModel() {
-            override fun getRowCount() = data.size
-            override fun getColumnCount() = 3
-
-            override fun getValueAt(rowIndex: Int, columnIndex: Int) = when (columnIndex) {
-                0 -> data[rowIndex].kind
-                1 -> data[rowIndex].name
-                2 -> data[rowIndex].container
-                else -> ""
-            }
-
-            override fun getColumnName(column: Int) = when (column) {
-                0 -> "Kind"
-                1 -> "Name"
-                2 -> "Container"
+        val model = HJTableModel(data, listOf("Kind", "Name", "Container")) { tag, col ->
+            when (col) {
+                0 -> tag.kind
+                1 -> tag.name
+                2 -> tag.container
                 else -> ""
             }
         }
@@ -2267,23 +2245,18 @@ private fun symbolPicker(cx: HJActionContext) {
             val tag = data[rowIdx]
             val start = tag.startOffset
             val end = tag.endOffset
-
+            openFile(cx, cx.hjEditor.editor.virtualFile) // necessary in case the picker is reopened from elsewhere
             cx.hjEditor.setNewSelection(HJSelection(HJRange(start, end)))
         }.show()
     }
 }
 
 private fun diagnosticPicker(cx: HJActionContext) {
-    val project = cx.hjEditor.editor.project!!
-
     val data = getDiagnostics(cx.hjEditor.editor)
 
-    val model = object : AbstractTableModel() {
-        override fun getRowCount() = data.size
-        override fun getColumnCount() = 2
-
-        override fun getValueAt(rowIndex: Int, columnIndex: Int) = when (columnIndex) {
-            0 -> when (val severity = data[rowIndex].severity) {
+    val model = HJTableModel(data, listOf("Severity", "Message")) { highlightInfo, col ->
+        when (col) {
+            0 -> when (val severity = highlightInfo.severity) {
                 HighlightSeverity.ERROR -> "Error"
                 HighlightSeverity.WARNING -> "Warning"
                 HighlightSeverity.INFORMATION -> "Info"
@@ -2293,13 +2266,7 @@ private fun diagnosticPicker(cx: HJActionContext) {
                 else -> ""
             }
 
-            1 -> data[rowIndex].description
-            else -> ""
-        }
-
-        override fun getColumnName(column: Int) = when (column) {
-            0 -> "Severity"
-            1 -> "Message"
+            1 -> highlightInfo.description
             else -> ""
         }
     }
@@ -2309,6 +2276,7 @@ private fun diagnosticPicker(cx: HJActionContext) {
 
     HJPickerWithPreview(cx.hjEditor.editor, "Diagnostic Picker", model, previewSelector) { rowIdx ->
         val info = data[rowIdx]
+        openFile(cx, cx.hjEditor.editor.virtualFile) // necessary in case the picker is reopened from elsewhere
         cx.hjEditor.setNewSelection(HJSelection(HJRange(info.startOffset, info.endOffset)))
     }.show()
 }
@@ -2320,16 +2288,13 @@ private fun diagnosticPickerWorkspace(cx: HJActionContext) {
     val data = fileEditorManager.allEditors
         .filterIsInstance<TextEditor>()
         .flatMap { textEditor ->
-            getDiagnostics(textEditor.editor).map { Pair(textEditor as FileEditor, it) }
+            getDiagnostics(textEditor.editor).map { Pair(textEditor.editor, it) }
         }
 
     val projectRoot = project.guessProjectDir()?.path ?: ""
-    val model = object : AbstractTableModel() {
-        override fun getRowCount() = data.size
-        override fun getColumnCount() = 3
-
-        override fun getValueAt(rowIndex: Int, columnIndex: Int) = when (columnIndex) {
-            0 -> when (val severity = data[rowIndex].second.severity) {
+    val model = HJTableModel(data, listOf("Severity", "Path", "Message")) { (editor, highlightInfo), col ->
+        when (col) {
+            0 -> when (val severity = highlightInfo.severity) {
                 HighlightSeverity.ERROR -> "Error"
                 HighlightSeverity.WARNING -> "Warning"
                 HighlightSeverity.INFORMATION -> "Info"
@@ -2339,44 +2304,28 @@ private fun diagnosticPickerWorkspace(cx: HJActionContext) {
                 else -> ""
             }
 
-            1 -> data[rowIndex].first.file.path.removePrefix(projectRoot)
+            1 -> editor.virtualFile.path.removePrefix(projectRoot)
 
-            2 -> data[rowIndex].second.description
-            else -> ""
-        }
-
-        override fun getColumnName(column: Int) = when (column) {
-            0 -> "Severity"
-            1 -> "Path"
-            2 -> "Message"
+            2 -> highlightInfo.description
             else -> ""
         }
     }
 
     val previewSelector = previewSelector@{ rowIdx: Int ->
-        val (fileEditor, hlInfo) = data.getOrNull(rowIdx) ?: return@previewSelector null
-        Pair(fileEditor.file, Pair(hlInfo.startOffset, hlInfo.endOffset))
+        val (editor, hlInfo) = data.getOrNull(rowIdx) ?: return@previewSelector null
+        Pair(editor.virtualFile, Pair(hlInfo.startOffset, hlInfo.endOffset))
     }
 
     HJPickerWithPreview(
         cx.hjEditor.editor, "Workspace Diagnostic Picker (Opened and Analyzed Files)", model, previewSelector
     ) { rowIdx ->
-        val (fileEditor, info) = data[rowIdx]
+        val (editor, info) = data[rowIdx]
 
         // select buffer
-        var composite: EditorComposite? = null
-        val window = fileEditorManager.windows.find { window ->
-            window.allComposites.any {
-                if (it.allEditors.contains(fileEditor)) {
-                    composite = it
-                    true
-                } else false
-            }
-        } ?: return@HJPickerWithPreview
-        window.setSelectedComposite(composite!!, true)
+        openFile(cx, editor.virtualFile)
 
         // set selection
-        val hjEditor = HJState.getHJEditor((fileEditor as TextEditor).editor)
+        val hjEditor = HJState.getHJEditor(editor)
         hjEditor?.setNewSelection(HJSelection(HJRange(info.startOffset, info.endOffset)))
     }.show()
 }
@@ -3025,20 +2974,7 @@ private fun jumplistPicker(cx: HJActionContext) {
     val data = HJState.jumps.jumps.reversed()
 
     val projectRoot = project.guessProjectDir()?.path ?: ""
-    val model = object : AbstractTableModel() {
-        override fun getRowCount() = data.size
-        override fun getColumnCount() = 1
-
-        override fun getValueAt(rowIndex: Int, columnIndex: Int) = when (columnIndex) {
-            0 -> data[rowIndex].file.path.removePrefix(projectRoot)
-            else -> ""
-        }
-
-        override fun getColumnName(column: Int) = when (column) {
-            0 -> "Path"
-            else -> ""
-        }
-    }
+    val model = HJTableModel(data, listOf("Path")) { jump, _ -> jump.file.path.removePrefix(projectRoot) }
 
     val previewSelector = previewSelector@{ rowIdx: Int ->
         val (file, selection) = data.getOrNull(rowIdx) ?: return@previewSelector null
@@ -3052,7 +2988,12 @@ private fun jumplistPicker(cx: HJActionContext) {
 
         openFile(cx, file, HJFileOpenLocation.InPlace, false)?.let { fileEditor ->
             val editor = (fileEditor as TextEditor).editor
-            getHJEditor(editor)?.setNewSelection(selection)
+            HJState.getHJEditor(editor)?.setNewSelection(selection)
         }
     }.show()
+}
+
+@Suppress("unused")
+private fun lastPicker(cx: HJActionContext) {
+    HJState.lastPicker?.show()
 }
