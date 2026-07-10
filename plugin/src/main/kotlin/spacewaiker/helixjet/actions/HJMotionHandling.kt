@@ -342,6 +342,82 @@ fun findNthChar(doc: Document, charMatcher: HJCharMatcher, pos: Int, count: Int,
     }
 }
 
+fun movePrevParagraph(doc: Document, range: HJRange, count: Int, extend: Boolean): HJRange {
+    var line = range.cursorLine(doc)
+    val firstChar = doc.getLineStartOffset(line) == range.cursor
+    val prevLineEmpty = doc.getLine((line - 1).coerceAtLeast(0))!!.isEmpty()
+    val currLineEmpty = doc.getLine(line)!!.isEmpty()
+    val prevEmptyToLine = prevLineEmpty == !currLineEmpty
+
+    // skip character before paragraph boundary
+    if (prevEmptyToLine && !firstChar) {
+        line++
+    }
+    var lines = doc.text.lines().reversed()
+    lines = lines.drop(lines.count() - line)
+    val linesBool = lines.map(String::isEmpty)
+    var lastLine = line
+    var i = 0
+    repeat(count) {
+        while (i < lines.size && linesBool[i]) {
+            i++
+            line--
+        }
+        while (i < lines.size && !linesBool[i]) {
+            i++
+            line--
+        }
+        if (line == lastLine) return@repeat
+        lastLine = line
+    }
+
+    val head = doc.getLineStartOffset(line)
+    val anchor = if (extend) {
+        range.putCursor(doc, head, true).anchor
+    } else {
+        // exclude first character after paragraph boundary
+        if (prevEmptyToLine && firstChar) range.cursor else range.head
+    }
+    return HJRange(anchor, head)
+}
+
+fun moveNextParagraph(doc: Document, range: HJRange, count: Int, extend: Boolean): HJRange {
+    var line = range.cursorLine(doc)
+    val lastChar = doc.getLineEndOffset(line) == range.cursor
+    val currLineEmpty = doc.getLine(line)!!.isEmpty()
+    val nextLineEmpty = doc.getLine((line + 1).coerceAtMost(doc.lineCount - 1))!!.isEmpty()
+    val currEmptyToLine = currLineEmpty && !nextLineEmpty
+
+    // skip character after paragraph boundary
+    if (currEmptyToLine && lastChar) {
+        line++
+    }
+    val lines = doc.text.lines().drop(line)
+    val linesBool = lines.map(String::isEmpty)
+    var lastLine = line
+    var i = 0
+    repeat(count) {
+        while (i < lines.size && !linesBool[i]) {
+            i++
+            line++
+        }
+        while (i < lines.size && linesBool[i]) {
+            i++
+            line++
+        }
+        if (line == lastLine) return@repeat
+        lastLine = line
+    }
+
+    val head = if (line == doc.lineCount) doc.textLength else doc.getLineStartOffset(line)
+    val anchor = if (extend) {
+        range.putCursor(doc, head, true).anchor
+    } else {
+        if (currEmptyToLine && lastChar) range.head else range.cursor
+    }
+    return HJRange(anchor, head)
+}
+
 /**
  * Returns the first index that doesn't satisfy the given predicate when advancing the character index.
  *

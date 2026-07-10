@@ -169,7 +169,7 @@ class HJRange {
     }
 
     fun slice(doc: Document): String? {
-        return if (to < doc.textLength) {
+        return if (to <= doc.textLength) {
             doc.getText(TextRange(from, to))
         } else null
     }

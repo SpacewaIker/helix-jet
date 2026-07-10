@@ -47,6 +47,7 @@ object HJState {
     val lastInsertKeystrokes: MutableList<HJInputKey> = mutableListOf()
     val jumps = HJJumpList()
     var lastPicker: HJPicker? = null
+    var lastModification: Pair<VirtualFile, Int>? = null
 
     fun getHJEditor(editor: Editor) = editors[editor]
 

@@ -1,6 +1,8 @@
 ﻿package spacewaiker.helixjet.core
 
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.event.DocumentEvent
+import com.intellij.openapi.editor.event.DocumentListener
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
 import com.intellij.openapi.fileEditor.TextEditor
@@ -28,6 +30,12 @@ class HJEditorListener : FileEditorManagerListener {
         fun handleNewEditor(editor: Editor) {
             HJState.initEditor(editor)
             editor.addEditorMouseListener(HJMouseListener())
+
+            editor.document.addDocumentListener(object : DocumentListener {
+                override fun documentChanged(event: DocumentEvent) {
+                    HJState.lastModification = Pair(editor.virtualFile, event.offset)
+                }
+            })
         }
     }
 }

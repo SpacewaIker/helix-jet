@@ -21,6 +21,7 @@ import com.intellij.openapi.editor.ex.util.EditorUtil
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.fileEditor.ex.FileEditorManagerEx
 import com.intellij.openapi.fileEditor.impl.EditorComposite
+import com.intellij.openapi.fileEditor.impl.EditorHistoryManager
 import com.intellij.openapi.fileEditor.impl.EditorWindow
 import com.intellij.openapi.fileTypes.PlainTextLanguage
 import com.intellij.openapi.project.guessProjectDir
@@ -228,9 +229,9 @@ private val actionsRaw = arrayOf(
     HJAction("goto_window_top", "Goto window top") { gotoWindowImpl(it, HJAlignment.Top) },
     HJAction("goto_window_center", "Goto window center") { gotoWindowImpl(it, HJAlignment.Center) },
     HJAction("goto_window_bottom", "Goto window bottom") { gotoWindowImpl(it, HJAlignment.Bottom) },
-    HJAction("goto_last_accessed_file", "Goto last accessed file"),
-    HJAction("goto_last_modified_file", "Goto last modified file"),
-    HJAction("goto_last_modification", "Goto last modification"),
+    HJAction("goto_last_accessed_file", "Goto last accessed file") { gotoLastAccessedFile(it) },
+    HJAction("goto_last_modified_file", "Goto last modified file") { gotoLastModifiedFile(it, false) },
+    HJAction("goto_last_modification", "Goto last modification") { gotoLastModifiedFile(it, true) },
     HJAction("goto_line", "Goto line") { gotoLineImpl(it, false) },
     HJAction("goto_last_line", "Goto last line") { gotoLastLineImpl(it, false) },
     HJAction("extend_to_last_line", "Extend to last line") { gotoLastLineImpl(it, true) },
@@ -365,8 +366,8 @@ private val actionsRaw = arrayOf(
     HJAction("goto_prev_xml_element", "Goto previous (X)HTML element") { gotoTsObjectImpl(it, "xml-element", HJDirection.Backward) },
     HJAction("goto_next_entry", "Goto next pairing") { gotoTsObjectImpl(it, "entry", HJDirection.Forward) },
     HJAction("goto_prev_entry", "Goto previous pairing") { gotoTsObjectImpl(it, "entry", HJDirection.Backward) },
-    HJAction("goto_next_paragraph", "Goto next paragraph"),
-    HJAction("goto_prev_paragraph", "Goto previous paragraph"),
+    HJAction("goto_next_paragraph", "Goto next paragraph") { gotoParagraphImpl(it, HJDirection.Forward) },
+    HJAction("goto_prev_paragraph", "Goto previous paragraph") { gotoParagraphImpl(it, HJDirection.Backward) },
     HJAction("dap_launch", "Launch debug target") { executeIdeAction(it, "Debug") },
     HJAction("dap_restart", "Restart debugging session") { executeIdeAction(it, "Debug") },
     HJAction("dap_toggle_breakpoint", "Toggle breakpoint") { executeIdeAction(it, "ToggleLineBreakpoint") },
@@ -603,7 +604,7 @@ private fun yank(cx: HJActionContext) {
 }
 
 private fun yankImpl(cx: HJActionContext, selection: HJSelection, register: HJRegister) {
-    val values = cx.hjEditor.selection.slices(cx.doc).filterNotNull()
+    val values = selection.slices(cx.doc).filterNotNull()
     val selections = values.size
 
     val plural = if (selections == 1) "" else "s"
@@ -1270,6 +1271,38 @@ private fun gotoTsObjectImpl(cx: HJActionContext, tsObject: String, direction: H
 
         pushJump(cx.hjEditor)
         hjEditor.setNewSelection(selection)
+    }
+}
+
+private fun gotoParagraphImpl(cx: HJActionContext, direction: HJDirection) {
+    cx.hjEditor.applyMotion { hJEditor ->
+        val extend = HJState.mode == HJEditorMode.Select
+        val moveFn = when (direction) {
+            HJDirection.Forward -> ::moveNextParagraph
+            HJDirection.Backward -> ::movePrevParagraph
+        }
+
+        val selection = hJEditor.selection.clone().transform { range ->
+            moveFn(cx.doc, range, cx.count, extend)
+        }
+        hJEditor.setNewSelection(selection)
+    }
+}
+
+private fun gotoLastAccessedFile(cx: HJActionContext) {
+    val project = cx.hjEditor.editor.project!!
+    val history = EditorHistoryManager.getInstance(project).fileList
+    if (history.size < 2) return
+    val lastFile = history[history.size - 2]
+    openFile(cx, lastFile)
+}
+
+private fun gotoLastModifiedFile(cx: HJActionContext, gotoModification: Boolean) {
+    val lastModification = HJState.lastModification ?: return
+    val fileEditor = openFile(cx, lastModification.first) ?: return
+    if (gotoModification) {
+        val hjEditor = HJState.getHJEditor((fileEditor as TextEditor).editor) ?: return
+        hjEditor.setNewSelection(HJSelection(HJRange.point(lastModification.second)))
     }
 }
 

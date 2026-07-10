@@ -58,7 +58,7 @@ fun nextGraphemeBoundary(doc: Document, charIdx: Int): Int {
  * Get line content at line `line`. Checks that the line number is valid
  */
 fun Document.getLine(line: Int): String? {
-    return if (line > this.lineCount - 1) null else {
+    return if (line < 0 || line >= this.lineCount) null else {
         this.getText(TextRange(this.getLineStartOffset(line), this.getLineEndOffset(line)))
     }
 }
