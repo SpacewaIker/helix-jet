@@ -8,10 +8,6 @@ import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.vfs.readText
 import com.intellij.openapi.vfs.resolveFromRootOrRelative
 import com.intellij.psi.PsiElement
-import io.github.treesitter.ktreesitter.Language
-import io.github.treesitter.ktreesitter.Parser
-import io.github.treesitter.ktreesitter.Query
-import io.github.treesitter.ktreesitter.kotlin.TreeSitterKotlin
 import spacewaiker.helixjet.config.HJConfiguration
 import spacewaiker.helixjet.config.HJFileGlobMatcher
 import spacewaiker.helixjet.editor.HJRegister
@@ -97,9 +93,9 @@ private val helixCommands = arrayOf(
         }
     },
     HJCommand("hsplit", listOf("hs", "sp"), "Open the file in a horizontal split") { cx, args, _ ->
+        val args = args.toMutableList()
         if (args.isEmpty()) {
-            cx.hjEditor.setError("'hsplit': expected at least 1 argument, got 0")
-            return@HJCommand
+            args.add(cx.hjEditor.editor.virtualFile.path)
         }
 
         for (path in args) {
@@ -107,9 +103,9 @@ private val helixCommands = arrayOf(
         }
     },
     HJCommand("vsplit", listOf("vs"), "Open the file in a vertical split") { cx, args, _ ->
+        val args = args.toMutableList()
         if (args.isEmpty()) {
-            cx.hjEditor.setError("'vsplit': expected at least 1 argument, got 0")
-            return@HJCommand
+            args.add(cx.hjEditor.editor.virtualFile.path)
         }
 
         for (path in args) {
@@ -118,7 +114,7 @@ private val helixCommands = arrayOf(
     },
     HJCommand("buffer-close", listOf("bc", "bclose"), "Close the current buffer.") { cx, _, _ ->
         // TODO: Does this close a modified but unsaved buffer?
-        closeFiles(cx) { it.currentFile?.let { file -> listOf(file) } ?: emptyList() }
+        closeFiles(cx) { it.currentFile?.let { file -> listOf(file) } }
     },
     HJCommand(
         "buffer-close-others",
@@ -127,13 +123,13 @@ private val helixCommands = arrayOf(
         listOf("-s  don't close buffers that are visible")
     ) { cx, _, _ ->
         // TODO: don't close buffers that are visible
-        closeFiles(cx) { it.openFiles.filterNot { file -> file == it.currentFile } }
+        closeFiles(cx) { it.currentWindow?.fileList?.filterNot { file -> file == it.currentFile } }
     },
     HJCommand("buffer-close-all", listOf("bca", "bcloseall"), "Close all buffers without quitting.") { cx, _, _ ->
-        closeFiles(cx) { it.openFiles.toList() }
+        closeFiles(cx) { it.currentWindow?.fileList }
     },
     HJCommand("quit", listOf("q"), "Close the current view.") { cx, _, _ ->
-        quitWindows(cx) { manager -> manager.currentWindow?.let { listOf(it) } ?: emptyList() }
+        quitWindows(cx) { manager -> manager.currentWindow?.let { listOf(it) } }
     },
     HJCommand("quit-all", listOf("qa"), "Close all views") { cx, _, _ ->
         quitWindows(cx) { manager -> manager.windows.toList() }
@@ -247,79 +243,9 @@ private val debugCommands = arrayOf(
 
         println("digraph AST {\n$decl$edges}")
     },
-    HJCommand("print-ts", doc = "Print TreeSitter AST") { cx, _, _ ->
-        val language = Language(TreeSitterKotlin.language())
-        val parser = Parser(language)
-        val tree = parser.parse(cx.doc.text)
-
-        val query = Query(
-            language, """
-            (function_declaration
-              (function_body)? @function.inside) @function.around
-
-            ; Unlike function_body above, the constructor body is does not have its own
-            ; symbol in the current grammar.
-            (secondary_constructor) @function.around
-
-            (class_declaration
-              (class_body)? @class.inside) @class.around
-
-            (class_declaration
-              (enum_class_body) @class.inside) @class.around
-
-            [
-              (line_comment)
-              (multiline_comment)
-            ] @comment.inside
-
-            (line_comment)+ @comment.around
-
-            (multiline_comment) @comment.around
-
-            (enum_entry) @entry.around
-            (lambda_literal) @entry.around
-            (property_declaration) @entry.around
-            (object_declaration) @entry.around
-            (assignment) @entry.around
-
-            ; TODO: This doesn't work with annotations yet, but fixing it without breaking
-            ; the case of multiple parameters is non-trivial.
-            (function_value_parameters
-              ((_) @parameter.inside . ","? @parameter.around) @parameter.around)
-
-            ; secondary constructor uses function_value_parameters above
-            (primary_constructor
-              ((_)@parameter.inside . ","? @parameter.around) @parameter.around)
-
-            (function_type_parameters
-              ((_)@parameter.inside . ","? @parameter.around) @parameter.around)
-
-            (value_arguments
-              ((_)@parameter.inside . ","? @parameter.around) @parameter.around)
-
-            (lambda_parameters
-              ((_) @parameter.inside . ","? @parameter.around) @parameter.around)
-        """.trimIndent()
-        )
-
-        val cursor = query(tree.rootNode)
-        val matches = cursor.captures()
-            .filter { (idx, match) -> match.captures[idx.toInt()].name == "function.inside" }
-            .map { (idx, match) -> match.captures[idx.toInt()].node }
-            .toList()
-
-        println(matches.size)
-        for (node in matches) {
-            println()
-            println(node.type)
-            println(node.text())
-            println(node.startPoint)
-        }
-    },
     HJCommand("print-ts-dot", doc = "Print DOT representation of TreeSitter tree") { cx, _, _ ->
-        val language = Language(TreeSitterKotlin.language())
-        val parser = Parser(language)
-        val tree = parser.parse(cx.doc.text)
+        val syntax = cx.hjEditor.syntax ?: return@HJCommand
+        val tree = syntax.tree
         val decl = StringBuilder()
         val edges = StringBuilder()
 
@@ -388,6 +314,11 @@ private val debugCommands = arrayOf(
         }
     },
     HJCommand("clear-jumplist") { _, _, _ -> HJState.jumps.jumps.clear() },
+    HJCommand("print-hjeditors") { _, _, _ ->
+        HJState.forAllEditors { hjEditor ->
+            println(hjEditor.editor.virtualFile.path)
+        }
+    },
 )
 
 private val commandsRaw =

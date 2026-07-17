@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="c-jvm">
+    <output-path>$PROJECT_DIR$/grammars/c/build/libs</output-path>
+    <root id="archive" name="c-jvm.jar">
+      <element id="module-output" name="helix-jet.grammars.c.jvmMain" />
+    </root>
+  </artifact>
+</component>

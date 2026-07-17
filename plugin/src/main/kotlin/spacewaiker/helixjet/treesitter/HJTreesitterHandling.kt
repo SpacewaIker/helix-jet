@@ -67,7 +67,7 @@ object HJTreesitterHandling {
         syntax: HJLanguageSyntax,
         count: Int,
     ): HJRange {
-        val query = syntax.textobjectQuery
+        val query = syntax.textobjectQuery ?: return range
         val getRange: (HJRange) -> HJRange? = getRange@{ range ->
             val pos = range.cursor
 
@@ -185,16 +185,6 @@ object HJTreesitterHandling {
     }
 
     fun syntaxWorkspaceSymbolPicker(cx: HJActionContext) {
-        val tag = HJTag(
-            "test",
-            "test",
-            "",
-            0,
-            0,
-            0,
-            0,
-            cx.hjEditor.editor.virtualFile
-        )
         val model = HJStreamingTableModel<HJTag>(listOf("Kind", "Name", "Container")) { tag, col ->
             when (col) {
                 0 -> tag.kind
@@ -315,7 +305,8 @@ object HJTreesitterHandling {
     }
 
     private fun tagsIter(syntax: HJLanguageSyntax, document: Document, file: VirtualFile): Sequence<HJTag> {
-        return syntax.tagQuery(syntax.tree.rootNode).captures()
+        val tagQuery = syntax.tagQuery ?: return emptySequence()
+        return tagQuery(syntax.tree.rootNode).captures()
             .map { (idx, match) ->
                 val capture = match.captures[idx.toInt()]
 

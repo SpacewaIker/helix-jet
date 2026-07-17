@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="lua-jvm">
+    <output-path>$PROJECT_DIR$/grammars/lua/build/libs</output-path>
+    <root id="archive" name="lua-jvm.jar">
+      <element id="module-output" name="helix-jet.grammars.lua.jvmMain" />
+    </root>
+  </artifact>
+</component>

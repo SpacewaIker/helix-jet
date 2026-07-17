@@ -33,6 +33,7 @@ import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.wm.WindowManager
 import com.intellij.ui.JBColor
+import com.intellij.util.concurrency.AppExecutorUtil
 import spacewaiker.helixjet.actions.HJKeyAction.HJAction
 import spacewaiker.helixjet.editor.*
 import spacewaiker.helixjet.input.HJInputHandler
@@ -642,14 +643,48 @@ fun yankMainSelectionImpl(cx: HJActionContext, register: HJRegister) {
 private fun pasteImpl(cx: HJActionContext, pasteBefore: Boolean, registerOverride: HJRegister? = null) {
     val register = registerOverride ?: cx.register ?: HJRegister.LastYank
     val registerContents = HJState.registers.read(register, cx.hjEditor) ?: return
+    if (registerContents.isEmpty()) return
 
-    val transaction = cx.hjEditor.changeBySelectionIndexed { idx, range ->
-        val pos = if (pasteBefore) range.from else range.to
-        val string = registerContents[idx.coerceAtMost(registerContents.size - 1)]
-        HJChange.Insert(pos, string)
+    // if any of values ends with a line ending, it's linewise paste
+    val linewise = registerContents.any { it.endsWith("\n") }
+    val mapValue = { value: String -> value.repeat(cx.count) }
+    val repeat = generateSequence { mapValue(registerContents.last()) }
+    val values = (registerContents.map(mapValue).asSequence() + repeat).iterator()
+
+    var offset = 0
+    val ranges = mutableListOf<HJRange>()
+
+    var transaction = cx.hjEditor.changeBySelectionIndexed { idx, range ->
+        val pos = when (Pair(pasteBefore, linewise)) {
+            // paste linewise before
+            Pair(true, true) -> cx.doc.getLineStartOffset(cx.doc.getLineNumber(range.from))
+            // paste linewise after
+            Pair(false, true) -> {
+                val line = range.lineRange(cx.doc).second
+                (cx.doc.getLineEndOffset(line) + 1).coerceAtMost(cx.doc.textLength)
+            }
+            // paste insert
+            Pair(true, false) -> range.from
+            // paste append
+            Pair(false, false) -> range.to
+            else -> 0
+        }
+
+        val value = values.next()
+        val anchor = offset + pos
+
+        val newRange = HJRange(anchor, anchor + value.length).withDirection(range.direction)
+        ranges.add(newRange)
+        offset += value.length
+
+        HJChange.Insert(pos, value)
     }
+
+    if (HJState.mode == HJEditorMode.Normal) {
+        transaction = transaction.copy(selection = HJSelection(ranges, cx.hjEditor.selection.primaryIndex))
+    }
+
     cx.hjEditor.apply(transaction)
-    exitSelectMode(cx)
 }
 
 private fun replaceWithYanked(cx: HJActionContext) {
@@ -1971,15 +2006,16 @@ private fun selectTextObject(cx: HJActionContext, objtype: HJTextObject.TextObje
 private fun filePickerImpl(cx: HJActionContext, title: String, directory: VirtualFile) {
     val project = cx.hjEditor.editor.project!!
 
-    val data = getAllProjectFiles(project, directory)
+    val model = HJStreamingTableModel<VirtualFile>(listOf("File")) { file, _ -> file.path.removePrefix(directory.path) }
 
-    val directoryPathLength = directory.path.length
-    val model = HJTableModel(data, listOf("File")) { file, _ -> file.path.drop(directoryPathLength) }
+    AppExecutorUtil.getAppExecutorService().submit {
+        model.addRows(getAllProjectFiles(project, directory))
+    }
 
-    val previewSelector = { rowIdx: Int -> Pair(data[rowIdx], null) }
+    val previewSelector = { rowIdx: Int -> Pair(model.tableData[rowIdx], null) }
 
     HJPickerWithPreview(cx.hjEditor.editor, title, model, previewSelector) { rowIdx ->
-        val file = data[rowIdx]
+        val file = model.tableData[rowIdx]
         openFile(cx, file)
     }.show()
 }

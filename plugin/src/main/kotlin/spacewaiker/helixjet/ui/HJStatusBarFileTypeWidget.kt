@@ -1,5 +1,6 @@
 ﻿package spacewaiker.helixjet.ui
 
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
 import com.intellij.openapi.project.Project
@@ -38,7 +39,9 @@ class HJStatusBarFileTypeWidget(proj: Project) : StatusBarWidget, StatusBarWidge
 
     override fun getAlignment() = Component.LEFT_ALIGNMENT
     override fun getText() = project?.focusedHJEditor?.let { hjEditor ->
-        (hjEditor.language?.name ?: "text") + if (hjEditor.psiFile == null) "*" else ""
+        var isSupported = false
+        ApplicationManager.getApplication().runReadAction { isSupported = hjEditor.psiFile != null }
+        (hjEditor.language?.name ?: "text") + if (isSupported) "" else "*"
     } ?: ""
 
     override fun install(statusBar: StatusBar) {

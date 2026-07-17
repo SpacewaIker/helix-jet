@@ -32,6 +32,7 @@ object HJState {
     var mode: HJEditorMode = HJEditorMode.Normal
     var config: HJConfiguration = HJConfiguration()
     private val editors: MutableMap<Editor, HJEditor> = mutableMapOf()
+    val allEditors get() = editors.values.toList()
     val registers = HJRegisters()
     val allRegisterContents get() = registers.rawRegisters.toList()
     var activePrompt: HJPrompt? = null

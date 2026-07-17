@@ -6,6 +6,9 @@ import org.gradle.internal.os.OperatingSystem
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
+import java.io.File
+import java.io.FileInputStream
+import java.util.*
 
 class GrammarPlugin : Plugin<Project> {
     override fun apply(project: Project) {
@@ -88,11 +91,51 @@ class GrammarPlugin : Plugin<Project> {
             doFirst {
                 var content = cmakeFile.readText().replace("\\", "/")
 
+                var srcDir = "tree-sitter-$grammarName/src"
+
+                // handle subpath
+                val languagesProperties: File = project.projectDir.resolve("../../languages.properties").absoluteFile
+                val properties = Properties()
+                properties.load(FileInputStream(languagesProperties))
+                val subpath =
+                    properties.entries.find { it.key == "grammar.$grammarName.source.subpath" }?.value as String?
+                if (subpath != null) {
+                    content = content.replace(
+                        "/tree-sitter-$grammarName/src",
+                        "/tree-sitter-$grammarName/$subpath/src"
+                    )
+                    srcDir = "tree-sitter-$grammarName/$subpath/src"
+                }
+
                 // Add src dir to include_directories so <tree_sitter/parser.h> can be found
                 content = content.replace(
                     "include_directories(",
-                    "include_directories(../../tree-sitter-$grammarName/src "
+                    "include_directories(../../$srcDir "
                 )
+
+                // Fix for scanner...
+                for (scanner in listOf("scanner.c", "scanner.cc")) {
+                    val scannerFile =
+                        project.layout.projectDirectory.file("$srcDir/$scanner").asFile
+                    if (scannerFile.exists() && !content.contains(scanner)) {
+                        content = content.replace(
+                            "../../$srcDir/parser.c",
+                            "../../$srcDir/parser.c ../../$srcDir/$scanner",
+                        )
+                    }
+                }
+
+                // Fix for cpp...
+                if (content.contains(".cc")) {
+                    content = content.replace("LANGUAGES C", "LANGUAGES C CXX")
+
+                    val setIdx = content.indexOf("set(CMAKE_C_STANDARD")
+                    val newLine = content.indexOf("\n", setIdx) + 1
+                    content = content.substring(0, newLine) +
+                            "set(CMAKE_CXX_STANDARD 17)\n" +
+                            "set(CMAKE_CXX_STANDARD_REQUIRED ON)\n" +
+                            content.substring(newLine)
+                }
 
                 cmakeFile.writeText(content)
             }

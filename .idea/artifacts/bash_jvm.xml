@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="bash-jvm">
+    <output-path>$PROJECT_DIR$/grammars/bash/build/libs</output-path>
+    <root id="archive" name="bash-jvm.jar">
+      <element id="module-output" name="helix-jet.grammars.bash.jvmMain" />
+    </root>
+  </artifact>
+</component>

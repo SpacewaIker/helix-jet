@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="go-jvm">
+    <output-path>$PROJECT_DIR$/grammars/go/build/libs</output-path>
+    <root id="archive" name="go-jvm.jar">
+      <element id="module-output" name="helix-jet.grammars.go.jvmMain" />
+    </root>
+  </artifact>
+</component>

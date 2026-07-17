@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="c_sharp-jvm">
+    <output-path>$PROJECT_DIR$/grammars/c_sharp/build/libs</output-path>
+    <root id="archive" name="c_sharp-jvm.jar">
+      <element id="module-output" name="helix-jet.grammars.c_sharp.jvmMain" />
+    </root>
+  </artifact>
+</component>

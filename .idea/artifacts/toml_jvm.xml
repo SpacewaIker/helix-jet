@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="toml-jvm">
+    <output-path>$PROJECT_DIR$/grammars/toml/build/libs</output-path>
+    <root id="archive" name="toml-jvm.jar">
+      <element id="module-output" name="helix-jet.grammars.toml.jvmMain" />
+    </root>
+  </artifact>
+</component>

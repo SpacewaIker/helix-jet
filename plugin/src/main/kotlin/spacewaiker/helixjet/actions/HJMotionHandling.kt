@@ -5,9 +5,9 @@ import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.LogicalPosition
 import com.intellij.openapi.editor.VisualPosition
-import fleet.fastutil.skip
-import fleet.util.backwards
 import spacewaiker.helixjet.editor.HJRange
+import spacewaiker.helixjet.utils.backwards
+import spacewaiker.helixjet.utils.skip
 import kotlin.math.max
 
 object HJMotionHandling {
@@ -56,7 +56,11 @@ fun moveHorizontally(
     }
 
     // compute the final new range
-    return range.putCursor(doc, newPos, extend)
+    val newRange = range.putCursor(doc, newPos, extend)
+
+    HJMotionHandling.logger.debug("moveHorizontally: $newRange")
+
+    return newRange
 }
 
 fun moveVerticallyVisual(
@@ -86,6 +90,9 @@ fun moveVerticallyVisual(
 
     val newRange = range.putCursor(editor.document, newPos, extend)
     newRange.oldVisualPosition = Pair(0, newCol)
+
+    HJMotionHandling.logger.debug("moveVerticallyVisual: $newRange")
+
     return newRange
 }
 
@@ -112,6 +119,9 @@ fun moveVertically(
 
     val newRange = range.putCursor(editor.document, newPos, extend)
     newRange.oldVisualPosition = editor.offsetToVisualPosition(newPos).let { Pair(it.line, it.column) }
+
+    HJMotionHandling.logger.debug("moveVertically: $newRange")
+
     return newRange
 }
 

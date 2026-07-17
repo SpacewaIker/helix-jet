@@ -223,19 +223,20 @@ fun openFile(
     }
 }
 
-fun closeFiles(cx: HJActionContext, selector: (FileEditorManager) -> List<VirtualFile>) {
+fun closeFiles(cx: HJActionContext, selector: (FileEditorManagerEx) -> List<VirtualFile>?) {
     val project = cx.hjEditor.editor.project!!
-    val fileEditorManager = FileEditorManager.getInstance(project)
-    for (file in selector(fileEditorManager)) {
-        fileEditorManager.closeFile(file)
+    val fileEditorManagerEx = FileEditorManagerEx.getInstanceEx(project)
+    val currentWindow = fileEditorManagerEx.currentWindow ?: return
+    for (file in selector(fileEditorManagerEx) ?: return) {
+        currentWindow.closeFile(file)
     }
-    fileEditorManager.selectedTextEditor?.contentComponent?.requestFocusInWindow()
+    fileEditorManagerEx.selectedTextEditor?.contentComponent?.requestFocusInWindow()
 }
 
-fun quitWindows(cx: HJActionContext, selector: (FileEditorManagerEx) -> List<EditorWindow>) {
+fun quitWindows(cx: HJActionContext, selector: (FileEditorManagerEx) -> List<EditorWindow>?) {
     val project = cx.hjEditor.editor.project!!
     val fileEditorManager = FileEditorManagerEx.getInstanceEx(project)
-    for (window in selector(fileEditorManager)) {
+    for (window in selector(fileEditorManager) ?: return) {
         window.closeAllExcept(null)
     }
 }

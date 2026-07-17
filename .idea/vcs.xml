@@ -2,9 +2,29 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/grammars/bash/tree-sitter-bash" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/grammars/c/tree-sitter-c" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/grammars/c_sharp/tree-sitter-c_sharp" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/grammars/cmake/tree-sitter-cmake" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/grammars/cpp/tree-sitter-cpp" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/grammars/css/tree-sitter-css" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/grammars/gdscript/tree-sitter-gdscript" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/grammars/go/tree-sitter-go" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/grammars/html/tree-sitter-html" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/grammars/ini/tree-sitter-ini" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/grammars/java/tree-sitter-java" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/grammars/javascript/tree-sitter-javascript" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/grammars/json/tree-sitter-json" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/grammars/kotlin/tree-sitter-kotlin" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/grammars/lua/tree-sitter-lua" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/grammars/markdown/tree-sitter-markdown" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/grammars/php/tree-sitter-php" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/grammars/python/tree-sitter-python" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/grammars/ruby/tree-sitter-ruby" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/grammars/rust/tree-sitter-rust" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/grammars/sql/tree-sitter-sql" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/grammars/toml/tree-sitter-toml" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/grammars/typescript/tree-sitter-typescript" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/grammars/yaml/tree-sitter-yaml" vcs="Git" />
   </component>
 </project>

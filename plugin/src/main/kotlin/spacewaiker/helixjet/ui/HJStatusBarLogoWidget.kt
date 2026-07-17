@@ -10,6 +10,7 @@ import com.intellij.openapi.util.IconLoader
 import com.intellij.openapi.wm.StatusBar
 import com.intellij.openapi.wm.StatusBarWidget
 import com.intellij.util.Consumer
+import com.intellij.util.IconUtil
 import com.intellij.vcsUtil.showAbove
 import spacewaiker.helixjet.config.HJConfiguration
 import spacewaiker.helixjet.editor.HJState
@@ -19,7 +20,8 @@ import javax.swing.Icon
 class HJStatusBarLogoWidget(private val project: Project) : StatusBarWidget, StatusBarWidget.IconPresentation {
     companion object {
         const val ID = "HelixJetLogoWidget"
-        val LOGO = IconLoader.getIcon("/icons/helix.svg", this::class.java)
+        val LOGO = IconLoader.getIcon("/META-INF/pluginIcon.svg", this::class.java)
+            .let { IconUtil.scale(it, null, 16.0f / it.iconWidth) }
     }
 
     private var statusBar: StatusBar? = null

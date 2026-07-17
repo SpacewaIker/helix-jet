@@ -29,7 +29,7 @@ object HJTextObject {
         document: Document, range: HJRange, textobject: TextObject, objectName: String, syntax: HJLanguageSyntax,
     ): HJRange {
         val root = syntax.tree.rootNode
-        val textobjectQuery = syntax.textobjectQuery
+        val textobjectQuery = syntax.textobjectQuery ?: return range
 
         val pos = range.cursor
         val captureName = "$objectName.$textobject"

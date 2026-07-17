@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="markdown-jvm">
+    <output-path>$PROJECT_DIR$/grammars/markdown/build/libs</output-path>
+    <root id="archive" name="markdown-jvm.jar">
+      <element id="module-output" name="helix-jet.grammars.markdown.jvmMain" />
+    </root>
+  </artifact>
+</component>

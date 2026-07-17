@@ -1,5 +1,7 @@
 import java.io.FileInputStream
 import java.util.*
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 rootProject.name = "helix-jet"
 
@@ -34,57 +36,83 @@ if (!languagesProperties.exists()) {
     println("Valid grammar definitions: ${grammars.size}")
 }
 
-grammars.forEach { (grammarName, repoUrl, rev) ->
-    print("> Grammar '$grammarName': "); System.out.flush()
 
-    // Create directory
-    val subprojectDir = grammarsDir.resolve(grammarName)
-    subprojectDir.mkdirs()
+fun runCommand(command: List<String>, timeout: Long, unit: TimeUnit): String {
+    val process = ProcessBuilder(command).redirectErrorStream(true).start()
+    val output = process.inputStream.bufferedReader().readText()
+    val exitedNormally = process.waitFor(timeout, unit)
 
-    // Create build file
-    val buildFile = subprojectDir.resolve("build.gradle.kts")
-    if (!buildFile.exists()) {
-        buildFile.writeText("apply<GrammarPlugin>()")
-    }
-
-    // clone, then checkout tree-sitter grammar
-    val repoDir = subprojectDir.resolve("tree-sitter-$grammarName")
-
-    // Repo does not exist, we clone it
-    if (!repoDir.resolve(".git").exists()) {
-        print("cloning..."); System.out.flush()
-        val process = ProcessBuilder("git", "clone", repoUrl, repoDir.absolutePath, "--revision", rev).start()
-        val exitedNormally = process.waitFor(5, TimeUnit.MINUTES)
-        if (!exitedNormally) {
-            process.destroy()
-            println("Timed out while cloning $repoUrl at rev $rev")
-            return@forEach
-        }
-        print(" done. "); System.out.flush()
-    } else { // Repo does exist, we nuke it to be able to checkout after
-        print("repo exists. Nuking... "); System.out.flush()
-        val process = ProcessBuilder("git", "-C", repoDir.absolutePath, "reset", "--hard").start()
-        val exitedNormally = process.waitFor(10, TimeUnit.SECONDS)
-        if (!exitedNormally) {
-            process.destroy()
-            println("Timed out while nuking $repoUrl")
-            return@forEach
-        }
-        print(" done. "); System.out.flush()
-    }
-
-    // Checking out revision
-    print("checking out rev..."); System.out.flush()
-    val process = ProcessBuilder("git", "-C", repoDir.absolutePath, "checkout", rev).start()
-    val exitedNormally = process.waitFor(10, TimeUnit.SECONDS)
     if (!exitedNormally) {
-        process.destroy()
-        println("Timed out while checking out rev $rev of $repoUrl")
-        return@forEach
+        process.destroyForcibly()
+        throw GradleException("Command timed out: ${command.joinToString(" ")}")
     }
-    print(" done. "); System.out.flush()
-    println()
+    if (process.exitValue() != 0) {
+        throw GradleException("Command failed (${command.joinToString(" ")}):\n$output")
+    }
+    return output
+}
 
+val grammarProjects = mutableListOf<Pair<String, File>>()
+val executor: ExecutorService = Executors.newCachedThreadPool()
+try {
+    val futures = grammars.map { (grammarName, repoUrl, rev, subpath) ->
+        executor.submit<Pair<String, File>> {
+            // Create directory
+            val subprojectDir = grammarsDir.resolve(grammarName)
+            subprojectDir.mkdirs()
+
+            // Create build file
+            val buildFile = subprojectDir.resolve("build.gradle.kts")
+            if (!buildFile.exists()) {
+                buildFile.writeText("apply<GrammarPlugin>()")
+            }
+
+            // clone, then checkout tree-sitter grammar
+            val repoDir = subprojectDir.resolve("tree-sitter-$grammarName")
+
+            // Repo does not exist, we clone it
+            if (!repoDir.resolve(".git").exists()) {
+                repoDir.deleteRecursively()
+                repoDir.mkdirs()
+
+                runCommand(
+                    listOf("git", "clone", repoUrl, repoDir.absolutePath, "--revision", rev),
+                    5,
+                    TimeUnit.MINUTES
+                )
+            } else { // Repo does exist. We check the revision
+                val actualRevision = runCommand(listOf("git", "rev-parse", "HEAD"), 5, TimeUnit.SECONDS)
+                val isCorrectRevision = actualRevision == rev
+
+                // incorrect revision, nuke and checkout
+                if (!isCorrectRevision) {
+                    runCommand(listOf("git", "-C", repoDir.absolutePath, "reset", "--hard"), 10, TimeUnit.SECONDS)
+                    runCommand(listOf("git", "-C", repoDir.absolutePath, "checkout", rev), 10, TimeUnit.SECONDS)
+                }
+            }
+
+            Pair(grammarName, subprojectDir)
+        }
+    }
+
+    val errors = mutableListOf<Exception>()
+    futures.forEach { future ->
+        try {
+            grammarProjects.add(future.get())
+        } catch (e: Exception) {
+            errors.add(e)
+        }
+    }
+
+    if (errors.isNotEmpty()) {
+        errors.forEach { it.printStackTrace() }
+        throw GradleException("Grammars could not be cloned.")
+    }
+} finally {
+    executor.shutdown()
+}
+
+grammarProjects.forEach { (grammarName, subprojectDir) ->
     include(":grammars:$grammarName")
     project(":grammars:$grammarName").projectDir = subprojectDir
 }
@@ -93,6 +121,7 @@ data class GrammarEntry(
     val name: String,
     var gitUrl: String,
     var gitRev: String,
+    var subpath: String?,
 )
 
 fun loadLanguagesProperties(file: File): List<GrammarEntry> {
@@ -111,13 +140,14 @@ fun loadLanguagesProperties(file: File): List<GrammarEntry> {
         val keyPath = key.split(".")
         if (keyPath.size != 4 || keyPath[0] != "grammar" || keyPath[2] != "source") continue
 
-        val name = keyPath[1]
+        val name = keyPath[1].replace("-", "_")
         val entryKey = keyPath[3]
 
-        val entry = grammars.getOrPut(name) { GrammarEntry(name, "", "") }
+        val entry = grammars.getOrPut(name) { GrammarEntry(name, "", "", null) }
         when (entryKey) {
             "git" -> entry.gitUrl = value
             "rev" -> entry.gitRev = value
+            "subpath" -> entry.subpath = value
             else -> {}
         }
     }

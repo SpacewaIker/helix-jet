@@ -102,7 +102,7 @@ class HJEditor {
         for ((idx, range) in this.selection.rangesWithPrimaryFirst.withIndex()) {
             val isPrimary = idx == 0 // rangesWithPrimaryFirst, so first element is primary
 
-            val pos = editor.offsetToLogicalPosition(range.cursor.coerceAtMost(editor.document.textLength - 1))
+            val pos = editor.offsetToLogicalPosition(range.cursor.coerceAtMost(editor.document.textLength))
             val caret = if (isPrimary) {
                 // have to reuse old primary caret
                 primaryCaret.moveToLogicalPosition(pos)

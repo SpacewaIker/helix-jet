@@ -1,10 +1,10 @@
 ﻿package spacewaiker.helixjet.actions
 
 import com.intellij.openapi.editor.Document
-import fleet.fastutil.skip
 import spacewaiker.helixjet.editor.HJRange
 import spacewaiker.helixjet.editor.HJSelection
 import spacewaiker.helixjet.treesitter.HJLanguageSyntax
+import spacewaiker.helixjet.utils.skip
 import kotlin.math.max
 import kotlin.math.min
 

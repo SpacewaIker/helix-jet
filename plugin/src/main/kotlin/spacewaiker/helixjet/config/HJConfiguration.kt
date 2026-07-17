@@ -19,6 +19,8 @@ import spacewaiker.helixjet.utils.getPrimitiveValue
 import spacewaiker.helixjet.utils.readToml
 import java.awt.Color
 import java.io.File
+import kotlin.io.path.Path
+import kotlin.io.path.absolute
 
 class HJConfiguration {
     @Suppress("PropertyName")
@@ -58,14 +60,14 @@ class HJConfiguration {
     /**
      * Try to load configuration file
      */
-    private fun loadConfiguration(): TomlFile? {
-        val file = File(userConfigPath)
+    private fun loadConfigurationFile(path: String): TomlFile? {
+        val file = File(path)
         if (!file.exists()) {
-            logger.info("Configuration file not found: $userConfigPath")
+            logger.info("Configuration file not found: $path")
             return null
         }
         if (!file.canRead()) {
-            logger.warn("Configuration file is not readable: $userConfigPath")
+            logger.warn("Configuration file is not readable: $path")
             return null
         }
         val content = file.readText()
@@ -73,18 +75,31 @@ class HJConfiguration {
         val toml = readToml(content)
 
         if (toml == null) {
-            logger.error("Failed to load configuration file: $userConfigPath")
+            logger.error("Failed to load configuration file: $path")
         } else {
             logger.info("Successfully parsed toml configuration")
+            logger.debug("*rstarst")
+            logger.info(this::class.java.name)
         }
         return toml
+    }
+
+    private fun applyConfig() {
+        val config = loadConfigurationFile(userConfigPath) ?: return
+        applyConfigFile(config, userConfigPath)
     }
 
     /**
      * Overload default keymap configuration with user defined config file, if one exists.
      */
-    private fun applyConfig() {
-        val config = loadConfiguration() ?: return
+    private fun applyConfigFile(config: TomlFile, path: String) {
+        config.getPrimitiveValue<String>("extend")?.let { extendFile ->
+            val path = Path(path)
+            var extendFile = extendFile.replace("~/", System.getProperty("user.home") + "/")
+            extendFile = path.resolve(extendFile).absolute().toString()
+            val extend = loadConfigurationFile(extendFile) ?: return@let
+            applyConfigFile(extend, extendFile)
+        }
 
         // editor settings
         val editor = config.children.find { it.name == "editor" }

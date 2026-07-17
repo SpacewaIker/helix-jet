@@ -21,10 +21,30 @@
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/buildSrc" />
             <option value="$PROJECT_DIR$/grammars" />
+            <option value="$PROJECT_DIR$/grammars/bash" />
+            <option value="$PROJECT_DIR$/grammars/c" />
+            <option value="$PROJECT_DIR$/grammars/c_sharp" />
+            <option value="$PROJECT_DIR$/grammars/cmake" />
             <option value="$PROJECT_DIR$/grammars/cpp" />
+            <option value="$PROJECT_DIR$/grammars/css" />
+            <option value="$PROJECT_DIR$/grammars/gdscript" />
+            <option value="$PROJECT_DIR$/grammars/go" />
+            <option value="$PROJECT_DIR$/grammars/html" />
+            <option value="$PROJECT_DIR$/grammars/ini" />
             <option value="$PROJECT_DIR$/grammars/java" />
+            <option value="$PROJECT_DIR$/grammars/javascript" />
+            <option value="$PROJECT_DIR$/grammars/json" />
             <option value="$PROJECT_DIR$/grammars/kotlin" />
+            <option value="$PROJECT_DIR$/grammars/lua" />
+            <option value="$PROJECT_DIR$/grammars/markdown" />
+            <option value="$PROJECT_DIR$/grammars/php" />
+            <option value="$PROJECT_DIR$/grammars/python" />
+            <option value="$PROJECT_DIR$/grammars/ruby" />
             <option value="$PROJECT_DIR$/grammars/rust" />
+            <option value="$PROJECT_DIR$/grammars/sql" />
+            <option value="$PROJECT_DIR$/grammars/toml" />
+            <option value="$PROJECT_DIR$/grammars/typescript" />
+            <option value="$PROJECT_DIR$/grammars/yaml" />
             <option value="$PROJECT_DIR$/plugin" />
           </set>
         </option>

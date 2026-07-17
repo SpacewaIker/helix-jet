@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="sql-jvm">
+    <output-path>$PROJECT_DIR$/grammars/sql/build/libs</output-path>
+    <root id="archive" name="sql-jvm.jar">
+      <element id="module-output" name="helix-jet.grammars.sql.jvmMain" />
+    </root>
+  </artifact>
+</component>

@@ -56,6 +56,14 @@ tasks {
     }
 }
 
+intellijPlatformTesting {
+    runIde {
+        register("runRider") {
+            localPath = file("C:/Program Files/JetBrains/JetBrains Rider 2025.3.2")
+        }
+    }
+}
+
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
