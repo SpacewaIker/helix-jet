@@ -1,5 +1,6 @@
 ﻿package spacewaiker.helixjet.input
 
+import com.intellij.codeInsight.lookup.LookupManager
 import com.intellij.ide.IdeEventQueue
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Editor
@@ -38,6 +39,17 @@ object HJInputHandler {
         private set
     private var minorModeMapping: Map<HJInputKey, HJKeyAction>? = null
     private var minorModeIsSticky: Boolean = false
+
+    /**
+     * Keys to treat as passthrough when an autocomplete popup is active in insert mode
+     */
+    private val autocompletePassthroughKeys = listOf(
+        HJInputKey.fromString("up"),
+        HJInputKey.fromString("down"),
+        HJInputKey.fromString("tab"),
+        HJInputKey.fromString("ret"),
+        HJInputKey.fromString("esc"),
+    )
 
     /**
      * Handle the given input key.
@@ -79,6 +91,11 @@ object HJInputHandler {
     }
 
     private fun handleKeyNormalBehaviour(editor: Editor, key: HJInputKey): Boolean {
+        // special case: do not handle up/down/tab/enter if autocomplete is up
+        if (HJState.mode == HJEditorMode.Insert && LookupManager.getActiveLookup(editor) != null
+            && autocompletePassthroughKeys.contains(key)
+        ) return false
+
         // if the key is a number, we're inputting an action count
         if (key is HJInputKey.Character && key.char.isDigit()) {
             actionCount += key.char

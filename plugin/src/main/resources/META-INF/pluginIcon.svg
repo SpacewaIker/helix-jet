@@ -39,21 +39,21 @@
                 style="fill:#997bc8"
                 id="path4"/>             </svg:g>         </svg:g>              </svg:g>
     <svg:rect
-            style="fill:#000000;fill-opacity:1"
+            style="fill:#000000;fill-opacity:1;stroke-width:1.29412"
             id="rect6"
-            width="425"
-            height="425"
-            x="832.3161"
-            y="271.18448"/>
+            width="550"
+            height="550"
+            x="760.5827"
+            y="217.38448"/>
     <svg:rect
-            style="fill:#ffffff;fill-opacity:1;stroke-width:0.896918"
+            style="fill:#ffffff;fill-opacity:1;stroke-width:1.30692"
             id="rect7"
-            width="177.0433"
-            height="35.603752"
-            x="889.37964"
-            y="608.20081"/>
+            width="287.85583"
+            height="46.493351"
+            x="810.05908"
+            y="672.49335"/>
     <svg:path
-            d="m 952.18435,464.32261 v -57.375 h -47.25 v 57.375 h -19.5 v -133.125 h 19.5 v 57.9375 h 47.25 v -57.9375 h 19.5 v 133.125 z m 86.43755,1.875 q -21.9375,0 -33.8438,-12.1875 -11.90625,-12.28125 -11.90625,-34.3125 h 19.50005 q 0,14.0625 6.9375,21.84375 7.0312,7.78125 19.7812,7.78125 12.375,0 19.0313,-7.6875 6.75,-7.78125 6.75,-21.9375 v -70.6875 h -34.125 v -17.8125 h 53.625 v 88.5 q 0,22.125 -12.0938,34.3125 -12.0937,12.1875 -33.6562,12.1875 z"
+            d="m 934.05204,490.99168 v -93.24512 h -75.42741 v 93.24512 H 827.49586 V 274.63861 h 31.12877 v 94.15929 h 75.42741 v -94.15929 h 31.1288 v 216.35307 z m 137.98446,3.04723 q -35.0199,0 -54.0265,-19.80697 -19.00663,-19.95933 -19.00663,-55.76424 h 31.12903 q 0,22.85419 11.0746,35.50018 11.2243,12.646 31.5776,12.646 19.7548,0 30.3806,-12.49363 10.7754,-12.646 10.7754,-35.65255 V 303.58727 h -54.4754 v -28.94866 h 85.6041 V 418.4677 q 0,35.95727 -19.3058,55.76424 -19.3058,19.80697 -53.727,19.80697 z"
             id="text7"
-            style="font-size:192px;font-family:'CaskaydiaCove Nerd Font';-inkscape-font-specification:'CaskaydiaCove Nerd Font, Normal';display:inline;fill:#ffffff"
+            style="font-size:192px;font-family:'CaskaydiaCove Nerd Font';-inkscape-font-specification:'CaskaydiaCove Nerd Font, Normal';display:inline;fill:#ffffff;stroke-width:1.6107"
             aria-label="HJ"/></svg:svg>

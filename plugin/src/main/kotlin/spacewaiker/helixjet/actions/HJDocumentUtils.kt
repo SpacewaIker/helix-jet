@@ -505,3 +505,13 @@ fun Document.logicalPositionToOffset(position: LogicalPosition): Int {
     val lineStart = getLineStartOffset(position.line)
     return lineStart + position.column
 }
+
+fun ensureFileWriteable(cx: HJActionContext): Boolean {
+    val project = cx.hjEditor.editor.project!!
+    val file = cx.hjEditor.editor.virtualFile
+    val status = ReadonlyStatusHandler.getInstance(project).ensureFilesWritable(listOf(file))
+    return if (status.hasReadonlyFiles()) {
+        cx.hjEditor.setWarning("Could not make file writeable")
+        false
+    } else true
+}

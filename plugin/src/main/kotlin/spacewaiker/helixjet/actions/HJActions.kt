@@ -474,7 +474,9 @@ fun exitSelectMode(cx: HJActionContext) {
     }
 }
 
-private fun insertMode(cx: HJActionContext, append: Boolean) {
+private fun insertMode(cx: HJActionContext, append: Boolean): Boolean {
+    if (!ensureFileWriteable(cx)) return false
+
     HJState.lastInsertKeystrokes.clear()
     val selection = cx.hjEditor.selection.clone().transform {
         val cursor = if (append) it.to else it.from
@@ -482,6 +484,7 @@ private fun insertMode(cx: HJActionContext, append: Boolean) {
     }
     cx.hjEditor.setNewSelection(selection)
     switchToMode(cx, HJEditorMode.Insert)
+    return true
 }
 
 private fun commandMode(cx: HJActionContext) {
@@ -640,6 +643,7 @@ fun yankMainSelectionImpl(cx: HJActionContext, register: HJRegister) {
 }
 
 private fun pasteImpl(cx: HJActionContext, pasteBefore: Boolean, registerOverride: HJRegister? = null) {
+    if (!ensureFileWriteable(cx)) return
     val register = registerOverride ?: cx.register ?: HJRegister.LastYank
     val registerContents = HJState.registers.read(register, cx.hjEditor) ?: return
     if (registerContents.isEmpty()) return
@@ -653,7 +657,7 @@ private fun pasteImpl(cx: HJActionContext, pasteBefore: Boolean, registerOverrid
     var offset = 0
     val ranges = mutableListOf<HJRange>()
 
-    var transaction = cx.hjEditor.changeBySelectionIndexed { idx, range ->
+    var transaction = cx.hjEditor.changeBySelectionIndexed { _, range ->
         val pos = when (Pair(pasteBefore, linewise)) {
             // paste linewise before
             Pair(true, true) -> cx.doc.getLineStartOffset(cx.doc.getLineNumber(range.from))
@@ -1613,7 +1617,7 @@ private fun mergeConsecutiveSelections(cx: HJActionContext) {
 }
 
 private fun open(cx: HJActionContext, openBelow: Boolean, commentContinuationEnabled: Boolean) {
-    insertMode(cx, false)
+    if (!insertMode(cx, false)) return
 
     var offs = 0
     val ranges = mutableListOf<HJRange>()
@@ -1640,11 +1644,25 @@ private fun open(cx: HJActionContext, openBelow: Boolean, commentContinuationEna
             Pair(cx.doc.getLineEndOffset(aboveNextNewLineNum), 1)
         }
 
-        val line = cx.doc.getLine(currLineNum)!!
-        val indent = when (val pos = firstNonWhitespaceChar(line)) {
-            is Int if continueCommentToken != null -> line.substring(0, pos)
-            else -> cx.hjEditor.codeStyleManager?.getLineIndent(cx.doc, cx.doc.getLineStartOffset(currLineNum))
-                ?: (cx.hjEditor.language?.indent?.unit ?: "")
+        // TODO: for some reason CodeStyleManager.getLineIndent does not work properly in my project in Rider
+        //       tried this workaround below but it doesn't work for empty lines
+        //       e.g.:
+        //       |     } // end of code block, open on next line
+        //       |
+        //       |     ^ should open here but opens at very start of line instead
+//        val indent = when (val pos = firstNonWhitespaceChar(line)) {
+//            is Int if continueCommentToken != null -> line.substring(0, pos)
+//            else -> cx.hjEditor.codeStyleManager?.getLineIndent(cx.doc, cx.doc.getLineStartOffset(nextNewLineNum))
+//                ?: (cx.hjEditor.language?.indent?.unit ?: "")
+//        }
+        var indent = ""
+        if (continueCommentToken != null) {
+            val line = cx.doc.getLine(currLineNum)!!
+            firstNonWhitespaceChar(line)?.let { indent = line.substring(0, it) }
+        } else {
+            cx.doc.getLine(nextNewLineNum)?.let { line ->
+                firstNonWhitespaceChar(line)?.let { indent = line.substring(0, it) }
+            }
         }
 
         val builder = StringBuilder()
@@ -2058,7 +2076,7 @@ private fun filePickerProjectRoot(cx: HJActionContext) {
 }
 
 private fun insertWithIndent(cx: HJActionContext, fallbackLineStart: Boolean) {
-    insertMode(cx, false)
+    if (!insertMode(cx, false)) return
 
     val psiFile = cx.hjEditor.psiFile
 
@@ -2995,7 +3013,7 @@ private fun repeatLastInsert(cx: HJActionContext) {
     lastInsertKeystrokes.addAll(HJState.lastInsertKeystrokes)
 
     ApplicationManager.getApplication().invokeLater {
-        insertMode(cx, false)
+        if (!insertMode(cx, false)) return@invokeLater
 
         repeat(cx.count) {
             for (key in lastInsertKeystrokes) {

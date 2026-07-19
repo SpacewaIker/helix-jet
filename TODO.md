@@ -25,15 +25,7 @@
 
 Fix:
 
-- Add to jumplist when jumping somewhere from shift-shift menu
-    - gD etc. also don't set correctly the range
-    - gd does nothing, only gD works
-- In insert mode, tab/enter doesn't autocomplete
-- Read only not clearing when going into insert mode, only when typing after
-    - Cannot paste in read only doc
 - open does not set the right indentation
-- Allow arrows to be used in insert mode to select entries in the autocomplete dialog
-    - In hx you can use arrow for this, or to move around if no dialog is up, not sure how that works
 - Make gw faster/run on another thread
 
 - HJJumpLabelOverlay: folds in editor means text isn't visible and shouldn't be considered
