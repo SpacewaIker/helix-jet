@@ -1,13 +1,16 @@
 ﻿package spacewaiker.helixjet.config
 
 import com.akuleshov7.ktoml.Toml
-import com.akuleshov7.ktoml.tree.nodes.TomlFile
-import com.akuleshov7.ktoml.tree.nodes.TomlKeyValuePrimitive
-import com.akuleshov7.ktoml.tree.nodes.TomlNode
-import com.akuleshov7.ktoml.tree.nodes.TomlTable
+import com.akuleshov7.ktoml.tree.nodes.*
+import com.akuleshov7.ktoml.tree.nodes.pairs.values.TomlBasicString
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.colors.EditorColors
 import com.intellij.openapi.editor.colors.EditorColorsManager
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.ProjectManager
+import com.intellij.openapi.project.guessProjectDir
+import com.intellij.openapi.vfs.VfsUtilCore
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.JBColor
 import kotlinx.serialization.decodeFromString
 import spacewaiker.helixjet.actions.HJActions
@@ -15,12 +18,46 @@ import spacewaiker.helixjet.actions.HJKeyAction
 import spacewaiker.helixjet.editor.HJEditorMode
 import spacewaiker.helixjet.editor.HJState
 import spacewaiker.helixjet.input.HJInputKey
+import spacewaiker.helixjet.utils.anyCumulative
 import spacewaiker.helixjet.utils.getPrimitiveValue
+import spacewaiker.helixjet.utils.getTomlValue
 import spacewaiker.helixjet.utils.readToml
 import java.awt.Color
 import java.io.File
+import java.nio.file.FileSystems
+import java.nio.file.PathMatcher
+import java.nio.file.Paths
 import kotlin.io.path.Path
 import kotlin.io.path.absolute
+
+data class HJFileIgnore(
+    val patterns: List<Triple<Boolean, String, PathMatcher>>,
+) {
+    fun isIgnoredFile(file: VirtualFile, projectDir: VirtualFile): Boolean {
+        val relativePath = VfsUtilCore.getRelativePath(file, projectDir) ?: return false
+        val relPath = Paths.get(relativePath)
+
+        // process patterns in order, last match wins (like gitignore)
+        var ignored = false
+        for ((isWhitelist, _, matcher) in patterns) {
+            val matches = matcher.matches(relPath) // match relative path
+                    || matcher.matches(Paths.get(file.name)) // match file name
+                    || relPath.anyCumulative { matcher.matches(it) } // match directory
+            if (matches) ignored = !isWhitelist
+        }
+
+        if (ignored && file.isDirectory) {
+            // only ignore directory if it does not contain any whitelisted patterns
+            val containsWhitelistedFiles = patterns.any { (isWhitelist, pattern, matcher) ->
+                if (!isWhitelist) return@any false
+                pattern.startsWith(relativePath) || matcher.matches(relPath)
+            }
+            return !containsWhitelistedFiles
+        }
+
+        return ignored
+    }
+}
 
 class HJConfiguration {
     @Suppress("PropertyName")
@@ -46,6 +83,8 @@ class HJConfiguration {
     var searchWrapAround: Boolean = true
         private set
     var jumpLabelAlphabet: CharArray = /* @formatter:off */ charArrayOf('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z') /* @formatter:on */
+        private set
+    var ignoreList: HJFileIgnore? = null
         private set
     // ======================================================================================
 
@@ -94,9 +133,12 @@ class HJConfiguration {
      */
     private fun applyConfigFile(config: TomlFile, path: String) {
         config.getPrimitiveValue<String>("extend")?.let { extendFile ->
-            val path = Path(path)
             var extendFile = extendFile.replace("~/", System.getProperty("user.home") + "/")
-            extendFile = path.resolve(extendFile).absolute().toString()
+            extendFile = Path(path).resolve(extendFile).absolute().toString()
+            if (extendFile == path) {
+                logger.warn("Detected recursive configuration, skipping 'extend'")
+                return@let
+            }
             val extend = loadConfigurationFile(extendFile) ?: return@let
             applyConfigFile(extend, extendFile)
         }
@@ -120,6 +162,11 @@ class HJConfiguration {
             // jump label alphabet
             editor.getPrimitiveValue<String>("jump-label-alphabet")?.let { jumpLabelAlphabet = it.toCharArray().distinct().toCharArray() }
         }
+
+        // ignore entries: allows users to specify additional patterns to ignore similarly to .gitignore/.p4ignore
+        val project = ProjectManager.getInstance().openProjects.first()
+        config.getTomlValue<TomlTable>("ignore")?.children?.firstNotNullOfOrNull{ findIgnoreList(project, it) }
+            ?.let { ignoreList = it }
 
         // keymap
         // here, we need to parse the user config into a flat structure. That is, instead of the tree of tables that the TOML
@@ -249,6 +296,30 @@ class HJConfiguration {
         }
 
         return actions.values.toList()
+    }
+
+    private fun findIgnoreList(project: Project, ignores: TomlNode): HJFileIgnore? {
+        val projectDir = (project.guessProjectDir() ?: return null).path
+        val home = System.getProperty("user.home") + "/"
+        val matches = (ignores.getTomlValue<TomlKeyValueArray>("in_directories")?.value?.content as? List<*> ?: return null)
+            .asSequence()
+            .mapNotNull { (it as? TomlBasicString)?.content as? String }
+            .map { it.replace("~/", home).replace('\\', '/') }
+            .any { it == projectDir }
+
+        if (!matches) return null
+
+        val fs = FileSystems.getDefault()
+        val patterns = (ignores.getTomlValue<TomlKeyValueArray>("patterns")?.value?.content as? List<*> ?: return null)
+            .mapNotNull { (it as? TomlBasicString)?.content as? String }
+            .map {
+                val isWhitelist = it.startsWith("!")
+                val pattern = it.removePrefix("!").replace('\\', '/').removeSuffix("/")
+                val matcher = fs.getPathMatcher("glob:$pattern")
+                Triple(isWhitelist, pattern, matcher)
+            }
+
+        return HJFileIgnore(patterns)
     }
 
     companion object {

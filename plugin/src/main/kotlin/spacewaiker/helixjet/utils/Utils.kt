@@ -48,3 +48,8 @@ fun isSubset(superSet: Iterator<IntRange>, subSet: Iterator<IntRange>, allowEmpt
         }
     }
 }
+
+fun java.nio.file.Path.anyCumulative(f: (java.nio.file.Path) -> Boolean) =
+    runningFold<java.nio.file.Path, java.nio.file.Path?>(null) { acc, path ->
+        acc?.resolve(path) ?: path
+    }.filterNotNull().any(f)

@@ -33,7 +33,6 @@ import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.wm.WindowManager
 import com.intellij.ui.JBColor
-import com.intellij.util.concurrency.AppExecutorUtil
 import spacewaiker.helixjet.actions.HJKeyAction.HJAction
 import spacewaiker.helixjet.editor.*
 import spacewaiker.helixjet.input.HJInputHandler
@@ -2005,18 +2004,14 @@ private fun selectTextObject(cx: HJActionContext, objtype: HJTextObject.TextObje
 
 private fun filePickerImpl(cx: HJActionContext, title: String, directory: VirtualFile) {
     val project = cx.hjEditor.editor.project!!
-
     val model = HJStreamingTableModel<VirtualFile>(listOf("File")) { file, _ -> file.path.removePrefix(directory.path) }
-
-    AppExecutorUtil.getAppExecutorService().submit {
-        model.addRows(getAllProjectFiles(project, directory))
-    }
-
     val previewSelector = { rowIdx: Int -> Pair(model.tableData[rowIdx], null) }
 
     HJPickerWithPreview(cx.hjEditor.editor, title, model, previewSelector) { rowIdx ->
         val file = model.tableData[rowIdx]
         openFile(cx, file)
+    }.populateRowsAsync {
+        getAllProjectFiles(project) { model.addRow(it) }
     }.show()
 }
 

@@ -5,7 +5,6 @@ import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.LogicalPosition
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.util.concurrency.AppExecutorUtil
 import io.github.treesitter.ktreesitter.*
 import spacewaiker.helixjet.actions.*
 import spacewaiker.helixjet.config.HJFileGlobMatcher
@@ -194,18 +193,6 @@ object HJTreesitterHandling {
             }
         }
 
-        AppExecutorUtil.getAppExecutorService().submit {
-            val documentManager = FileDocumentManager.getInstance()
-            getAllProjectFiles(cx.hjEditor.editor.project!!).forEach { file ->
-                ReadAction.compute<Unit, Throwable> {
-                    val document = documentManager.getDocument(file) ?: return@compute
-                    val language = HJFileGlobMatcher.match(file.path) ?: return@compute
-                    val syntax = HJSyntaxLoader.getLanguageSyntax(language.name, document.text) ?: return@compute
-                    model.addRows(tagsIter(syntax, document, file).toList())
-                }
-            }
-        }
-
         val previewSelector = { rowIdx: Int ->
             val tag = model.tableData[rowIdx]
             Pair(tag.file, Pair(tag.startOffset, tag.endOffset))
@@ -215,6 +202,16 @@ object HJTreesitterHandling {
             val tag = model.tableData[rowIdx]
             openFile(cx, tag.file)
             cx.hjEditor.setNewSelection(HJSelection(HJRange(tag.startOffset, tag.endOffset)))
+        }.populateRowsAsync {
+            val documentManager = FileDocumentManager.getInstance()
+            getAllProjectFiles(cx.hjEditor.editor.project!!) { file ->
+                ReadAction.compute<Unit, Throwable> {
+                    val document = documentManager.getDocument(file) ?: return@compute
+                    val language = HJFileGlobMatcher.match(file.path) ?: return@compute
+                    val syntax = HJSyntaxLoader.getLanguageSyntax(language.name, document.text) ?: return@compute
+                    model.addRows(tagsIter(syntax, document, file).toList())
+                }
+            }
         }.show()
     }
 

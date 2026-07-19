@@ -19,6 +19,7 @@ import com.intellij.ui.OnePixelSplitter
 import com.intellij.ui.SearchTextField
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.table.JBTable
+import com.intellij.util.concurrency.AppExecutorUtil
 import spacewaiker.helixjet.actions.HJDirection
 import spacewaiker.helixjet.editor.HJState
 import java.awt.BorderLayout
@@ -27,6 +28,7 @@ import java.awt.Dimension
 import java.awt.event.ActionEvent
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
+import java.util.concurrent.Future
 import javax.swing.*
 import javax.swing.event.DocumentEvent
 import javax.swing.table.AbstractTableModel
@@ -62,6 +64,14 @@ class HJStreamingTableModel<T>(
         ApplicationManager.getApplication().invokeLater {
             val startIndex = data.size
             data.addAll(rows)
+            fireTableRowsInserted(startIndex, data.size - 1)
+        }
+    }
+
+    fun addRow(row: T) {
+        ApplicationManager.getApplication().invokeLater {
+            val startIndex = data.size
+            data.add(row)
             fireTableRowsInserted(startIndex, data.size - 1)
         }
     }
@@ -168,6 +178,8 @@ open class HJPicker(
         .setRequestFocus(true)
         .createPopup()
 
+    private var asyncTask: Future<*>? = null
+
     init {
         selectFirstRow()
 
@@ -186,6 +198,9 @@ open class HJPicker(
                     }
 
                     HJState.lastPicker = lastPicker
+
+                    asyncTask?.cancel(true)
+                    println("asyncTask is null: ${asyncTask == null}")
                 }
             })
         }
@@ -224,6 +239,11 @@ open class HJPicker(
         inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_PAGE_DOWN, 0), "scroll_down")
         inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_D, InputEvent.CTRL_DOWN_MASK), "scroll_down")
         actionMap.put("scroll_down", selectDownAction(scrollAmount))
+    }
+
+    fun populateRowsAsync(f: () -> Unit): HJPicker {
+        asyncTask = AppExecutorUtil.getAppExecutorService().submit(f)
+        return this
     }
 
     fun show() {

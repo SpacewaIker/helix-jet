@@ -3,6 +3,8 @@
 - Might actually need "views" into an editor, otherwise if you have the same doc opened twice, it might conflict
 - open empty buffer when all are closed to maintain functionality?
 - HJPicker: additional mappings (A-Enter for open in background, C-t toggle preview)
+    - show number of entries (shown/total)
+    - Show file name above file preview
 - file explorer?
 - settings.gradle.kts: clone repos in parallel
 - settings.gradle.kts: don't reset repo if it's already at the right commit
@@ -13,14 +15,26 @@
 - language configuration class
     - parse file types, comment tokens?
 - jumplist: should be one jumplist per view, not one
-- configuration: some kind of ignore for file analysis. Per project?
-    - extending other configuration?
+- configuration: some kind of ignore for file analysis.
+    - Working, except you cannot go up. E.g. specifically allow "../../whatever"
+    - Also, should allow allowlist even outside of exclusive mode
 - workspace symbol syntax picker: don't re-parse files if they haven't changed
+- Logo widget:
+    - Remove debug options
+    - Add open config option
 
 Fix:
 
-- b not working??
-- gw not working
+- Add to jumplist when jumping somewhere from shift-shift menu
+    - gD etc. also don't set correctly the range
+    - gd does nothing, only gD works
+- In insert mode, tab/enter doesn't autocomplete
+- Read only not clearing when going into insert mode, only when typing after
+    - Cannot paste in read only doc
+- open does not set the right indentation
+- Allow arrows to be used in insert mode to select entries in the autocomplete dialog
+    - In hx you can use arrow for this, or to move around if no dialog is up, not sure how that works
+- Make gw faster/run on another thread
 
 - HJJumpLabelOverlay: folds in editor means text isn't visible and shouldn't be considered
 - ctrl shift U in picker with preview doesn't scroll up

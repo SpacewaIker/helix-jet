@@ -14,10 +14,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vcs.changes.ChangeListManager
-import com.intellij.openapi.vfs.VfsUtil
-import com.intellij.openapi.vfs.VfsUtilCore
-import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.openapi.vfs.VirtualFileVisitor
+import com.intellij.openapi.vfs.*
 import com.intellij.psi.PsiFile
 import com.intellij.psi.codeStyle.CodeStyleManager
 import spacewaiker.helixjet.editor.HJJump
@@ -458,14 +455,36 @@ val Project.focusedHJEditor
 /**
  * Get a list of all files in the project, ignoring files specified in .gitignore, .p4ignore, etc.
  */
-fun getAllProjectFiles(project: Project, directory: VirtualFile? = null): List<VirtualFile> {
-    val changeListManager = ChangeListManager.getInstance(project)
-    val dir = directory ?: project.guessProjectDir() ?: return listOf()
+fun getAllProjectFiles(project: Project): List<VirtualFile> {
     return buildList {
+        getAllProjectFiles(project) { add(it) }
+    }
+}
+
+fun getAllProjectFiles(project: Project, callback: (VirtualFile) -> Unit) {
+    val changeListManager = ChangeListManager.getInstance(project)
+    val projectDir = project.guessProjectDir()!!
+    val dirs = mutableListOf(projectDir)
+
+    val customIgnore = HJState.config.ignoreList
+    customIgnore?.patterns?.forEach { (isWhitelist, pattern) ->
+        if (!isWhitelist) return@forEach
+        val path = projectDir.resolveFromRootOrRelative(pattern) ?: return@forEach
+        val isWithinProject = path.path.startsWith(projectDir.path)
+        if (!isWithinProject) {
+            if (path.isDirectory) dirs.add(path)
+            else callback(path)
+        }
+    }
+
+    for (dir in dirs) {
         VfsUtilCore.visitChildrenRecursively(dir, object : VirtualFileVisitor<Unit>() {
             override fun visitFile(file: VirtualFile): Boolean {
+                if (file == projectDir) return true
                 if (changeListManager.isIgnoredFile(file)) return false
-                if (!file.isDirectory) add(file)
+                if (customIgnore != null && customIgnore.isIgnoredFile(file, projectDir)) return false
+
+                if (!file.isDirectory) callback(file)
                 return true
             }
         })
