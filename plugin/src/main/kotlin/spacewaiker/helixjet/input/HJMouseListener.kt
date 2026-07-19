@@ -2,9 +2,6 @@
 
 import com.intellij.openapi.editor.event.EditorMouseEvent
 import com.intellij.openapi.editor.event.EditorMouseListener
-import spacewaiker.helixjet.actions.HJActionContext
-import spacewaiker.helixjet.actions.switchToMode
-import spacewaiker.helixjet.editor.HJEditorMode
 import spacewaiker.helixjet.editor.HJRange
 import spacewaiker.helixjet.editor.HJSelection
 import spacewaiker.helixjet.editor.HJState
@@ -14,22 +11,10 @@ class HJMouseListener : EditorMouseListener {
     var head: Int = 0
 
     override fun mouseClicked(event: EditorMouseEvent) {
-        val editor = event.editor
-
-        val cx = HJActionContext(HJState.getHJEditor(editor) ?: return)
-        if (HJState.mode == HJEditorMode.Select) switchToMode(cx, HJEditorMode.Normal)
-
-        // override range with block-corrected location
-        val pos = editor.xyToVisualPosition(event.mouseEvent.point)
-        val center = editor.visualPositionToXY(pos)
-        // if clicked left of center between chars, i.e. if actually pressed on prev char
-        if (event.mouseEvent.point.x < center.x) {
-            val selection = HJSelection(HJRange.point(head - 1))
-            cx.hjEditor.setNewSelection(selection)
-        }
     }
 
     override fun mousePressed(event: EditorMouseEvent) {
+        HJState.isMouseButtonDown = true
         val editor = event.editor
         val pos = editor.xyToVisualPosition(event.mouseEvent.point)
         val offset = editor.visualPositionToOffset(pos)
@@ -37,6 +22,7 @@ class HJMouseListener : EditorMouseListener {
     }
 
     override fun mouseReleased(event: EditorMouseEvent) {
+        HJState.isMouseButtonDown = false
         val editor = event.editor
         val pos = editor.xyToVisualPosition(event.mouseEvent.point)
         val offset = editor.visualPositionToOffset(pos)

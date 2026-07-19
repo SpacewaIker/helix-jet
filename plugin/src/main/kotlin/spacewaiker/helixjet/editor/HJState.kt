@@ -29,6 +29,9 @@ enum class HJEditorMode {
  */
 object HJState {
     var keymappingEnabled = true
+    var helixJetSettingCaret = false
+    var isMouseButtonDown = false
+
     var mode: HJEditorMode = HJEditorMode.Normal
     var config: HJConfiguration = HJConfiguration()
     private val editors: MutableMap<Editor, HJEditor> = mutableMapOf()
@@ -83,9 +86,11 @@ object HJState {
         jumps.backward(hjEditor, count)?.copy()?.let { (file, selection) ->
             jumpTo(hjEditor, file, selection)
         }
+        println(jumps.current)
     }
 
     private fun jumpTo(hjEditor: HJEditor, file: VirtualFile, selection: HJSelection) {
+        HJState.helixJetSettingCaret = true
         val oldDoc = hjEditor.editor.virtualFile
         if (oldDoc != file) {
             val cx = HJActionContext(hjEditor)
@@ -93,6 +98,8 @@ object HJState {
                 val editor = (fileEditor as TextEditor).editor
                 getHJEditor(editor)?.setNewSelection(selection)
             }
+        } else {
+            hjEditor.setNewSelection(selection)
         }
     }
 }

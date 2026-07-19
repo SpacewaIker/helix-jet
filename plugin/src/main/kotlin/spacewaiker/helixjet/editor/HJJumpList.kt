@@ -9,7 +9,7 @@ data class HJJump(
     var selection: HJSelection,
 )
 
-data class HJJumpList(
+class HJJumpList(
     val jumps: ArrayDeque<HJJump>,
     var current: Int,
 ) {

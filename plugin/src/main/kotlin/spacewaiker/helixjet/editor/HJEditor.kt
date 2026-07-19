@@ -91,6 +91,7 @@ class HJEditor {
      * Save new selection to the HJState and apply it to this HJEditor.
      */
     fun setNewSelection(selection: HJSelection) {
+        HJState.helixJetSettingCaret = true
         this.selection = selection.ensureInvariants(editor.document)
 
         editor.caretModel.removeSecondaryCarets()

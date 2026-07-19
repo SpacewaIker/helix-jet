@@ -211,12 +211,12 @@ private val actionsRaw = arrayOf(
     HJAction("normal_mode", "Enter normal mode") { switchToMode(it, HJEditorMode.Normal) },
     HJAction("select_mode", "Enter selection extend mode") { switchToMode(it, HJEditorMode.Select) },
     HJAction("exit_select_mode", "Exit selection mode") { if (HJState.mode == HJEditorMode.Select) switchToMode(it, HJEditorMode.Normal) },
-    HJAction("goto_definition", "Goto definition") { executeIdeJumpAction(it, IdeActions.ACTION_GOTO_IMPLEMENTATION) },
-    HJAction("goto_declaration", "Goto declaration") { executeIdeJumpAction(it, IdeActions.ACTION_GOTO_DECLARATION) },
+    HJAction("goto_definition", "Goto definition") { executeIdeAction(it, IdeActions.ACTION_GOTO_IMPLEMENTATION) },
+    HJAction("goto_declaration", "Goto declaration") { executeIdeAction(it, IdeActions.ACTION_GOTO_DECLARATION) },
     HJAction("add_newline_above", "Add newline above") { addNewlineImpl(it, true) },
     HJAction("add_newline_below", "Add newline below") { addNewlineImpl(it, false) },
-    HJAction("goto_type_definition", "Goto type definition") { executeIdeJumpAction(it, IdeActions.ACTION_GOTO_TYPE_DECLARATION) },
-    HJAction("goto_implementation", "Goto implementation") { executeIdeJumpAction(it, IdeActions.ACTION_GOTO_IMPLEMENTATION) },
+    HJAction("goto_type_definition", "Goto type definition") { executeIdeAction(it, IdeActions.ACTION_GOTO_TYPE_DECLARATION) },
+    HJAction("goto_implementation", "Goto implementation") { executeIdeAction(it, IdeActions.ACTION_GOTO_IMPLEMENTATION) },
     HJAction("goto_file_start", "Goto line number `<n>` else file start") { gotoFileStartImpl(it, false) },
     HJAction("goto_file_end", "Goto file end") { gotoFileEndImpl(it, false) },
     HJAction("extend_to_file_start", "Extend to line number `<n>` else file start") { gotoFileStartImpl(it, true) },
@@ -225,7 +225,7 @@ private val actionsRaw = arrayOf(
     HJAction("goto_file_hsplit", "Goto files in selections (hsplit)") { gotoFileImpl(it, HJFileOpenLocation.HSplit) },
     HJAction("goto_file_vsplit", "Goto files in selections (vsplit)") { gotoFileImpl(it, HJFileOpenLocation.VSplit) },
     HJAction("goto_file_background", "Goto files in selections (background)") { gotoFileImpl(it, HJFileOpenLocation.BackgroundTab) },
-    HJAction("goto_reference", "Goto references") { executeIdeJumpAction(it, IdeActions.ACTION_FIND_USAGES) },
+    HJAction("goto_reference", "Goto references") { executeIdeAction(it, IdeActions.ACTION_FIND_USAGES) },
     HJAction("goto_window_top", "Goto window top") { gotoWindowImpl(it, HJAlignment.Top) },
     HJAction("goto_window_center", "Goto window center") { gotoWindowImpl(it, HJAlignment.Center) },
     HJAction("goto_window_bottom", "Goto window bottom") { gotoWindowImpl(it, HJAlignment.Bottom) },
@@ -247,8 +247,8 @@ private val actionsRaw = arrayOf(
     HJAction("goto_line_end", "Goto line end") { gotoLineStartEnd(it, false) },
     HJAction("goto_column", "Goto column") { gotoColumnImpl(it, false) },
     HJAction("extend_to_column", "Extend to column") { gotoColumnImpl(it, true) },
-    HJAction("goto_next_buffer", "Goto next buffer") { executeIdeJumpAction(it, IdeActions.ACTION_NEXT_TAB) },
-    HJAction("goto_previous_buffer", "Goto previous buffer") { executeIdeJumpAction(it, IdeActions.ACTION_PREVIOUS_TAB) },
+    HJAction("goto_next_buffer", "Goto next buffer") { executeIdeAction(it, IdeActions.ACTION_NEXT_TAB) },
+    HJAction("goto_previous_buffer", "Goto previous buffer") { executeIdeAction(it, IdeActions.ACTION_PREVIOUS_TAB) },
     HJAction("goto_line_end_newline", "Goto newline at line end") { gotoLineEndNewline(it) },
     HJAction("goto_first_nonwhitespace", "Goto first non-blank in line") { gotoFirstNonWhitespace(it) },
     HJAction("trim_selections", "Trim whitespace from selections") { trimSelections(it) },
@@ -736,11 +736,6 @@ fun executeIdeAction(cx: HJActionContext, actionId: String, extendLines: Boolean
     if (extendLines) {
         cx.hjEditor.setNewSelection(selection)
     }
-}
-
-fun executeIdeJumpAction(cx: HJActionContext, actionId: String) {
-    pushJump(cx.hjEditor)
-    executeIdeAction(cx, actionId)
 }
 
 private fun findChar(cx: HJActionContext, direction: HJDirection, inclusive: Boolean, extend: Boolean) {
@@ -3022,7 +3017,7 @@ private fun jumpBackward(cx: HJActionContext) {
     HJState.jumpBackward(cx.hjEditor, cx.count)
 }
 
-private fun pushJump(hjEditor: HJEditor) {
+fun pushJump(hjEditor: HJEditor) {
     val jump = HJJump(hjEditor.editor.virtualFile, hjEditor.selection.clone())
     HJState.jumps.push(jump)
 }

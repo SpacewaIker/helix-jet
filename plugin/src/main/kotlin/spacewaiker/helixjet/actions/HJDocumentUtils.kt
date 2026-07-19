@@ -461,6 +461,9 @@ fun getAllProjectFiles(project: Project): List<VirtualFile> {
     }
 }
 
+/**
+ * Get a list of all files in the project, ignoring files specified in .gitignore, .p4ignore, etc.
+ */
 fun getAllProjectFiles(project: Project, callback: (VirtualFile) -> Unit) {
     val changeListManager = ChangeListManager.getInstance(project)
     val projectDir = project.guessProjectDir()!!
