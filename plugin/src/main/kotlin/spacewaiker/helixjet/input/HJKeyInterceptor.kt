@@ -13,8 +13,11 @@ import java.awt.event.KeyEvent
  * Forwards valid inputs to HJInputHandler, or leaves HJTypedHandler handle Insert mode key presses.
  */
 class HJKeyInterceptor(private val project: Project) : IdeEventQueue.EventDispatcher {
+    private val hjState = HJState.getInstance(project)
+    private val inputHandler = HJInputHandler.getInstance(project)
+
     override fun dispatch(e: AWTEvent): Boolean {
-        if (!HJState.keymappingEnabled) return false
+        if (!hjState.keymappingEnabled) return false
         if (e !is KeyEvent) return false
         if (e.id != KeyEvent.KEY_PRESSED) return false
         // get currently focused editor, or return if there are no currently focused editors
@@ -25,9 +28,9 @@ class HJKeyInterceptor(private val project: Project) : IdeEventQueue.EventDispat
 
         // typedHandlerBlock is set to true when transitioning to insert mode, such that the key used to transition isn't
         // also used by the typed handler. So any key pressed here removes the block
-        HJState.typedHandlerBlock = false
+        hjState.typedHandlerBlock = false
 
         val inputKey = HJInputKey.fromKeyEvent(e)
-        return if (inputKey != null) HJInputHandler.handle(focusedEditor, inputKey) else false
+        return inputKey != null && inputHandler.handle(focusedEditor, inputKey, e)
     }
 }

@@ -2,6 +2,7 @@
 
 import com.intellij.ide.DataManager
 import com.intellij.openapi.actionSystem.*
+import com.intellij.openapi.components.Service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.naturalSorted
@@ -10,18 +11,20 @@ import com.intellij.openapi.util.IconLoader
 import com.intellij.openapi.wm.StatusBar
 import com.intellij.openapi.wm.StatusBarWidget
 import com.intellij.util.Consumer
-import com.intellij.util.IconUtil
 import com.intellij.vcsUtil.showAbove
+import spacewaiker.helix.BuildConfig
+import spacewaiker.helixjet.actions.HJActionContext
+import spacewaiker.helixjet.actions.openFile
 import spacewaiker.helixjet.config.HJConfiguration
 import spacewaiker.helixjet.editor.HJState
 import java.awt.event.MouseEvent
 import javax.swing.Icon
 
+@Service(Service.Level.PROJECT)
 class HJStatusBarLogoWidget(private val project: Project) : StatusBarWidget, StatusBarWidget.IconPresentation {
     companion object {
         const val ID = "HelixJetLogoWidget"
         val LOGO = IconLoader.getIcon("/META-INF/pluginIcon.svg", this::class.java)
-            .let { IconUtil.scale(it, null, 16.0f / it.iconWidth) }
     }
 
     private var statusBar: StatusBar? = null
@@ -37,6 +40,7 @@ class HJStatusBarLogoWidget(private val project: Project) : StatusBarWidget, Sta
     }
 
     private fun showMenu(event: MouseEvent) {
+        val hjState = HJState.getInstance(project)
         val group = DefaultActionGroup().apply {
             add(object : AnAction("About HelixJet Plugin") {
                 override fun actionPerformed(e: AnActionEvent) {
@@ -46,43 +50,52 @@ class HJStatusBarLogoWidget(private val project: Project) : StatusBarWidget, Sta
                 }
             })
             add(object : ToggleAction("Enabled") {
-                override fun isSelected(e: AnActionEvent) = HJState.keymappingEnabled
+                override fun isSelected(e: AnActionEvent) = hjState.keymappingEnabled
 
                 override fun setSelected(e: AnActionEvent, selected: Boolean) {
-                    HJState.keymappingEnabled = selected
-                    HJState.forAllEditors { it.reloadCaretShapes() }
+                    hjState.keymappingEnabled = selected
+                    hjState.forAllEditors { it.reloadCaretShapes() }
                 }
 
                 override fun getActionUpdateThread(): ActionUpdateThread {
                     return ActionUpdateThread.EDT
                 }
             })
+            if (BuildConfig.DEBUG) {
+                addSeparator()
+                add(object : AnAction("Print All Mappings") {
+                    override fun actionPerformed(e: AnActionEvent) {
+                        val mapping = hjState.config.mapping.flatMap { (mode, map) ->
+                            map.map { (key, action) -> Triple(mode, key, action) }
+                        }
+                        mapping.naturalSorted().forEach { triple ->
+                            val mode = triple.first.toString()
+                            val inputKey = triple.second.toString()
+                            val action = triple.third.name
+                            println("[$mode] $inputKey -> $action")
+                        }
+                    }
+                })
+                add(object : AnAction("Print Register Contents") {
+                    override fun actionPerformed(e: AnActionEvent) {
+                        println("Registers contents:")
+                        for ((register, contents) in hjState.allRegisterContents) {
+                            println("[$register] = $contents")
+                        }
+                    }
+                })
+            }
             addSeparator()
-            add(object : AnAction("Print All Mappings") {
+            add(object : AnAction("Open Config") {
                 override fun actionPerformed(e: AnActionEvent) {
-                    val mapping = HJState.config.mapping.flatMap { (mode, map) ->
-                        map.map { (key, action) -> Triple(mode, key, action) }
-                    }
-                    mapping.naturalSorted().forEach { triple ->
-                        val mode = triple.first.toString()
-                        val inputKey = triple.second.toString()
-                        val action = triple.third.name
-                        println("[$mode] $inputKey -> $action")
-                    }
+                    val hjState = HJState.getInstance(project)
+                    val cx = HJActionContext(hjState, hjState.currentEditor ?: return)
+                    openFile(cx, HJConfiguration.userConfigPath)
                 }
             })
-            add(object : AnAction("Print Register Contents") {
-                override fun actionPerformed(e: AnActionEvent) {
-                    println("Registers contents:")
-                    for ((register, contents) in HJState.allRegisterContents) {
-                        println("[$register] = $contents")
-                    }
-                }
-            })
-            addSeparator()
             add(object : AnAction("Reload Config") {
                 override fun actionPerformed(e: AnActionEvent) {
-                    HJState.config = HJConfiguration()
+                    hjState.config = HJConfiguration(project)
                 }
             })
         }

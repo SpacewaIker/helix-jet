@@ -19,6 +19,8 @@ data class HJLanguage(
     val indent: Indent? = null,
     @SerialName("comment-tokens")
     val commentTokens: List<String>? = null,
+    @SerialName("block-comment-tokens")
+    val blockCommentTokens: List<BlockCommentToken>? = null,
     val grammar: String? = null,
 ) {
     val grammarOrName = grammar ?: name
@@ -29,4 +31,14 @@ data class HJLanguage(
         val tabWidth: Int,
         val unit: String,
     )
+
+    @Serializable
+    data class BlockCommentToken(
+        val start: String,
+        val end: String,
+    ) {
+        companion object {
+            val DEFAULT = BlockCommentToken("/*", "*/")
+        }
+    }
 }

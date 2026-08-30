@@ -3,9 +3,12 @@
 import com.akuleshov7.ktoml.Toml
 import com.akuleshov7.ktoml.tree.nodes.*
 import com.akuleshov7.ktoml.tree.nodes.pairs.values.TomlBasicString
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.colors.EditorColors
 import com.intellij.openapi.editor.colors.EditorColorsManager
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.project.guessProjectDir
@@ -16,7 +19,6 @@ import kotlinx.serialization.decodeFromString
 import spacewaiker.helixjet.actions.HJActions
 import spacewaiker.helixjet.actions.HJKeyAction
 import spacewaiker.helixjet.editor.HJEditorMode
-import spacewaiker.helixjet.editor.HJState
 import spacewaiker.helixjet.input.HJInputKey
 import spacewaiker.helixjet.utils.anyCumulative
 import spacewaiker.helixjet.utils.getPrimitiveValue
@@ -88,12 +90,12 @@ class HJConfiguration {
         private set
     // ======================================================================================
 
-    constructor() {
+    constructor(project: Project) {
         val colorScheme = EditorColorsManager.getInstance().globalScheme
         primaryCursorColor = colorScheme.getColor(EditorColors.CARET_COLOR) ?: JBColor.LIGHT_GRAY
         otherCursorsColor = colorScheme.getColor(EditorColors.SELECTED_TEARLINE_COLOR) ?: JBColor.GRAY
 
-        applyConfig()
+        applyConfig(project)
     }
 
     /**
@@ -123,15 +125,15 @@ class HJConfiguration {
         return toml
     }
 
-    private fun applyConfig() {
+    private fun applyConfig(project: Project) {
         val config = loadConfigurationFile(userConfigPath) ?: return
-        applyConfigFile(config, userConfigPath)
+        applyConfigFile(project, config, userConfigPath)
     }
 
     /**
      * Overload default keymap configuration with user defined config file, if one exists.
      */
-    private fun applyConfigFile(config: TomlFile, path: String) {
+    private fun applyConfigFile(project: Project, config: TomlFile, path: String) {
         config.getPrimitiveValue<String>("extend")?.let { extendFile ->
             var extendFile = extendFile.replace("~/", System.getProperty("user.home") + "/")
             extendFile = Path(path).resolve(extendFile).absolute().toString()
@@ -140,7 +142,7 @@ class HJConfiguration {
                 return@let
             }
             val extend = loadConfigurationFile(extendFile) ?: return@let
-            applyConfigFile(extend, extendFile)
+            applyConfigFile(project, extend, extendFile)
         }
 
         // editor settings
@@ -148,7 +150,9 @@ class HJConfiguration {
         if (editor != null) {
                 editor.getPrimitiveValue<Int>("scrolloff")?.let { scrolloff ->
                 this.scrolloff = scrolloff
-                HJState.forAllEditors { it.editor.settings.verticalScrollOffset = scrolloff }
+                FileEditorManager.getInstance(project).allEditors.forEach { fileEditor ->
+                    (fileEditor as? TextEditor)?.editor?.settings?.verticalScrollOffset = scrolloff
+                }
             }
             editor.getPrimitiveValue<Boolean>("continue-comments")?.let { continueComments = it }
 
@@ -166,7 +170,11 @@ class HJConfiguration {
         // ignore entries: allows users to specify additional patterns to ignore similarly to .gitignore/.p4ignore
         val project = ProjectManager.getInstance().openProjects.first()
         config.getTomlValue<TomlTable>("ignore")?.children?.firstNotNullOfOrNull{ findIgnoreList(project, it) }
-            ?.let { ignoreList = it }
+            ?.let {
+                ApplicationManager.getApplication().invokeLater {
+                    ignoreList = it
+                }
+            }
 
         // keymap
         // here, we need to parse the user config into a flat structure. That is, instead of the tree of tables that the TOML

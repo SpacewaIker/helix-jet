@@ -3,6 +3,18 @@
 name = "rust"
 file-types-str = [ "rs",]
 comment-tokens = [ "//", "///", "//!",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
+[[language.block-comment-tokens]]
+start = "/**"
+end = "*/"
+
+[[language.block-comment-tokens]]
+start = "/*!"
+end = "*/"
+
 
 [language.indent]
 tab-width = 4
@@ -37,6 +49,10 @@ name = "protobuf"
 file-types-str = [ "proto",]
 comment-tokens = [ "//",]
 grammar = "proto"
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -91,6 +107,10 @@ unit = " "
 name = "mint"
 file-types-str = [ "mint",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -126,6 +146,10 @@ file-types-str = [ "jsonc",]
 file-types-glob = [ "{t,j}sconfig.json", "bun.lock", ".devcontainer.json", "devcontainer.json", ".vscode/*.json",]
 comment-tokens = [ "//",]
 grammar = "json"
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -150,6 +174,10 @@ unit = "    "
 name = "c"
 file-types-str = [ "c",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -159,6 +187,10 @@ name = "cpp"
 file-types-str = [ "cc", "hh", "c++", "cpp", "hpp", "h", "ipp", "tpp", "cxx", "hxx", "ixx", "txx", "ino", "C", "H", "cu", "cuh", "cppm", "h++", "ii", "inl",]
 file-types-glob = [ ".hpp.in", ".h.in",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -175,6 +207,10 @@ unit = "  "
 name = "c-sharp"
 file-types-str = [ "cs", "csx", "cake",]
 comment-tokens = [ "//", "///",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 4
@@ -183,6 +219,14 @@ unit = "\t"
 name = "c3"
 file-types-str = [ "c3", "c3i", "c3t",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
+[[language.block-comment-tokens]]
+start = "<*"
+end = "*>"
+
 
 [language.indent]
 tab-width = 4
@@ -207,6 +251,10 @@ unit = "  "
 name = "go"
 file-types-str = [ "go",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 4
@@ -223,6 +271,10 @@ unit = "\t"
 name = "gotmpl"
 file-types-str = [ "gotmpl",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -243,6 +295,10 @@ name = "javascript"
 file-types-str = [ "js", "mjs", "cjs", "rules", "es6", "pac", "gs",]
 file-types-glob = [ ".node_repl_history", "jakefile",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -252,6 +308,10 @@ name = "jsx"
 file-types-str = [ "jsx",]
 comment-tokens = [ "//",]
 grammar = "javascript"
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -260,6 +320,10 @@ unit = "  "
 name = "typescript"
 file-types-str = [ "ts", "mts", "cts",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -268,6 +332,10 @@ unit = "  "
 name = "typespec"
 file-types-str = [ "tsp",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -276,6 +344,10 @@ unit = "  "
 name = "tsx"
 file-types-str = [ "tsx",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -283,6 +355,10 @@ unit = "  "
 [[language]]
 name = "css"
 file-types-str = [ "css",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -290,6 +366,10 @@ unit = "  "
 [[language]]
 name = "scss"
 file-types-str = [ "scss",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -297,6 +377,10 @@ unit = "  "
 [[language]]
 name = "less"
 file-types-str = [ "less",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -304,6 +388,10 @@ unit = "  "
 [[language]]
 name = "html"
 file-types-str = [ "html", "htm", "shtml", "xhtml", "xht", "jsp", "asp", "aspx", "jshtm", "volt", "rhtml", "cshtml",]
+[[language.block-comment-tokens]]
+start = "<!--"
+end = "-->"
+
 
 [language.indent]
 tab-width = 2
@@ -332,6 +420,10 @@ unit = "  "
 name = "nix"
 file-types-str = [ "nix",]
 comment-tokens = [ "#",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -348,6 +440,10 @@ unit = "  "
 [[language]]
 name = "rshtml"
 file-types-glob = [ "*.rs.html",]
+[[language.block-comment-tokens]]
+start = "@*"
+end = "*@"
+
 
 [language.indent]
 tab-width = 2
@@ -365,6 +461,14 @@ unit = "  "
 name = "php"
 file-types-str = [ "php", "inc", "php4", "php5", "phtml", "ctp",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/**"
+end = "*/"
+
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 4
@@ -383,6 +487,10 @@ file-types-glob = [ "*.blade.php",]
 [[language]]
 name = "twig"
 file-types-str = [ "twig",]
+[[language.block-comment-tokens]]
+start = "{#"
+end = "#}"
+
 
 [language.indent]
 tab-width = 2
@@ -407,6 +515,10 @@ unit = "\t"
 name = "lean"
 file-types-str = [ "lean",]
 comment-tokens = [ "--",]
+[[language.block-comment-tokens]]
+start = "/-"
+end = "-/"
+
 
 [language.indent]
 tab-width = 2
@@ -420,6 +532,10 @@ comment-tokens = [ "#",]
 name = "julia"
 file-types-str = [ "jl",]
 comment-tokens = [ "#",]
+[[language.block-comment-tokens]]
+start = "#="
+end = "=#"
+
 
 [language.indent]
 tab-width = 4
@@ -428,6 +544,10 @@ unit = "    "
 name = "java"
 file-types-str = [ "java", "jav", "pde",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -459,6 +579,10 @@ unit = "  "
 [[language]]
 name = "ocaml"
 file-types-str = [ "ml",]
+[[language.block-comment-tokens]]
+start = "(*"
+end = "*)"
+
 
 [language.indent]
 tab-width = 2
@@ -467,6 +591,10 @@ unit = "  "
 name = "ocaml-interface"
 file-types-str = [ "mli",]
 comment-tokens = [ "(**)",]
+[[language.block-comment-tokens]]
+start = "(*"
+end = "*)"
+
 
 [language.indent]
 tab-width = 2
@@ -484,6 +612,10 @@ unit = " "
 name = "lua"
 file-types-str = [ "lua", "rockspec",]
 comment-tokens = [ "--",]
+[[language.block-comment-tokens]]
+start = "--[["
+end = "--]]"
+
 
 [language.indent]
 tab-width = 2
@@ -498,11 +630,19 @@ name = "lua-format-string"
 name = "teal"
 file-types-str = [ "tl",]
 comment-tokens = [ "--",]
+[[language.block-comment-tokens]]
+start = "--[["
+end = "--]]"
+
 
 [[language]]
 name = "svelte"
 file-types-str = [ "svelte",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -510,6 +650,10 @@ unit = "  "
 [[language]]
 name = "vue"
 file-types-str = [ "vue",]
+[[language.block-comment-tokens]]
+start = "<!--"
+end = "-->"
+
 
 [language.indent]
 tab-width = 2
@@ -536,6 +680,10 @@ unit = "    "
 name = "haskell"
 file-types-str = [ "hs", "hs-boot", "hsc",]
 comment-tokens = [ "--",]
+[[language.block-comment-tokens]]
+start = "{-"
+end = "-}"
+
 
 [language.indent]
 tab-width = 2
@@ -552,6 +700,10 @@ unit = "  "
 name = "haskell-literate"
 file-types-str = [ "lhs",]
 comment-tokens = [ "--",]
+[[language.block-comment-tokens]]
+start = "{-"
+end = "-}"
+
 
 [language.indent]
 tab-width = 2
@@ -560,6 +712,10 @@ unit = "  "
 name = "purescript"
 file-types-str = [ "purs",]
 comment-tokens = [ "--",]
+[[language.block-comment-tokens]]
+start = "{-"
+end = "-}"
+
 
 [language.indent]
 tab-width = 2
@@ -576,6 +732,10 @@ unit = "    "
 name = "picat"
 file-types-str = [ "pi", "picat",]
 comment-tokens = [ "%",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 4
@@ -584,6 +744,10 @@ unit = "    "
 name = "prolog"
 file-types-str = [ "pl", "prolog",]
 comment-tokens = [ "%",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [[language]]
 name = "tsq"
@@ -599,6 +763,10 @@ name = "cmake"
 file-types-str = [ "cmake",]
 file-types-glob = [ "CMakeLists.txt",]
 comment-tokens = [ "#",]
+[[language.block-comment-tokens]]
+start = "#[["
+end = "]]"
+
 
 [language.indent]
 tab-width = 2
@@ -616,6 +784,10 @@ unit = "\t"
 name = "glsl"
 file-types-str = [ "glsl", "vert", "tesc", "tese", "geom", "frag", "comp",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 4
@@ -655,6 +827,10 @@ name = "racket"
 file-types-str = [ "rkt", "rktd", "rktl", "scrbl", "zuo",]
 comment-tokens = [ ";",]
 grammar = "scheme"
+[[language.block-comment-tokens]]
+start = "#|"
+end = "|#"
+
 
 [language.indent]
 tab-width = 2
@@ -675,6 +851,10 @@ name = "comment"
 name = "wesl"
 file-types-str = [ "wesl",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 4
@@ -683,6 +863,10 @@ unit = "    "
 name = "wgsl"
 file-types-str = [ "wgsl",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 4
@@ -714,6 +898,10 @@ unit = "  "
 name = "tablegen"
 file-types-str = [ "td",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -726,6 +914,10 @@ file-types-str = [ "eml",]
 name = "markdown"
 file-types-str = [ "md", "livemd", "markdown", "mdx", "mkd", "mkdn", "mdwn", "mdown", "markdn", "mdtxt", "mdtext", "workbook",]
 file-types-glob = [ "PULLREQ_EDITMSG",]
+[[language.block-comment-tokens]]
+start = "<!--"
+end = "-->"
+
 
 [language.indent]
 tab-width = 2
@@ -733,6 +925,10 @@ unit = "  "
 [[language]]
 name = "markdown-rustdoc"
 grammar = "markdown"
+[[language.block-comment-tokens]]
+start = "<!--"
+end = "-->"
+
 
 [language.indent]
 tab-width = 2
@@ -744,6 +940,10 @@ grammar = "markdown_inline"
 [[language]]
 name = "djot"
 file-types-str = [ "dj", "djot",]
+[[language.block-comment-tokens]]
+start = "{%"
+end = "%}"
+
 
 [language.indent]
 tab-width = 2
@@ -752,6 +952,10 @@ unit = "  "
 name = "dart"
 file-types-str = [ "dart",]
 comment-tokens = [ "//", "///",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -760,6 +964,10 @@ unit = "  "
 name = "scala"
 file-types-str = [ "scala", "sbt", "sc",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -855,6 +1063,10 @@ grammar = "gitignore"
 name = "graphql"
 file-types-str = [ "gql", "graphql", "graphqls",]
 comment-tokens = [ "#",]
+[[language.block-comment-tokens]]
+start = "\"\"\""
+end = "\"\"\""
+
 
 [language.indent]
 tab-width = 2
@@ -863,6 +1075,10 @@ unit = "  "
 name = "elm"
 file-types-str = [ "elm",]
 comment-tokens = [ "--",]
+[[language.block-comment-tokens]]
+start = "{-"
+end = "-}"
+
 
 [language.indent]
 tab-width = 4
@@ -876,6 +1092,10 @@ comment-tokens = [ "#",]
 name = "rescript"
 file-types-str = [ "res",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -893,6 +1113,10 @@ unit = "    "
 name = "kotlin"
 file-types-str = [ "kt", "kts",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 4
@@ -901,6 +1125,10 @@ unit = "    "
 name = "hcl"
 file-types-str = [ "hcl", "tf", "nomad",]
 comment-tokens = [ "#",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -910,6 +1138,10 @@ name = "tfvars"
 file-types-str = [ "tfvars",]
 comment-tokens = [ "#",]
 grammar = "hcl"
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -925,6 +1157,10 @@ unit = "  "
 name = "solidity"
 file-types-str = [ "sol",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 4
@@ -941,6 +1177,10 @@ unit = "  "
 name = "quarto"
 file-types-str = [ "qmd",]
 grammar = "markdown"
+[[language.block-comment-tokens]]
+start = "<!--"
+end = "-->"
+
 
 [language.indent]
 tab-width = 2
@@ -949,6 +1189,10 @@ unit = "  "
 name = "ron"
 file-types-str = [ "ron",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 4
@@ -974,6 +1218,10 @@ unit = "  "
 name = "rmarkdown"
 file-types-str = [ "rmd", "Rmd",]
 grammar = "markdown"
+[[language.block-comment-tokens]]
+start = "<!--"
+end = "-->"
+
 
 [language.indent]
 tab-width = 2
@@ -982,11 +1230,19 @@ unit = "  "
 name = "swift"
 file-types-str = [ "swift", "swiftinterface",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [[language]]
 name = "erb"
 file-types-str = [ "erb",]
 grammar = "embedded-template"
+[[language.block-comment-tokens]]
+start = "<!--"
+end = "-->"
+
 
 [language.indent]
 tab-width = 2
@@ -995,6 +1251,10 @@ unit = "  "
 name = "ejs"
 file-types-str = [ "ejs",]
 grammar = "embedded-template"
+[[language.block-comment-tokens]]
+start = "<!--"
+end = "-->"
+
 
 [language.indent]
 tab-width = 2
@@ -1002,6 +1262,10 @@ unit = "  "
 [[language]]
 name = "eex"
 file-types-str = [ "eex",]
+[[language.block-comment-tokens]]
+start = "<!--"
+end = "-->"
+
 
 [language.indent]
 tab-width = 2
@@ -1009,6 +1273,10 @@ unit = "  "
 [[language]]
 name = "heex"
 file-types-str = [ "heex",]
+[[language.block-comment-tokens]]
+start = "<!--"
+end = "-->"
+
 
 [language.indent]
 tab-width = 2
@@ -1017,6 +1285,10 @@ unit = "  "
 name = "sql"
 file-types-str = [ "sql", "dsql",]
 comment-tokens = [ "--",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 4
@@ -1049,6 +1321,10 @@ unit = "  "
 name = "vala"
 file-types-str = [ "vala", "vapi",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -1065,6 +1341,10 @@ unit = "\t"
 name = "devicetree"
 file-types-str = [ "dts", "dtsi",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 4
@@ -1089,6 +1369,10 @@ unit = "  "
 name = "odin"
 file-types-str = [ "odin",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 4
@@ -1110,6 +1394,10 @@ comment-tokens = [ "#",]
 name = "scheme"
 file-types-str = [ "ss", "scm", "sld",]
 comment-tokens = [ ";",]
+[[language.block-comment-tokens]]
+start = "#|"
+end = "|#"
+
 
 [language.indent]
 tab-width = 2
@@ -1118,6 +1406,10 @@ unit = "  "
 name = "v"
 file-types-str = [ "v", "vv", "vsh",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 4
@@ -1126,6 +1418,10 @@ unit = "\t"
 name = "verilog"
 file-types-str = [ "v", "vh",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -1134,6 +1430,10 @@ unit = "  "
 name = "systemverilog"
 file-types-str = [ "sv", "svh",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -1156,6 +1456,10 @@ unit = "  "
 name = "openscad"
 file-types-str = [ "scad",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -1199,6 +1503,10 @@ unit = "  "
 name = "idris"
 file-types-str = [ "idr",]
 comment-tokens = [ "--",]
+[[language.block-comment-tokens]]
+start = "{-"
+end = "-}"
+
 
 [language.indent]
 tab-width = 2
@@ -1223,6 +1531,10 @@ unit = "  "
 name = "dot"
 file-types-str = [ "dot",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 4
@@ -1239,6 +1551,10 @@ unit = "\t"
 name = "slang"
 file-types-str = [ "slang",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 4
@@ -1247,6 +1563,10 @@ unit = "  "
 name = "slint"
 file-types-str = [ "slint",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 4
@@ -1278,6 +1598,10 @@ unit = "  "
 name = "pascal"
 file-types-str = [ "pas", "pp", "inc", "lpr", "lfm",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "{"
+end = "}"
+
 
 [language.indent]
 tab-width = 2
@@ -1285,11 +1609,19 @@ unit = "  "
 [[language]]
 name = "sml"
 file-types-str = [ "sml",]
+[[language.block-comment-tokens]]
+start = "(*"
+end = "*)"
+
 
 [[language]]
 name = "jsonnet"
 file-types-str = [ "libsonnet", "jsonnet",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -1305,6 +1637,10 @@ unit = "   "
 [[language]]
 name = "astro"
 file-types-str = [ "astro",]
+[[language.block-comment-tokens]]
+start = "<!--"
+end = "-->"
+
 
 [language.indent]
 tab-width = 2
@@ -1321,16 +1657,28 @@ unit = "  "
 name = "wat"
 file-types-str = [ "wat",]
 comment-tokens = [ ";;",]
+[[language.block-comment-tokens]]
+start = "(;"
+end = ";)"
+
 
 [[language]]
 name = "wast"
 file-types-str = [ "wast",]
 comment-tokens = [ ";;",]
+[[language.block-comment-tokens]]
+start = "(;"
+end = ";)"
+
 
 [[language]]
 name = "d"
 file-types-str = [ "d", "dd",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 4
@@ -1348,11 +1696,19 @@ unit = "  "
 name = "kdl"
 file-types-str = [ "kdl",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [[language]]
 name = "xml"
 file-types-str = [ "ascx", "atom", "axaml", "axml", "bpmn", "checkstyle", "cpt", "csl", "csproj.user", "dita", "ditamap", "dtml", "fods", "fodt", "fxml", "gir", "glif", "gml", "gpx", "iml", "isml", "itermcolors", "jmx", "kml", "launch", "menu", "mobileconfig", "mpd", "musicxml", "mxml", "ncx", "nuspec", "opml", "osc", "osm", "plist", "policy", "pt", "publishsettings", "pubxml", "pubxml.user", "rbxlx", "rbxmx", "resx", "rng", "rss", "shproj", "smil", "storyboard", "sublime-snippet", "svg", "terminal", "tld", "tmx", "ui", "vbproj.user", "vcxproj", "vcxproj.filters", "wixproj", "wsdl", "wxi", "wxs", "xaml", "xbl", "xib", "xlf", "xliff", "xml", "xmp", "xoml", "xpdl", "xrc", "xsd", "xsl", "xul",]
 file-types-glob = [ "*.tm[Ll]anguage", "*.tm[Pp]references", "*.tm[Tt]heme",]
+[[language.block-comment-tokens]]
+start = "<!--"
+end = "-->"
+
 
 [language.indent]
 tab-width = 2
@@ -1360,6 +1716,10 @@ unit = "  "
 [[language]]
 name = "dtd"
 file-types-str = [ "dtd", "ent",]
+[[language.block-comment-tokens]]
+start = "<!--"
+end = "-->"
+
 
 [language.indent]
 tab-width = 2
@@ -1368,6 +1728,10 @@ unit = "  "
 name = "wit"
 file-types-str = [ "wit",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -1409,6 +1773,10 @@ unit = "  "
 name = "bicep"
 file-types-str = [ "bicep", "bicepparam",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -1418,6 +1786,10 @@ name = "qml"
 file-types-str = [ "qml",]
 comment-tokens = [ "//",]
 grammar = "qmljs"
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 4
@@ -1442,6 +1814,10 @@ unit = "  "
 name = "ponylang"
 file-types-str = [ "pony",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -1450,6 +1826,10 @@ unit = "  "
 name = "dhall"
 file-types-str = [ "dhall",]
 comment-tokens = [ "--",]
+[[language.block-comment-tokens]]
+start = "{-"
+end = "-}"
+
 
 [language.indent]
 tab-width = 2
@@ -1467,6 +1847,10 @@ unit = "    "
 name = "msbuild"
 file-types-str = [ "proj", "vbproj", "csproj", "fsproj", "targets", "props",]
 grammar = "xml"
+[[language.block-comment-tokens]]
+start = "<!--"
+end = "-->"
+
 
 [language.indent]
 tab-width = 2
@@ -1488,6 +1872,10 @@ comment-tokens = [ "#",]
 [[language]]
 name = "uxntal"
 file-types-str = [ "tal",]
+[[language.block-comment-tokens]]
+start = "("
+end = ")"
+
 
 [[language]]
 name = "yuck"
@@ -1572,6 +1960,10 @@ grammar = "rego"
 name = "nim"
 file-types-str = [ "nim", "nims", "nimble",]
 comment-tokens = [ "#",]
+[[language.block-comment-tokens]]
+start = "#["
+end = "]#"
+
 
 [language.indent]
 tab-width = 2
@@ -1595,6 +1987,10 @@ unit = "  "
 [[language]]
 name = "markdoc"
 file-types-str = [ "mdoc",]
+[[language.block-comment-tokens]]
+start = "<!--"
+end = "-->"
+
 
 [[language]]
 name = "opencl"
@@ -1622,6 +2018,10 @@ unit = "  "
 name = "blueprint"
 file-types-str = [ "blp",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 4
@@ -1638,6 +2038,10 @@ unit = "   "
 name = "fsharp"
 file-types-str = [ "fs", "fsx", "fsi", "fsscript",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "(*"
+end = "*)"
+
 
 [language.indent]
 tab-width = 4
@@ -1654,6 +2058,10 @@ unit = "  "
 name = "webc"
 file-types-str = [ "webc",]
 grammar = "html"
+[[language.block-comment-tokens]]
+start = "<!--"
+end = "-->"
+
 
 [language.indent]
 tab-width = 2
@@ -1662,6 +2070,10 @@ unit = "  "
 name = "typst"
 file-types-str = [ "typst", "typ",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -1670,6 +2082,10 @@ unit = "  "
 name = "nunjucks"
 file-types-str = [ "njk",]
 grammar = "jinja2"
+[[language.block-comment-tokens]]
+start = "{#"
+end = "#}"
+
 
 [language.indent]
 tab-width = 2
@@ -1678,6 +2094,10 @@ unit = "  "
 name = "jinja"
 file-types-str = [ "jinja", "jinja2", "j2",]
 grammar = "jinja2"
+[[language.block-comment-tokens]]
+start = "{#"
+end = "#}"
+
 
 [language.indent]
 tab-width = 2
@@ -1848,6 +2268,10 @@ unit = "    "
 name = "powershell"
 file-types-str = [ "ps1", "psm1", "psd1", "pscc", "psrc",]
 comment-tokens = [ "#",]
+[[language.block-comment-tokens]]
+start = "<#"
+end = "#>"
+
 
 [language.indent]
 tab-width = 4
@@ -1855,6 +2279,10 @@ unit = "    "
 [[language]]
 name = "ld"
 file-types-str = [ "ld",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -1908,11 +2336,23 @@ grammar = "gotmpl"
 name = "glimmer"
 file-types-glob = [ "{app,addon}/{components,templates}/*.hbs",]
 grammar = "glimmer"
+[[language.block-comment-tokens]]
+start = "{{!"
+end = "}}"
+
 
 [[language]]
 name = "ohm"
 file-types-str = [ "ohm",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
+[[language.block-comment-tokens]]
+start = "/**"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -1955,6 +2395,10 @@ unit = "    "
 name = "pest"
 file-types-str = [ "pest",]
 comment-tokens = [ "//", "///", "//!",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 4
@@ -1969,6 +2413,10 @@ name = "gjs"
 file-types-str = [ "gjs",]
 comment-tokens = [ "//",]
 grammar = "glimmer-javascript"
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -1978,6 +2426,10 @@ name = "gts"
 file-types-str = [ "gts",]
 comment-tokens = [ "//",]
 grammar = "glimmer-typescript"
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -1994,6 +2446,10 @@ unit = "  "
 name = "thrift"
 file-types-str = [ "thrift",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -2028,6 +2484,10 @@ unit = "    "
 name = "quint"
 file-types-str = [ "qnt",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -2036,6 +2496,14 @@ unit = "  "
 name = "spade"
 file-types-str = [ "spade",]
 comment-tokens = [ "//", "///",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
+[[language.block-comment-tokens]]
+start = "/**"
+end = "*/"
+
 
 [language.indent]
 tab-width = 4
@@ -2052,6 +2520,10 @@ unit = "    "
 name = "koto"
 file-types-str = [ "koto",]
 comment-tokens = [ "#",]
+[[language.block-comment-tokens]]
+start = "#-"
+end = "-#"
+
 
 [language.indent]
 tab-width = 2
@@ -2067,6 +2539,10 @@ unit = "   "
 [[language]]
 name = "vento"
 file-types-str = [ "vto",]
+[[language.block-comment-tokens]]
+start = "{{#"
+end = "#}}"
+
 
 [language.indent]
 tab-width = 4
@@ -2084,6 +2560,10 @@ name = "codeql"
 file-types-str = [ "ql", "qll",]
 comment-tokens = [ "//",]
 grammar = "ql"
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -2092,6 +2572,10 @@ unit = "  "
 name = "gren"
 file-types-str = [ "gren",]
 comment-tokens = [ "--",]
+[[language.block-comment-tokens]]
+start = "{-"
+end = "-}"
+
 
 [language.indent]
 tab-width = 4
@@ -2108,6 +2592,22 @@ unit = "  "
 [[language]]
 name = "tera"
 file-types-str = [ "tera",]
+[[language.block-comment-tokens]]
+start = "{#"
+end = "#}"
+
+[[language.block-comment-tokens]]
+start = "{#-"
+end = "-#}"
+
+[[language.block-comment-tokens]]
+start = "{#"
+end = "-#}"
+
+[[language.block-comment-tokens]]
+start = "{#-"
+end = "#}"
+
 
 [language.indent]
 tab-width = 4
@@ -2128,6 +2628,10 @@ file-types-str = [ "csv",]
 name = "yara"
 file-types-str = [ "yara", "yar",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -2136,6 +2640,10 @@ unit = "  "
 name = "ink"
 file-types-str = [ "ink",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 4
@@ -2161,6 +2669,10 @@ unit = "\t"
 name = "tlaplus"
 file-types-str = [ "tla",]
 comment-tokens = [ "\\*",]
+[[language.block-comment-tokens]]
+start = "(*"
+end = "*)"
+
 
 [language.indent]
 tab-width = 4
@@ -2212,6 +2724,10 @@ unit = "  "
 name = "alloy"
 file-types-str = [ "alloy",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -2220,6 +2736,18 @@ unit = "  "
 name = "luau"
 file-types-str = [ "luau",]
 comment-tokens = [ "--", "---",]
+[[language.block-comment-tokens]]
+start = "--[["
+end = "]]"
+
+[[language.block-comment-tokens]]
+start = "--[=["
+end = "]=]"
+
+[[language.block-comment-tokens]]
+start = "--[==["
+end = "]==]"
+
 
 [language.indent]
 tab-width = 2
@@ -2303,6 +2831,10 @@ name = "docker-bake"
 file-types-glob = [ "docker-bake.hcl", "docker-bake.override.hcl",]
 comment-tokens = [ "#",]
 grammar = "hcl"
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -2319,6 +2851,10 @@ unit = "  "
 [[language]]
 name = "wikitext"
 file-types-str = [ "wikimedia", "mediawiki", "wikitext",]
+[[language.block-comment-tokens]]
+start = "<!--"
+end = "-->"
+
 
 [language.indent]
 tab-width = 2
@@ -2343,6 +2879,10 @@ unit = "  "
 name = "kcl"
 file-types-str = [ "kcl",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 2
@@ -2350,6 +2890,14 @@ unit = "  "
 [[language]]
 name = "bovex"
 file-types-str = [ "bovex", "bibvex",]
+[[language.block-comment-tokens]]
+start = "(*"
+end = "*)"
+
+[[language.block-comment-tokens]]
+start = "[*"
+end = "*]"
+
 
 [language.indent]
 tab-width = 2
@@ -2358,6 +2906,14 @@ unit = "  "
 name = "haxe"
 file-types-str = [ "hx",]
 comment-tokens = [ "//", "///",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
+[[language.block-comment-tokens]]
+start = "/**"
+end = "*/"
+
 
 [language.indent]
 tab-width = 4
@@ -2387,6 +2943,10 @@ comment-tokens = [ "#",]
 name = "ripple"
 file-types-str = [ "ripple",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 4
@@ -2404,6 +2964,10 @@ unit = "  "
 name = "chuck"
 file-types-glob = [ "*.ck",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 4
@@ -2456,6 +3020,10 @@ comment-tokens = [ "//",]
 [[language]]
 name = "proverif"
 file-types-str = [ "pv",]
+[[language.block-comment-tokens]]
+start = "(*"
+end = "*)"
+
 
 [language.indent]
 tab-width = 8
@@ -2464,6 +3032,10 @@ unit = "        "
 name = "ptx"
 file-types-str = [ "ptx",]
 comment-tokens = [ "//",]
+[[language.block-comment-tokens]]
+start = "/*"
+end = "*/"
+
 
 [language.indent]
 tab-width = 4

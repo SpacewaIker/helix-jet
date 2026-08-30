@@ -13,15 +13,19 @@ import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.IdeActions
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.command.CommandProcessor
+import com.intellij.openapi.command.undo.UndoManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.LogicalPosition
 import com.intellij.openapi.editor.VisualPosition
 import com.intellij.openapi.editor.ex.util.EditorUtil
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.fileEditor.ex.FileEditorManagerEx
+import com.intellij.openapi.fileEditor.ex.IdeDocumentHistory
 import com.intellij.openapi.fileEditor.impl.EditorComposite
-import com.intellij.openapi.fileEditor.impl.EditorHistoryManager
 import com.intellij.openapi.fileEditor.impl.EditorWindow
 import com.intellij.openapi.fileTypes.PlainTextLanguage
 import com.intellij.openapi.project.guessProjectDir
@@ -34,8 +38,8 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.wm.WindowManager
 import com.intellij.ui.JBColor
 import spacewaiker.helixjet.actions.HJKeyAction.HJAction
+import spacewaiker.helixjet.config.HJLanguage
 import spacewaiker.helixjet.editor.*
-import spacewaiker.helixjet.input.HJInputHandler
 import spacewaiker.helixjet.input.HJInputKey
 import spacewaiker.helixjet.treesitter.HJLanguageSyntax
 import spacewaiker.helixjet.treesitter.HJTreesitterHandling
@@ -210,7 +214,7 @@ private val actionsRaw = arrayOf(
     HJAction("open_above", "Open new line above selection") { open(it, false, true) },
     HJAction("normal_mode", "Enter normal mode") { switchToMode(it, HJEditorMode.Normal) },
     HJAction("select_mode", "Enter selection extend mode") { switchToMode(it, HJEditorMode.Select) },
-    HJAction("exit_select_mode", "Exit selection mode") { if (HJState.mode == HJEditorMode.Select) switchToMode(it, HJEditorMode.Normal) },
+    HJAction("exit_select_mode", "Exit selection mode") { if (it.hjState.mode == HJEditorMode.Select) switchToMode(it, HJEditorMode.Normal) },
     HJAction("goto_definition", "Goto definition") { executeIdeAction(it, IdeActions.ACTION_GOTO_IMPLEMENTATION) },
     HJAction("goto_declaration", "Goto declaration") { executeIdeAction(it, IdeActions.ACTION_GOTO_DECLARATION) },
     HJAction("add_newline_above", "Add newline above") { addNewlineImpl(it, true) },
@@ -268,8 +272,8 @@ private val actionsRaw = arrayOf(
     HJAction("delete_word_forward", "Delete next word") { executeIdeAction(it, IdeActions.ACTION_EDITOR_DELETE_TO_WORD_END); it.hjEditor.setNewSelection(HJSelection(it.hjEditor.editor.caretModel)) },
     HJAction("kill_to_line_start", "Delete till start of line") { killToLineStart(it) },
     HJAction("kill_to_line_end", "Delete till end of line") { killToLineEnd(it) },
-    HJAction("undo", "Undo change") { executeIdeAction(it, IdeActions.ACTION_UNDO); it.hjEditor.setNewSelection(HJSelection(it.hjEditor.editor.caretModel)) },
-    HJAction("redo", "Redo change") { executeIdeAction(it, IdeActions.ACTION_REDO); it.hjEditor.setNewSelection(HJSelection(it.hjEditor.editor.caretModel)) },
+    HJAction("undo", "Undo change") { undoImpl(it, HJDirection.Backward) },
+    HJAction("redo", "Redo change") { undoImpl(it, HJDirection.Forward) },
     HJAction("earlier", "Move backward in history"),
     HJAction("later", "Move forward in history"),
     HJAction("commit_undo_checkpoint", "Commit changes to new checkpoint"),
@@ -291,8 +295,8 @@ private val actionsRaw = arrayOf(
     HJAction("paste_clipboard_before", "Paste clipboard before selections") { pasteImpl(it.copy(register = HJRegister.Clipboard), true) },
     HJAction("paste_primary_clipboard_after", "Paste primary clipboard after selections"),
     HJAction("paste_primary_clipboard_before", "Paste primary clipboard before selections"),
-    HJAction("indent", "Indent selection") { executeIdeAction(it, IdeActions.ACTION_EDITOR_INDENT_SELECTION, true) }, // TODO: indent manually? or update cursor location manually after
-    HJAction("unindent", "Unindent selection") { executeIdeAction(it, IdeActions.ACTION_EDITOR_UNINDENT_SELECTION, true) },
+    HJAction("indent", "Indent selection") { indentImpl(it, HJDirection.Forward) },
+    HJAction("unindent", "Unindent selection") { indentImpl(it, HJDirection.Backward) },
     HJAction("format_selections", "Format selection") { executeIdeAction(it, IdeActions.ACTION_EDITOR_REFORMAT)}, // TODO: only format selected?
     HJAction("join_selections", "Join lines inside selection") { joinSelectionsImpl(it, false) },
     HJAction("join_selections_space", "Join lines inside selection and select spaces") { joinSelectionsImpl(it, true) },
@@ -303,7 +307,7 @@ private val actionsRaw = arrayOf(
     HJAction("remove_primary_selection", "Remove primary selection") { removePrimarySelection(it) },
     HJAction("completion", "Invoke completion popup") { executeIdeAction(it, IdeActions.ACTION_CODE_COMPLETION) },
     HJAction("hover", "Show docs for item under cursor") { executeIdeAction(it, "ShowHoverInfo") },
-    HJAction("toggle_comments", "Comment/uncomment selections"), // TODO: see helix's commenting behaviour
+    HJAction("toggle_comments", "Comment/uncomment selections") { toggleComments(it) },
     HJAction("toggle_line_comments", "Line comment/uncomment selections") { executeIdeAction(it, "CommentByLineComment") },
     HJAction("toggle_block_comments", "Block comment/uncomment selections") { executeIdeAction(it, "CommentByBlockComment") },
     HJAction("rotate_selections_forward", "Rotate selections forward") { rotateSelections(it, HJDirection.Forward) },
@@ -317,8 +321,8 @@ private val actionsRaw = arrayOf(
     HJAction("select_prev_sibling", "Select previous sibling the in syntax tree") { selectSiblingImpl(it, HJTreesitterHandling::selectPrevSibling) },
     HJAction("select_all_siblings", "Select all siblings of the current node") { selectAllImpl(it, HJTreesitterHandling::selectAllSiblings) },
     HJAction("select_all_children", "Select all children of the current node") { selectAllImpl(it, HJTreesitterHandling::selectAllChildren) },
-    HJAction("jump_forward", "Jump forward on jumplist") { jumpForward(it) },
-    HJAction("jump_backward", "Jump backward on jumplist") { jumpBackward(it) },
+    HJAction("jump_forward", "Jump forward on jumplist") {executeIdeAction(it, IdeActions.ACTION_GOTO_FORWARD) },
+    HJAction("jump_backward", "Jump backward on jumplist") { executeIdeAction(it, IdeActions.ACTION_GOTO_BACK) },
     HJAction("save_selection", "Save current selection to jumplist") { saveSelection(it) },
     HJAction("jump_view_right", "Jump to right split") { jumpViewImpl(it, HJNavDirection.Right) },
     HJAction("jump_view_left", "Jump to left split") { jumpViewImpl(it, HJNavDirection.Left) },
@@ -453,15 +457,15 @@ private fun moveWordImpl(cx: HJActionContext, target: HJWordMotionTarget, extend
 }
 
 fun switchToMode(cx: HJActionContext, newMode: HJEditorMode) {
-    if (HJState.mode == newMode) return
-    HJState.mode = newMode
+    if (cx.hjState.mode == newMode) return
+    cx.hjState.mode = newMode
 
     if (newMode == HJEditorMode.Insert) {
         collapseSelection(cx)
-        HJState.typedHandlerBlock = true
+        cx.hjState.typedHandlerBlock = true
     }
 
-    HJState.forAllEditors { it.reloadCaretShapes() }
+    cx.hjState.forAllEditors { it.reloadCaretShapes() }
 
     cx.hjEditor.editor.project?.let {
         WindowManager.getInstance().getStatusBar(it)?.updateWidget(HJStatusBarModeWidget.ID)
@@ -469,7 +473,7 @@ fun switchToMode(cx: HJActionContext, newMode: HJEditorMode) {
 }
 
 fun exitSelectMode(cx: HJActionContext) {
-    if (HJState.mode == HJEditorMode.Select) {
+    if (cx.hjState.mode == HJEditorMode.Select) {
         switchToMode(cx, HJEditorMode.Normal)
     }
 }
@@ -477,7 +481,7 @@ fun exitSelectMode(cx: HJActionContext) {
 private fun insertMode(cx: HJActionContext, append: Boolean): Boolean {
     if (!ensureFileWriteable(cx)) return false
 
-    HJState.lastInsertKeystrokes.clear()
+    cx.hjState.lastInsertKeystrokes.clear()
     val selection = cx.hjEditor.selection.clone().transform {
         val cursor = if (append) it.to else it.from
         HJRange.point(cursor)
@@ -544,6 +548,7 @@ private fun collapseSelection(cx: HJActionContext) {
 }
 
 private fun deleteSelectionImpl(cx: HJActionContext, change: Boolean, yank: Boolean) {
+    if (!ensureFileWriteable(cx)) return
     val onlyWholeLines = cx.hjEditor.selectionIsLinewise
 
     if (yank) {
@@ -611,7 +616,7 @@ private fun yankImpl(cx: HJActionContext, selection: HJSelection, register: HJRe
     val selections = values.size
 
     val plural = if (selections == 1) "" else "s"
-    if (HJState.registers.write(register, values, cx.hjEditor)) {
+    if (cx.hjState.registers.write(register, values, cx.hjEditor)) {
         cx.hjEditor.setStatus("Yanked $selections selection$plural to register $register")
     }
 }
@@ -630,14 +635,14 @@ fun yankJoinedImpl(cx: HJActionContext, separator: String, register: HJRegister)
         .toString()
 
     val plural = if (selections == 1) "" else "s"
-    if (HJState.registers.write(register, listOf(joined), cx.hjEditor)) {
+    if (cx.hjState.registers.write(register, listOf(joined), cx.hjEditor)) {
         cx.hjEditor.setStatus("Joined and yanked $selections selection$plural to register $register")
     }
 }
 
 fun yankMainSelectionImpl(cx: HJActionContext, register: HJRegister) {
     val selection = cx.hjEditor.selection.primary.slice(cx.doc) ?: return
-    if (HJState.registers.write(register, listOf(selection), cx.hjEditor)) {
+    if (cx.hjState.registers.write(register, listOf(selection), cx.hjEditor)) {
         cx.hjEditor.setStatus("Yanked primary selection to register $register")
     }
 }
@@ -645,7 +650,7 @@ fun yankMainSelectionImpl(cx: HJActionContext, register: HJRegister) {
 private fun pasteImpl(cx: HJActionContext, pasteBefore: Boolean, registerOverride: HJRegister? = null) {
     if (!ensureFileWriteable(cx)) return
     val register = registerOverride ?: cx.register ?: HJRegister.LastYank
-    val registerContents = HJState.registers.read(register, cx.hjEditor) ?: return
+    val registerContents = cx.hjState.registers.read(register, cx.hjEditor) ?: return
     if (registerContents.isEmpty()) return
 
     // if any of values ends with a line ending, it's linewise paste
@@ -683,7 +688,7 @@ private fun pasteImpl(cx: HJActionContext, pasteBefore: Boolean, registerOverrid
         HJChange.Insert(pos, value)
     }
 
-    if (HJState.mode == HJEditorMode.Normal) {
+    if (cx.hjState.mode == HJEditorMode.Normal) {
         transaction = transaction.copy(selection = HJSelection(ranges, cx.hjEditor.selection.primaryIndex))
     }
 
@@ -691,17 +696,17 @@ private fun pasteImpl(cx: HJActionContext, pasteBefore: Boolean, registerOverrid
 }
 
 private fun replaceWithYanked(cx: HJActionContext) {
-    replaceSelectionsWithRegister(cx.hjEditor, HJRegister.LastYank, cx.count)
+    replaceSelectionsWithRegister(cx, HJRegister.LastYank, cx.count)
     exitSelectMode(cx)
 }
 
 private fun replaceWithClipboard(cx: HJActionContext) {
-    replaceSelectionsWithRegister(cx.hjEditor, HJRegister.Clipboard, cx.count)
+    replaceSelectionsWithRegister(cx, HJRegister.Clipboard, cx.count)
     exitSelectMode(cx)
 }
 
-private fun replaceSelectionsWithRegister(editor: HJEditor, register: HJRegister, count: Int) {
-    val values = HJState.registers.read(register, editor)?.filter { it.isNotEmpty() } ?: return
+private fun replaceSelectionsWithRegister(cx: HJActionContext, register: HJRegister, count: Int) {
+    val values = cx.hjState.registers.read(register, cx.hjEditor)?.filter { it.isNotEmpty() } ?: return
 
     val mapValue = { value: String ->
         val value = LINE_ENDING_REGEX.replace(value, "\n")
@@ -715,12 +720,12 @@ private fun replaceSelectionsWithRegister(editor: HJEditor, register: HJRegister
     val last = values.last()
     val repeat = generateSequence(mapValue(last)) { it }
     val valuesIt = (values.map(mapValue).asSequence() + repeat).iterator()
-    val transaction = editor.changeBySelection { range ->
+    val transaction = cx.hjEditor.changeBySelection { range ->
         if (!range.isEmpty) {
             HJChange.Replace(range.from, range.to, valuesIt.next())
         } else null
     }
-    editor.apply(transaction)
+    cx.hjEditor.apply(transaction)
 }
 
 fun executeIdeAction(cx: HJActionContext, actionId: String, extendLines: Boolean = false) {
@@ -735,7 +740,7 @@ fun executeIdeAction(cx: HJActionContext, actionId: String, extendLines: Boolean
     }
     repeat(cx.count) {
         ActionManager.getInstance()
-            .tryToExecute(action, null, cx.hjEditor.editor.contentComponent, ActionPlaces.UNKNOWN, true)
+            .tryToExecute(action, cx.inputEvent, cx.hjEditor.editor.contentComponent, ActionPlaces.UNKNOWN, true)
     }
     if (extendLines) {
         cx.hjEditor.setNewSelection(selection)
@@ -743,7 +748,7 @@ fun executeIdeAction(cx: HJActionContext, actionId: String, extendLines: Boolean
 }
 
 private fun findChar(cx: HJActionContext, direction: HJDirection, inclusive: Boolean, extend: Boolean) {
-    HJInputHandler.onNextKey { key: HJInputKey ->
+    cx.inputHandler.onNextKey { key: HJInputKey ->
         val motion = if (key is HJInputKey.Character || (
                     key is HJInputKey.Other && (key.code == KeyEvent.VK_ENTER || key.code == KeyEvent.VK_TAB))
         ) {
@@ -810,7 +815,7 @@ private fun findChar(cx: HJActionContext, direction: HJDirection, inclusive: Boo
 }
 
 private fun replace(cx: HJActionContext) {
-    HJInputHandler.onNextKey { key: HJInputKey ->
+    cx.inputHandler.onNextKey { key: HJInputKey ->
         val char = when (key) {
             is HJInputKey.Character -> key.char
             is HJInputKey.Other if key.code == KeyEvent.VK_ENTER -> '\n'
@@ -819,6 +824,8 @@ private fun replace(cx: HJActionContext) {
         }
 
         if (char != null) {
+            if (!ensureFileWriteable(cx)) return@onNextKey
+
             val transaction = cx.hjEditor.changeBySelection { range ->
                 if (range.isEmpty) {
                     // no change
@@ -991,8 +998,8 @@ private fun alignViewImpl(cx: HJActionContext, align: HJAlignment) {
 
     val relative = when (align) {
         HJAlignment.Center -> lastLineHeight / 2
-        HJAlignment.Top -> HJState.config.scrolloff
-        HJAlignment.Bottom -> lastLineHeight - HJState.config.scrolloff
+        HJAlignment.Top -> cx.hjState.config.scrolloff
+        HJAlignment.Bottom -> lastLineHeight - cx.hjState.config.scrolloff
     }
 
     val scrollTo = (cursorRow - relative).coerceAtLeast(0) * lineHeight
@@ -1068,35 +1075,37 @@ private fun extendLine(cx: HJActionContext) {
 }
 
 private fun extendImpl(cx: HJActionContext, below: Boolean) {
-    val lastLine = (cx.doc.lineCount - 1).coerceAtLeast(0)
-
-    val selection = cx.hjEditor.selection.clone().transform { range ->
-        val (startLine, endLine) = range.lineRange(cx.doc)
-
-        val start = cx.doc.getLineStartOffset(startLine)
-        val end = 1 + cx.doc.getLineEndOffset(endLine.coerceAtMost(lastLine))
-
-        val (anchor, head) = if (range.from == start && range.to == end) {
-            if (below) {
-                Pair(start, 1 + cx.doc.getLineEndOffset((endLine + cx.count).coerceAtMost(lastLine)))
-            } else {
-                Pair(end, cx.doc.getLineStartOffset((startLine - cx.count).coerceAtLeast(0)))
-            }
-        } else {
-            if (below) {
-                Pair(start, 1 + cx.doc.getLineEndOffset((endLine + cx.count - 1).coerceAtMost(lastLine)))
-            } else {
-                Pair(end, cx.doc.getLineStartOffset((startLine - (cx.count - 1)).coerceAtLeast(0)))
-            }
-        }
-
-        // helix handles the above only with "lineStartOffset". If we do this here, we can't select the last line of a file
-        // so instead we opt for line start and line end + 1. That means we need to check that we're not trying to select
-        // past the very last character
-        val lastOffset = cx.doc.textLength // last caret position is last char + 1
-        HJRange(anchor, head.coerceAtMost(lastOffset))
-    }
+    val selection = cx.hjEditor.selection.clone().transform { extendRange(cx, below, it) }
     cx.hjEditor.setNewSelection(selection)
+}
+
+fun extendRange(cx: HJActionContext, below: Boolean, range: HJRange): HJRange {
+    val lastLine = (cx.doc.lineCount - 1).coerceAtLeast(0)
+    val (startLine, endLine) = range.lineRange(cx.doc)
+
+    val start = cx.doc.getLineStartOffset(startLine)
+    val end = 1 + cx.doc.getLineEndOffset(endLine.coerceAtMost(lastLine))
+
+    val (anchor, head) = if (range.from == start && range.to == end) {
+        if (below) {
+            Pair(start, 1 + cx.doc.getLineEndOffset((endLine + cx.count).coerceAtMost(lastLine)))
+        } else {
+            Pair(end, cx.doc.getLineStartOffset((startLine - cx.count).coerceAtLeast(0)))
+        }
+    } else {
+        if (below) {
+            Pair(start, 1 + cx.doc.getLineEndOffset((endLine + cx.count - 1).coerceAtMost(lastLine)))
+        } else {
+            Pair(end, cx.doc.getLineStartOffset((startLine - (cx.count - 1)).coerceAtLeast(0)))
+        }
+    }
+
+    // helix handles the above only with "lineStartOffset". If we do this here, we can't select the last line of a file
+    // so instead we opt for line start and line end + 1. That means we need to check that we're not trying to select
+    // past the very last character
+    val lastOffset = cx.doc.textLength // last caret position is last char + 1
+    return HJRange(anchor, head.coerceAtMost(lastOffset))
+
 }
 
 private fun gotoLineImpl(cx: HJActionContext, extend: Boolean) {
@@ -1110,7 +1119,6 @@ private fun gotoLineImpl(cx: HJActionContext, extend: Boolean) {
         val lineIdx = (cx.count - 1).coerceAtMost(maxLine)
         val pos = cx.doc.getLineStartOffset(lineIdx)
         val selection = cx.hjEditor.selection.clone().transform { it.putCursor(cx.doc, pos, extend) }
-        pushJump(cx.hjEditor)
         cx.hjEditor.setNewSelection(selection)
     }
 }
@@ -1120,7 +1128,6 @@ private fun gotoFileStartImpl(cx: HJActionContext, extend: Boolean) {
         gotoLineImpl(cx, extend)
     } else {
         val selection = cx.hjEditor.selection.clone().transform { it.putCursor(cx.doc, 0, extend) }
-        pushJump(cx.hjEditor)
         cx.hjEditor.setNewSelection(selection)
     }
 }
@@ -1128,7 +1135,6 @@ private fun gotoFileStartImpl(cx: HJActionContext, extend: Boolean) {
 private fun gotoFileEndImpl(cx: HJActionContext, extend: Boolean) {
     val end = cx.doc.textLength
     val selection = cx.hjEditor.selection.clone().transform { it.putCursor(cx.doc, end, extend) }
-    pushJump(cx.hjEditor)
     cx.hjEditor.setNewSelection(selection)
 }
 
@@ -1151,7 +1157,7 @@ private fun gotoLineStartEndImpl(cx: HJActionContext, start: Boolean, extend: Bo
 }
 
 private fun gotoLineStartEnd(cx: HJActionContext, start: Boolean) {
-    gotoLineStartEndImpl(cx, start, HJState.mode == HJEditorMode.Select)
+    gotoLineStartEndImpl(cx, start, cx.hjState.mode == HJEditorMode.Select)
 }
 
 private fun gotoFirstNonWhitespaceImpl(cx: HJActionContext, extend: Boolean) {
@@ -1168,7 +1174,7 @@ private fun gotoFirstNonWhitespaceImpl(cx: HJActionContext, extend: Boolean) {
 }
 
 private fun gotoFirstNonWhitespace(cx: HJActionContext) {
-    gotoFirstNonWhitespaceImpl(cx, HJState.mode == HJEditorMode.Select)
+    gotoFirstNonWhitespaceImpl(cx, cx.hjState.mode == HJEditorMode.Select)
 }
 
 private fun gotoLineEndNewlineImpl(cx: HJActionContext, extend: Boolean) {
@@ -1182,13 +1188,11 @@ private fun gotoLineEndNewlineImpl(cx: HJActionContext, extend: Boolean) {
 }
 
 private fun gotoLineEndNewline(cx: HJActionContext) {
-    gotoLineEndNewlineImpl(cx, HJState.mode == HJEditorMode.Select)
+    gotoLineEndNewlineImpl(cx, cx.hjState.mode == HJEditorMode.Select)
 }
 
 private fun gotoFileImpl(cx: HJActionContext, location: HJFileOpenLocation) {
     // TODO: detect URL/path from LSP?
-    val project = cx.hjEditor.editor.project!!
-
     val relPath = Path(cx.hjEditor.editor.virtualFile.path)
 
     val paths = cx.hjEditor.selection.ranges.mapNotNull { range ->
@@ -1235,7 +1239,6 @@ private fun gotoDiagnosticImpl(cx: HJActionContext, gotoTarget: HJGotoTarget) {
     val endOffsetFn = { diagnostic: HighlightInfo -> diagnostic.endOffset }
     val targetDiagnostic = gotoElementInList(cx, diagnostics, gotoTarget, startOffsetFn, endOffsetFn) ?: return
 
-    pushJump(cx.hjEditor)
     cx.hjEditor.setNewSelection(HJSelection(HJRange(targetDiagnostic.startOffset, targetDiagnostic.endOffset)))
 }
 
@@ -1248,13 +1251,12 @@ private fun gotoChangeImpl(cx: HJActionContext, gotoTarget: HJGotoTarget) {
     val endOffsetFn = { change: TextRange -> change.startOffset }
     val targetChange = gotoElementInList(cx, changes, gotoTarget, startOffsetFn, endOffsetFn) ?: return
 
-    pushJump(cx.hjEditor)
     cx.hjEditor.setNewSelection(HJSelection(HJRange(targetChange.startOffset, targetChange.endOffset)))
 }
 
 private fun gotoWindowImpl(cx: HJActionContext, align: HJAlignment) {
     val view = cx.hjEditor.editor.scrollingModel.visibleArea
-    val scrolloffOffset = HJState.config.scrolloff
+    val scrolloffOffset = cx.hjState.config.scrolloff
     val countOffset = cx.rawCount ?: 0
 
     val topLine = (cx.hjEditor.editor.xyToLogicalPosition(Point(0, view.y)).line
@@ -1271,7 +1273,7 @@ private fun gotoWindowImpl(cx: HJActionContext, align: HJAlignment) {
     val offset = cx.doc.getLineStartOffset(visualLine)
 
     val selection = cx.hjEditor.selection.clone()
-        .transform { it.putCursor(cx.doc, offset, HJState.mode == HJEditorMode.Select) }
+        .transform { it.putCursor(cx.doc, offset, cx.hjState.mode == HJEditorMode.Select) }
     cx.hjEditor.setNewSelection(selection)
 }
 
@@ -1296,20 +1298,19 @@ private fun gotoTsObjectImpl(cx: HJActionContext, tsObject: String, direction: H
                 cx.count
             )
 
-            if (HJState.mode == HJEditorMode.Select) {
+            if (cx.hjState.mode == HJEditorMode.Select) {
                 val head = if (newRange.head < range.anchor) newRange.anchor else newRange.head
                 HJRange(range.anchor, head)
             } else newRange.withDirection(direction)
         }
 
-        pushJump(cx.hjEditor)
         hjEditor.setNewSelection(selection)
     }
 }
 
 private fun gotoParagraphImpl(cx: HJActionContext, direction: HJDirection) {
     cx.hjEditor.applyMotion { hJEditor ->
-        val extend = HJState.mode == HJEditorMode.Select
+        val extend = cx.hjState.mode == HJEditorMode.Select
         val moveFn = when (direction) {
             HJDirection.Forward -> ::moveNextParagraph
             HJDirection.Backward -> ::movePrevParagraph
@@ -1323,18 +1324,15 @@ private fun gotoParagraphImpl(cx: HJActionContext, direction: HJDirection) {
 }
 
 private fun gotoLastAccessedFile(cx: HJActionContext) {
-    val project = cx.hjEditor.editor.project!!
-    val history = EditorHistoryManager.getInstance(project).fileList
-    if (history.size < 2) return
-    val lastFile = history[history.size - 2]
+    val lastFile = cx.hjState.previousEditor?.editor?.virtualFile ?: return
     openFile(cx, lastFile)
 }
 
 private fun gotoLastModifiedFile(cx: HJActionContext, gotoModification: Boolean) {
-    val lastModification = HJState.lastModification ?: return
+    val lastModification = cx.hjState.lastModification ?: return
     val fileEditor = openFile(cx, lastModification.first) ?: return
     if (gotoModification) {
-        val hjEditor = HJState.getHJEditor((fileEditor as TextEditor).editor) ?: return
+        val hjEditor = cx.hjState.getHJEditor((fileEditor as TextEditor).editor) ?: return
         hjEditor.setNewSelection(HJSelection(HJRange.point(lastModification.second)))
     }
 }
@@ -1423,7 +1421,7 @@ private fun selectAllImpl(cx: HJActionContext, selectFn: (HJLanguageSyntax, Docu
 private fun jumpToWord(cx: HJActionContext, extend: Boolean) {
     // Calculate the jump candidates: ranges for any visible words with two or more characters.
 
-    val alphabet = HJState.config.jumpLabelAlphabet
+    val alphabet = cx.hjState.config.jumpLabelAlphabet
     val jumpLabelLimit = alphabet.size * alphabet.size
     val words = mutableListOf<HJRange>()
 
@@ -1508,7 +1506,7 @@ private fun jumpToWord(cx: HJActionContext, extend: Boolean) {
 }
 
 private fun jumpToLabel(cx: HJActionContext, labels: List<HJRange>, extend: Boolean) {
-    val alphabet = HJState.config.jumpLabelAlphabet
+    val alphabet = cx.hjState.config.jumpLabelAlphabet
     if (labels.isEmpty()) {
         return
     }
@@ -1522,7 +1520,7 @@ private fun jumpToLabel(cx: HJActionContext, labels: List<HJRange>, extend: Bool
 
     // Accept two characters matching a visible label. Jump to the candidate for that label if it exists
     val primarySelection = cx.hjEditor.selection.primary
-    HJInputHandler.onNextKey { inputKey ->
+    cx.inputHandler.onNextKey { inputKey ->
         val i = if (inputKey is HJInputKey.Character && !(inputKey.ctrl || inputKey.shift || inputKey.alt)) {
             inputKey.char.let { alphabet.indexOfOrNull(it) }
         } else null
@@ -1532,7 +1530,7 @@ private fun jumpToLabel(cx: HJActionContext, labels: List<HJRange>, extend: Bool
             return@onNextKey
         }
         val outer = i * alphabet.size
-        HJInputHandler.onNextKey { inputKey ->
+        cx.inputHandler.onNextKey { inputKey ->
             cx.hjEditor.hideJumpLabels()
 
             val inner = if (inputKey is HJInputKey.Character && !(inputKey.ctrl || inputKey.shift || inputKey.alt)) {
@@ -1560,7 +1558,7 @@ private fun jumpToLabel(cx: HJActionContext, labels: List<HJRange>, extend: Bool
 
 private fun commandPalette(cx: HJActionContext) {
     val actions =
-        HJState.config.allActionsWithBindings(HJState.mode).filterNot { (action, _) -> action.name == "no_op" }
+        cx.hjState.config.allActionsWithBindings(cx.hjState.mode).filterNot { (action, _) -> action.name == "no_op" }
     val commands = HJCommands.allCommands.map { command -> Pair(command, listOf<List<HJInputKey>>()) }
     val data = actions + commands
 
@@ -1617,12 +1615,14 @@ private fun mergeConsecutiveSelections(cx: HJActionContext) {
 }
 
 private fun open(cx: HJActionContext, openBelow: Boolean, commentContinuationEnabled: Boolean) {
-    if (!insertMode(cx, false)) return
+    if (!ensureFileWriteable(cx)) return
+    collapseSelection(cx)
+    insertMode(cx, false)
 
     var offs = 0
     val ranges = mutableListOf<HJRange>()
 
-    val continueCommentTokens = if (commentContinuationEnabled && HJState.config.continueComments) {
+    val continueCommentTokens = if (commentContinuationEnabled && cx.hjState.config.continueComments) {
         val language = cx.hjEditor.psiFile?.language
         if (language != null) {
             val commenter = LanguageCommenters.INSTANCE.forLanguage(language)
@@ -1650,9 +1650,14 @@ private fun open(cx: HJActionContext, openBelow: Boolean, commentContinuationEna
         //       |     } // end of code block, open on next line
         //       |
         //       |     ^ should open here but opens at very start of line instead
+//        val line = cx.doc.getLine(currLineNum)!!
 //        val indent = when (val pos = firstNonWhitespaceChar(line)) {
 //            is Int if continueCommentToken != null -> line.substring(0, pos)
-//            else -> cx.hjEditor.codeStyleManager?.getLineIndent(cx.doc, cx.doc.getLineStartOffset(nextNewLineNum))
+////            else -> cx.hjEditor.codeStyleManager?.getLineIndent(cx.doc, cx.doc.getLineStartOffset(nextNewLineNum))
+//            else -> cx.hjEditor.codeStyleManager?.getLineIndent(
+//                cx.doc,
+//                cx.doc.getLineEndOffset(if (openBelow) currLineNum else (currLineNum - 1).coerceAtLeast(0))
+//            )
 //                ?: (cx.hjEditor.language?.indent?.unit ?: "")
 //        }
         var indent = ""
@@ -1709,7 +1714,7 @@ private fun open(cx: HJActionContext, openBelow: Boolean, commentContinuationEna
 }
 
 private fun matchBrackets(cx: HJActionContext) {
-    val isSelection = HJState.mode == HJEditorMode.Select
+    val isSelection = cx.hjState.mode == HJEditorMode.Select
     val syntax = cx.hjEditor.syntax
 
     val selection = cx.hjEditor.selection.clone().transform { range ->
@@ -1735,7 +1740,7 @@ private val surroundHelpTextLines = listOf(
 )
 
 private fun surroundAdd(cx: HJActionContext) {
-    HJInputHandler.onNextKey { inputKey ->
+    cx.inputHandler.onNextKey { inputKey ->
         val (open, close, surroundLen) = when (inputKey) {
             is HJInputKey.Character -> {
                 val (o, c) = HJMatchBrackets.getPair(inputKey.char)
@@ -1765,12 +1770,12 @@ private fun surroundAdd(cx: HJActionContext) {
         switchToMode(cx, HJEditorMode.Normal)
     }
 
-    HJState.getOrCreateHelpWidget(cx.hjEditor.editor)
+    cx.hjState.getOrCreateHelpWidget(cx.hjEditor.editor)
         .setHelpContent("Surround selections with", surroundHelpTextLines.drop(1))
 }
 
 private fun surroundReplace(cx: HJActionContext) {
-    HJInputHandler.onNextKey { inputKey ->
+    cx.inputHandler.onNextKey { inputKey ->
         val surroundCh = when (inputKey) {
             is HJInputKey.Character if inputKey.char == 'm' -> null
             is HJInputKey.Character -> inputKey.char
@@ -1787,7 +1792,7 @@ private fun surroundReplace(cx: HJActionContext) {
         val ranges = changePos.map { p -> HJRange.point(p) }
         cx.hjEditor.setNewSelection(HJSelection(ranges, selection.primaryIndex * 2))
 
-        HJInputHandler.onNextKey { inputKey ->
+        cx.inputHandler.onNextKey { inputKey ->
             val to = when (inputKey) {
                 is HJInputKey.Character -> inputKey.char
                 is HJInputKey.Other if inputKey.code == KeyEvent.VK_SPACE -> ' '
@@ -1815,16 +1820,16 @@ private fun surroundReplace(cx: HJActionContext) {
             switchToMode(cx, HJEditorMode.Normal)
         }
 
-        HJState.getOrCreateHelpWidget(cx.hjEditor.editor)
+        cx.hjState.getOrCreateHelpWidget(cx.hjEditor.editor)
             .setHelpContent("Replace with a pair of", surroundHelpTextLines.drop(1))
     }
 
-    HJState.getOrCreateHelpWidget(cx.hjEditor.editor)
+    cx.hjState.getOrCreateHelpWidget(cx.hjEditor.editor)
         .setHelpContent("Replace surrounding pair of", surroundHelpTextLines)
 }
 
 private fun surroundDelete(cx: HJActionContext) {
-    HJInputHandler.onNextKey { inputKey ->
+    cx.inputHandler.onNextKey { inputKey ->
         val surroundCh = when (inputKey) {
             is HJInputKey.Character if inputKey.char == 'm' -> null
             is HJInputKey.Character -> inputKey.char
@@ -1843,7 +1848,7 @@ private fun surroundDelete(cx: HJActionContext) {
         switchToMode(cx, HJEditorMode.Normal)
     }
 
-    HJState.getOrCreateHelpWidget(cx.hjEditor.editor)
+    cx.hjState.getOrCreateHelpWidget(cx.hjEditor.editor)
         .setHelpContent("Delete surrounding pair of", surroundHelpTextLines)
 }
 
@@ -1855,7 +1860,7 @@ private fun searchImpl(
     direction: HJDirection,
     showWarnings: Boolean,
 ) {
-    val wrapAround = HJState.config.searchWrapAround
+    val wrapAround = cx.hjState.config.searchWrapAround
     val doc = cx.doc.text
 
     // get the right side of the primary block cursor for forward search, or the grapheme before the start of the selection for reverse
@@ -1909,8 +1914,10 @@ private fun searchImpl(
 }
 
 private fun searcher(cx: HJActionContext, direction: HJDirection) {
-    val extend = HJState.mode == HJEditorMode.Select
+    val extend = cx.hjState.mode == HJEditorMode.Select
     val snapshot = cx.hjEditor.selection.clone()
+
+    cx.hjState.typedHandlerBlock = true
 
     val onEvent = onEvent@{ e: HJPromptEvent, pattern: String? ->
         when (e) {
@@ -1919,7 +1926,7 @@ private fun searcher(cx: HJActionContext, direction: HJDirection) {
             }
 
             HJPromptEvent.Update if pattern != null -> {
-                val regex = regex(pattern)
+                val regex = regex(pattern, cx.hjState)
                 if (regex == null) {
                     cx.hjEditor.setError("Invalid regex: $pattern")
                 } else {
@@ -1937,8 +1944,8 @@ private fun searcher(cx: HJActionContext, direction: HJDirection) {
 private fun searchNextOrPrevImpl(cx: HJActionContext, extend: Boolean, direction: HJDirection) {
     val register = HJRegister.LastSearch
 
-    HJState.registers.first(register, cx.hjEditor)?.let { pattern ->
-        val regex = regex(pattern)
+    cx.hjState.registers.first(register, cx.hjEditor)?.let { pattern ->
+        val regex = regex(pattern, cx.hjState)
         if (regex == null) {
             cx.hjEditor.setError("Invalid regex: $pattern")
         } else {
@@ -1950,7 +1957,7 @@ private fun searchNextOrPrevImpl(cx: HJActionContext, extend: Boolean, direction
 }
 
 private fun selectTextObject(cx: HJActionContext, objtype: HJTextObject.TextObject) {
-    HJInputHandler.onNextKey { inputKey ->
+    cx.inputHandler.onNextKey { inputKey ->
         if (inputKey !is HJInputKey.Character) return@onNextKey
         cx.hjEditor.applyMotion { hjEditor ->
             val textobjectTreesitter = textobjectTreesitter@{ objName: String, range: HJRange ->
@@ -1996,7 +2003,7 @@ private fun selectTextObject(cx: HJActionContext, objtype: HJTextObject.TextObje
         HJTextObject.TextObject.Around -> "Match around"
         else -> return
     }
-    HJState.getOrCreateHelpWidget(cx.hjEditor.editor).setHelpContent(
+    cx.hjState.getOrCreateHelpWidget(cx.hjEditor.editor).setHelpContent(
         title, listOf(
             Pair("w", "Word"),
             Pair("W", "WORD"),
@@ -2016,25 +2023,25 @@ private fun selectTextObject(cx: HJActionContext, objtype: HJTextObject.TextObje
 }
 
 private fun filePickerImpl(cx: HJActionContext, title: String, directory: VirtualFile) {
-    val project = cx.hjEditor.editor.project!!
     val model = HJStreamingTableModel<VirtualFile>(listOf("File")) { file, _ -> file.path.removePrefix(directory.path) }
     val previewSelector = { rowIdx: Int -> Pair(model.tableData[rowIdx], null) }
 
     HJPickerWithPreview(cx.hjEditor.editor, title, model, previewSelector) { rowIdx ->
         val file = model.tableData[rowIdx]
-        openFile(cx, file)
+        // invokeLater so that the picker gets closed first, then we open the file
+        ApplicationManager.getApplication().invokeLater {
+            openFile(cx, file)
+        }
     }.populateRowsAsync {
-        getAllProjectFiles(project) { model.addRow(it) }
+        getAllProjectFiles(cx.project) { model.addRow(it) }
     }.show()
 }
 
 private fun changedFilePicker(cx: HJActionContext) {
-    val project = cx.hjEditor.editor.project!!
-
-    val changeListManager = ChangeListManager.getInstance(project)
+    val changeListManager = ChangeListManager.getInstance(cx.project)
     val data = changeListManager.allChanges.distinctBy { it.virtualFile }
 
-    val projectRoot = project.guessProjectDir()?.path ?: ""
+    val projectRoot = cx.project.guessProjectDir()?.path ?: ""
     val model = HJTableModel(data, listOf("Change", "Path")) { change, col ->
         when (col) {
             0 -> when (change.type) {
@@ -2067,7 +2074,7 @@ private fun changedFilePicker(cx: HJActionContext) {
 }
 
 private fun filePickerProjectRoot(cx: HJActionContext) {
-    val projectDir = cx.hjEditor.editor.project!!.guessProjectDir()
+    val projectDir = cx.project.guessProjectDir()
     if (projectDir == null) {
         cx.hjEditor.setError("Could not find project directory")
     } else {
@@ -2153,14 +2160,14 @@ private fun searchSelectionImpl(cx: HJActionContext, detectWordBoundaries: Boole
         .toList()
         .joinToString(separator = "|")
 
-    if (HJState.registers.push(register, regex, cx.hjEditor)) {
+    if (cx.hjState.registers.push(register, regex, cx.hjEditor)) {
         cx.hjEditor.setStatus("register '$register' set to '$regex'")
     }
 }
 
 private fun makeSearchWordBounded(cx: HJActionContext) {
     val register = cx.register ?: HJRegister.LastSearch
-    val regex = HJState.registers.first(register, cx.hjEditor) ?: return
+    val regex = cx.hjState.registers.first(register, cx.hjEditor) ?: return
 
     val startAnchored = regex.startsWith("\\b")
     val endAnchored = regex.endsWith("\\b")
@@ -2172,7 +2179,7 @@ private fun makeSearchWordBounded(cx: HJActionContext) {
     newRegex += regex
     if (!endAnchored) newRegex += "\\b"
 
-    if (HJState.registers.push(register, newRegex, cx.hjEditor)) {
+    if (cx.hjState.registers.push(register, newRegex, cx.hjEditor)) {
         cx.hjEditor.setStatus("register '$register' set to '$newRegex'")
     }
 }
@@ -2267,11 +2274,9 @@ private fun ensureSelectionsForward(cx: HJActionContext) {
 }
 
 private fun bufferPicker(cx: HJActionContext) {
-    val project = cx.hjEditor.editor.project!!
-
-    val fileEditorManager = FileEditorManagerEx.getInstanceEx(project)
+    val fileEditorManager = FileEditorManagerEx.getInstanceEx(cx.project)
     val data = fileEditorManager.allEditors.toList()
-    val rootDir = project.guessProjectDir()?.path ?: ""
+    val rootDir = cx.project.guessProjectDir()?.path ?: ""
 
     val model = HJTableModel(data, listOf("Flags", "Path")) { fileEditor, col ->
         when (col) {
@@ -2359,16 +2364,14 @@ private fun diagnosticPicker(cx: HJActionContext) {
 }
 
 private fun diagnosticPickerWorkspace(cx: HJActionContext) {
-    val project = cx.hjEditor.editor.project!!
-
-    val fileEditorManager = FileEditorManagerEx.getInstanceEx(project)
+    val fileEditorManager = FileEditorManagerEx.getInstanceEx(cx.project)
     val data = fileEditorManager.allEditors
         .filterIsInstance<TextEditor>()
         .flatMap { textEditor ->
             getDiagnostics(textEditor.editor).map { Pair(textEditor.editor, it) }
         }
 
-    val projectRoot = project.guessProjectDir()?.path ?: ""
+    val projectRoot = cx.project.guessProjectDir()?.path ?: ""
     val model = HJTableModel(data, listOf("Severity", "Path", "Message")) { (editor, highlightInfo), col ->
         when (col) {
             0 -> when (val severity = highlightInfo.severity) {
@@ -2402,7 +2405,7 @@ private fun diagnosticPickerWorkspace(cx: HJActionContext) {
         openFile(cx, editor.virtualFile)
 
         // set selection
-        val hjEditor = HJState.getHJEditor(editor)
+        val hjEditor = cx.hjState.getHJEditor(editor)
         hjEditor?.setNewSelection(HJSelection(HJRange(info.startOffset, info.endOffset)))
     }.show()
 }
@@ -2426,7 +2429,6 @@ private fun gotoColumnImpl(cx: HJActionContext, extend: Boolean) {
         val pos = (lineStart + cx.count).coerceAtMost(lineEnd)
         range.putCursor(cx.doc, pos, extend)
     }
-    pushJump(cx.hjEditor)
     cx.hjEditor.setNewSelection(selection)
 }
 
@@ -2541,7 +2543,7 @@ private fun keepOrRemoveSelectionsImpl(cx: HJActionContext, remove: Boolean) {
 
             HJPromptEvent.Update -> {
                 if (regex.isNullOrEmpty()) return@onEvent
-                val regex = regex(regex) ?: return@onEvent
+                val regex = regex(regex, cx.hjState) ?: return@onEvent
                 val selection = keepOrRemoveMatches(cx.doc.text, snapshot, regex, remove)
                 if (selection != null) {
                     cx.hjEditor.setNewSelection(selection)
@@ -2666,8 +2668,7 @@ private fun reorderSelectionContents(cx: HJActionContext, strategy: HJReorderStr
 }
 
 private fun getWindowInDirection(cx: HJActionContext, direction: HJNavDirection): EditorWindow? {
-    val project = cx.hjEditor.editor.project!!
-    val manager = FileEditorManagerEx.getInstanceEx(project)
+    val manager = FileEditorManagerEx.getInstanceEx(cx.project)
     val currentWindow = manager.currentWindow ?: return null
 
     val getScreenBounds = getScreenBounds@{ window: EditorWindow ->
@@ -2712,8 +2713,7 @@ private fun jumpViewImpl(cx: HJActionContext, direction: HJNavDirection) {
 }
 
 private fun swapViewImpl(cx: HJActionContext, direction: HJNavDirection) {
-    val project = cx.hjEditor.editor.project!!
-    val manager = FileEditorManagerEx.getInstanceEx(project)
+    val manager = FileEditorManagerEx.getInstanceEx(cx.project)
     val current = manager.currentWindow?.selectedComposite?.component?.parent as? JComponent ?: return
     val target = getWindowInDirection(cx, direction)?.selectedComposite?.component?.parent as? JComponent ?: return
 
@@ -2771,8 +2771,7 @@ private fun swapViewImpl(cx: HJActionContext, direction: HJNavDirection) {
 }
 
 private fun transposeSplit(cx: HJActionContext) {
-    val project = cx.hjEditor.editor.project!!
-    val manager = FileEditorManagerEx.getInstanceEx(project)
+    val manager = FileEditorManagerEx.getInstanceEx(cx.project)
     val current = manager.currentWindow?.selectedComposite?.component?.parent as? JComponent ?: return
 
     val currentParent = current.parent as? Splitter ?: return
@@ -2782,8 +2781,7 @@ private fun transposeSplit(cx: HJActionContext) {
 }
 
 private fun rotateViewImpl(cx: HJActionContext, direction: HJDirection) {
-    val project = cx.hjEditor.editor.project!!
-    val manager = FileEditorManagerEx.getInstanceEx(project)
+    val manager = FileEditorManagerEx.getInstanceEx(cx.project)
     val currentWindow = manager.currentWindow ?: return
 
     val currentIndex = manager.windows.indexOf(currentWindow)
@@ -2798,9 +2796,8 @@ private fun rotateViewImpl(cx: HJActionContext, direction: HJDirection) {
 
 private fun splitBufferImpl(cx: HJActionContext, location: HJFileOpenLocation, openScratch: Boolean) {
     val file = if (openScratch) {
-        val project = cx.hjEditor.editor.project!!
         ScratchRootType.getInstance().createScratchFile(
-            project, "scratch", PlainTextLanguage.INSTANCE, "", ScratchFileService.Option.create_new_always
+            cx.project, "scratch", PlainTextLanguage.INSTANCE, "", ScratchFileService.Option.create_new_always
         )
     } else {
         cx.hjEditor.editor.virtualFile
@@ -2811,10 +2808,6 @@ private fun splitBufferImpl(cx: HJActionContext, location: HJFileOpenLocation, o
 
 private fun closeWindow(cx: HJActionContext) {
     quitWindows(cx) { manager ->
-        for (window in manager.windows) {
-            println(window)
-        }
-
         manager.currentWindow?.let { listOf(it) } ?: emptyList()
     }
 }
@@ -2827,9 +2820,9 @@ private fun closeOtherWindows(cx: HJActionContext) {
     }
 }
 
-private fun registerHelpText(): List<Pair<String, String>> {
+private fun registerHelpText(cx: HJActionContext): List<Pair<String, String>> {
     val helpText = mutableListOf<Pair<HJRegister, String>>()
-    val registers = HJState.registers.rawRegisters
+    val registers = cx.hjState.registers.rawRegisters
 
     // order:
     // macro
@@ -2861,58 +2854,58 @@ private fun registerHelpText(): List<Pair<String, String>> {
 }
 
 private fun selectRegister(cx: HJActionContext) {
-    HJInputHandler.onNextKey { inputKey ->
+    cx.inputHandler.onNextKey { inputKey ->
         if (inputKey is HJInputKey.Character) {
-            HJState.selectedRegister = HJRegister.fromChar(inputKey.char)
+            cx.hjState.selectedRegister = HJRegister.fromChar(inputKey.char)
         }
     }
 
-    HJState.getOrCreateHelpWidget(cx.hjEditor.editor)
-        .setHelpContent("Select register", registerHelpText())
+    cx.hjState.getOrCreateHelpWidget(cx.hjEditor.editor)
+        .setHelpContent("Select register", registerHelpText(cx))
 }
 
 private fun insertRegister(cx: HJActionContext) {
-    HJInputHandler.onNextKey { inputKey ->
+    cx.inputHandler.onNextKey { inputKey ->
         if (inputKey is HJInputKey.Character) {
             val reg = HJRegister.fromChar(inputKey.char)
             pasteImpl(cx, false, reg)
         }
     }
 
-    HJState.getOrCreateHelpWidget(cx.hjEditor.editor)
-        .setHelpContent("Insert register", registerHelpText())
+    cx.hjState.getOrCreateHelpWidget(cx.hjEditor.editor)
+        .setHelpContent("Insert register", registerHelpText(cx))
 }
 
 private fun copyBetweenRegisters(cx: HJActionContext) {
-    HJInputHandler.onNextKey { inputKey ->
+    cx.inputHandler.onNextKey { inputKey ->
         if (inputKey is HJInputKey.Character) {
             val sourceReg = HJRegister.fromChar(inputKey.char)
 
-            val values = HJState.registers.read(sourceReg, cx.hjEditor)
+            val values = cx.hjState.registers.read(sourceReg, cx.hjEditor)
             if (values == null) {
                 cx.hjEditor.setError("Register $sourceReg is empty")
                 return@onNextKey
             }
 
-            HJInputHandler.onNextKey { inputKey ->
+            cx.inputHandler.onNextKey { inputKey ->
                 if (inputKey is HJInputKey.Character) {
                     val destReg = HJRegister.fromChar(inputKey.char)
 
                     val nValues = values.size
-                    if (HJState.registers.write(destReg, values, cx.hjEditor)) {
+                    if (cx.hjState.registers.write(destReg, values, cx.hjEditor)) {
                         val plural = if (nValues == 1) "" else "s"
                         cx.hjEditor.setStatus("Yanked $nValues value$plural from register $sourceReg to $destReg")
                     }
                 }
             }
 
-            HJState.getOrCreateHelpWidget(cx.hjEditor.editor)
-                .setHelpContent("Copy into register", registerHelpText())
+            cx.hjState.getOrCreateHelpWidget(cx.hjEditor.editor)
+                .setHelpContent("Copy into register", registerHelpText(cx))
         }
     }
 
-    HJState.getOrCreateHelpWidget(cx.hjEditor.editor)
-        .setHelpContent("Copy from register", registerHelpText())
+    cx.hjState.getOrCreateHelpWidget(cx.hjEditor.editor)
+        .setHelpContent("Copy from register", registerHelpText(cx))
 }
 
 private fun incrementImpl(cx: HJActionContext, direction: HJDirection) {
@@ -2955,17 +2948,17 @@ private fun incrementImpl(cx: HJActionContext, direction: HJDirection) {
 }
 
 private fun recordMacro(cx: HJActionContext) {
-    if (HJState.macroRecording != null) {
-        val (reg, keys) = HJState.macroRecording!!
+    if (cx.hjState.macroRecording != null) {
+        val (reg, keys) = cx.hjState.macroRecording!!
         // Remove the keypress which ends the recording
         keys.removeLast()
         val s = keys.joinToString(separator = "") { it.toString() }
-        if (HJState.registers.write(reg, listOf(s), cx.hjEditor)) {
+        if (cx.hjState.registers.write(reg, listOf(s), cx.hjEditor)) {
             cx.hjEditor.setStatus("Recorded to register [$reg]")
         }
     } else {
         val reg = cx.register ?: HJRegister.LastMacro
-        HJState.macroRecording = Pair(reg, mutableListOf())
+        cx.hjState.macroRecording = Pair(reg, mutableListOf())
         cx.hjEditor.setStatus("Recording to register [$reg]")
     }
 }
@@ -2973,12 +2966,12 @@ private fun recordMacro(cx: HJActionContext) {
 private fun replayMacro(cx: HJActionContext) {
     val reg = cx.register ?: HJRegister.LastMacro
 
-    if (HJState.macroReplaying.contains(reg)) {
+    if (cx.hjState.macroReplaying.contains(reg)) {
         cx.hjEditor.setError("Cannot replay from register [$reg] because already replaying from same register.")
         return
     }
 
-    val registerString = HJState.registers.read(reg, cx.hjEditor)?.let { if (it.size == 1) it.first() else null }
+    val registerString = cx.hjState.registers.read(reg, cx.hjEditor)?.let { if (it.size == 1) it.first() else null }
     val keys = if (registerString != null) {
         HJInputKey.parseMacro(cx.hjEditor, registerString) ?: return
     } else {
@@ -2987,17 +2980,17 @@ private fun replayMacro(cx: HJActionContext) {
     }
 
     // Once the macro has been fully validated, it's marked as being under replay to ensure we don't fall into infinite recursion
-    HJState.macroReplaying.add(reg)
+    cx.hjState.macroReplaying.add(reg)
 
     ApplicationManager.getApplication().invokeLater {
         repeat(cx.count) {
             for (key in keys) {
-                HJInputHandler.sendInputKeyKeyEvent(cx.hjEditor, key)
+                cx.inputHandler.sendInputKeyKeyEvent(cx.hjEditor, key)
             }
         }
     }
 
-    HJState.macroReplaying.removeLast()
+    cx.hjState.macroReplaying.removeLast()
 }
 
 // TODO: does this consider all motions?
@@ -3010,67 +3003,149 @@ private fun repeatLastMotion(cx: HJActionContext) {
 
 private fun repeatLastInsert(cx: HJActionContext) {
     val lastInsertKeystrokes = mutableListOf<HJInputKey>()
-    lastInsertKeystrokes.addAll(HJState.lastInsertKeystrokes)
+    lastInsertKeystrokes.addAll(cx.hjState.lastInsertKeystrokes)
 
     ApplicationManager.getApplication().invokeLater {
         if (!insertMode(cx, false)) return@invokeLater
 
         repeat(cx.count) {
             for (key in lastInsertKeystrokes) {
-                HJInputHandler.sendInputKeyKeyEvent(cx.hjEditor, key)
+                cx.inputHandler.sendInputKeyKeyEvent(cx.hjEditor, key)
             }
         }
 
         switchToMode(cx, HJEditorMode.Normal)
-        HJState.lastInsertKeystrokes.clear()
-        HJState.lastInsertKeystrokes.addAll(lastInsertKeystrokes)
+        cx.hjState.lastInsertKeystrokes.clear()
+        cx.hjState.lastInsertKeystrokes.addAll(lastInsertKeystrokes)
     }
 }
 
-private fun jumpForward(cx: HJActionContext) {
-    HJState.jumpForward(cx.hjEditor, cx.count)
-}
-
-private fun jumpBackward(cx: HJActionContext) {
-    HJState.jumpBackward(cx.hjEditor, cx.count)
-}
-
-fun pushJump(hjEditor: HJEditor) {
-    val jump = HJJump(hjEditor.editor.virtualFile, hjEditor.selection.clone())
-    HJState.jumps.push(jump)
-}
-
 private fun saveSelection(cx: HJActionContext) {
-    pushJump(cx.hjEditor)
+    CommandProcessor.getInstance().executeCommand(cx.project, {
+        IdeDocumentHistory.getInstance(cx.project).includeCurrentCommandAsNavigation()
+        // "navigate" in place to trigger a document history point
+        OpenFileDescriptor(cx.project, cx.hjEditor.editor.virtualFile).navigate(true)
+    }, "HJSaveSelection", null)
     cx.hjEditor.setStatus("Selection saved to jumplist")
 }
 
 private fun jumplistPicker(cx: HJActionContext) {
-    val project = cx.hjEditor.editor.project!!
+    val data = IdeDocumentHistory.getInstance(cx.project).let { it.backPlaces + it.forwardPlaces }.reversed()
 
-    val data = HJState.jumps.jumps.reversed()
-
-    val projectRoot = project.guessProjectDir()?.path ?: ""
+    val projectRoot = cx.project.guessProjectDir()?.path ?: ""
     val model = HJTableModel(data, listOf("Path")) { jump, _ -> jump.file.path.removePrefix(projectRoot) }
 
     val previewSelector = previewSelector@{ rowIdx: Int ->
-        val (file, selection) = data.getOrNull(rowIdx) ?: return@previewSelector null
-        Pair(file, Pair(selection.primary.from, selection.primary.to))
+        val placeInfo = data.getOrNull(rowIdx) ?: return@previewSelector null
+        val range = placeInfo.caretPosition?.textRange
+        Pair(placeInfo.file, Pair(range?.startOffset ?: 0, (range?.endOffset ?: 0) + 1))
     }
 
     HJPickerWithPreview(
         cx.hjEditor.editor, "Jumplist Picker", model, previewSelector
     ) { rowIdx ->
-        val (file, selection) = data[rowIdx]
+        val placeInfo = data[rowIdx]
 
-        openFile(cx, file, HJFileOpenLocation.InPlace, false)?.let { fileEditor ->
+        openFile(cx, placeInfo.file, HJFileOpenLocation.InPlace)?.let { fileEditor ->
             val editor = (fileEditor as TextEditor).editor
-            HJState.getHJEditor(editor)?.setNewSelection(selection)
+            placeInfo.caretPosition?.textRange?.let { range ->
+                cx.hjState.getHJEditor(editor)
+                    ?.setNewSelection(HJSelection(HJRange(range.startOffset, range.endOffset)))
+            }
         }
     }.show()
 }
 
 @Suppress("unused")
 private fun lastPicker(cx: HJActionContext) {
-    HJState.lastPicker?.show()
+    cx.hjState.lastPicker?.show()
+}
+
+private fun indentImpl(cx: HJActionContext, direction: HJDirection) {
+    // TODO: indent manually? First must be able to get correct indentation here and in open
+    //       in any case, ensure cursor is in right place after indenting
+    // TODO: modify selection to be on the same text as before the document modification
+
+    // must select something, otherwise Ide action "indent" does not work
+    val selection = cx.hjEditor.selection.clone()
+    val temp = cx.hjEditor.selection.transform { range ->
+        if (range.isSingleGrapheme) extendRange(cx, true, range)
+        else range
+    }
+    cx.hjEditor.setNewSelection(temp)
+
+    val ideAction = when (direction) {
+        HJDirection.Forward -> IdeActions.ACTION_EDITOR_INDENT_SELECTION
+        HJDirection.Backward -> IdeActions.ACTION_EDITOR_UNINDENT_SELECTION
+    }
+    executeIdeAction(cx, ideAction)
+    cx.hjEditor.setNewSelection(selection)
+}
+
+private fun toggleCommentsImpl(
+    cx: HJActionContext,
+    commentTransaction: (lineToken: String?, blockTokens: List<HJLanguage.BlockCommentToken>?, doc: Document, selection: HJSelection) -> HJTransaction,
+) {
+    val lineToken = cx.hjEditor.language?.commentTokens?.firstOrNull()
+    val blockTokens = cx.hjEditor.language?.blockCommentTokens
+
+    val transaction = commentTransaction(lineToken, blockTokens, cx.doc, cx.hjEditor.selection)
+    cx.hjEditor.apply(transaction)
+    exitSelectMode(cx)
+}
+
+private fun toggleComments(cx: HJActionContext) {
+    if (!ensureFileWriteable(cx)) return
+    toggleCommentsImpl(cx) { lineToken, blockTokens, doc, selection ->
+        // only have line comment tokens
+        if (lineToken != null && blockTokens == null) {
+            return@toggleCommentsImpl HJComment.toggleLineComments(doc, selection, lineToken)
+        }
+
+        val splitLines = HJComment.splitLinesOfSelection(doc, selection)
+
+        val defaultBlockTokens = listOf(HJLanguage.BlockCommentToken("/*", "*/"))
+        val blockCommentTokens = blockTokens ?: defaultBlockTokens
+
+        val (lineCommented, lineCommentChanges) = HJComment.findBlockComments(blockCommentTokens, doc, splitLines)
+
+        // block commented by line would also be block commented so check this first
+        if (lineCommented) {
+            return@toggleCommentsImpl HJComment.createBlockCommentTransaction(lineCommented, lineCommentChanges).first
+        }
+
+        val (blockCommented, commentChanges) = HJComment.findBlockComments(blockCommentTokens, doc, selection)
+
+        // check if selection has block comments
+        if (blockCommented) {
+            return@toggleCommentsImpl HJComment.createBlockCommentTransaction(blockCommented, commentChanges).first
+        }
+
+        // not commented and only have block comment tokens
+        if (lineToken == null && blockTokens != null) {
+            return@toggleCommentsImpl HJComment.createBlockCommentTransaction(lineCommented, lineCommentChanges).first
+        }
+
+        // not block commented at all and don't have any tokens
+        HJComment.toggleLineComments(doc, selection, lineToken)
+    }
+}
+
+private fun undoImpl(cx: HJActionContext, direction: HJDirection) {
+    val fileEditor = FileEditorManager.getInstance(cx.project).focusedEditor ?: return
+    val undoManager = UndoManager.getInstance(cx.project)
+
+    when (direction) {
+        HJDirection.Backward -> {
+            if (undoManager.isUndoAvailable(fileEditor)) {
+                undoManager.undo(fileEditor)
+            } else cx.hjEditor.setError("Undo not available")
+        }
+
+        HJDirection.Forward -> {
+            if (undoManager.isRedoAvailable(fileEditor)) {
+                undoManager.redo(fileEditor)
+            } else cx.hjEditor.setError("Redo not available")
+        }
+    }
 }

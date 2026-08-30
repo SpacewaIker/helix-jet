@@ -59,7 +59,11 @@ tasks {
 intellijPlatformTesting {
     runIde {
         register("runRider") {
-            localPath = file("C:/Program Files/JetBrains/JetBrains Rider 2025.3.2")
+            val riderBin = System.getenv("JetBrains Rider")
+            localPath = file("$riderBin/..")
+            task {
+                jvmArgs("-Xmx24576m")
+            }
         }
     }
 }
@@ -69,4 +73,32 @@ kotlin {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
         freeCompilerArgs.add("-XXLanguage:+UnnamedLocalVariables")
     }
+}
+
+val debugMode = System.getenv("HJDEBUG") == "true"
+
+sourceSets.main {
+    val buildDir = layout.buildDirectory.asFile.get()
+    kotlin.srcDir("$buildDir/generated/kotlin")
+}
+
+tasks.register("generateBuildConfig") {
+    doLast {
+        val buildDir = layout.buildDirectory.asFile.get()
+        val dir = file("$buildDir/generated/kotlin/spacewaiker/helixjet")
+        dir.mkdirs()
+        file("$dir/BuildConfig.kt").writeText(
+            """
+            package spacewaiker.helix
+            
+            object BuildConfig {
+                const val DEBUG = $debugMode
+            }
+        """.trimIndent()
+        )
+    }
+}
+
+tasks.named("compileKotlin") {
+    dependsOn("generateBuildConfig")
 }

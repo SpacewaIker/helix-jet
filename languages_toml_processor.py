@@ -89,7 +89,7 @@ def languages(args):
                 val = language[key]
                 if isinstance(val, str):
                     comment_tokens.append(val)
-                if isinstance(val, list):
+                elif isinstance(val, list):
                     comment_tokens.extend(val)
         for i, token in enumerate(comment_tokens):
             if token == "\\":  # ktoml can't parse ["\\"], so use unicode/ascii code
@@ -98,6 +98,25 @@ def languages(args):
                 comment_tokens[i] = "\\x2a"
         if len(comment_tokens) > 0:
             language_new["comment-tokens"] = comment_tokens
+
+        # block comment tokens
+        block_comment_tokens = []
+        if "block-comment-tokens" in language:
+            val = language["block-comment-tokens"]
+            if isinstance(val, dict):
+                block_comment_tokens.append(val)
+            elif isinstance(val, list):
+                if isinstance(val[0], dict):
+                    block_comment_tokens.extend(val)
+                elif isinstance(val[0], str) and len(val) == 2:
+                    block_comment_tokens.append({"start": val[0], "end": val[1]})
+        for i, token in enumerate(block_comment_tokens):
+            if "\\" in token:
+                block_comment_tokens[i] = token.replace("\\", "\\x5c")
+            if "*" in token:
+                block_comment_tokens[i] = token.replace("*", "\\x2a")
+        if len(block_comment_tokens) > 0:
+            language_new["block-comment-tokens"] = block_comment_tokens
 
         for key in ["grammar", "indent"]:
             if key in language:

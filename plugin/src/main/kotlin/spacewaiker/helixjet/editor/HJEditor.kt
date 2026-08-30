@@ -49,11 +49,15 @@ data class HJTransaction(
 /**
  * @property objectSelections Used to store previous selections of treesitter objects
  */
-class HJEditor {
+class HJEditor(
+    val editor: Editor,
+) {
     val logger = Logger.getInstance(this::class.java)
-    val editor: Editor
-    var selection: HJSelection
+    var selection: HJSelection = HJSelection(listOf(), 0)
+        private set
     var lastMotion: ((HJEditor) -> Unit)? = null
+    var isSettingNewSelection = false
+        private set
     val psiFile
         get() = editor.project?.let { PsiDocumentManager.getInstance(it) }?.getPsiFile(editor.document)?.let {
             if (it.elementType == PlainTextTokenTypes.PLAIN_TEXT_FILE || it.elementType?.toString() == "TextMate") null else it
@@ -75,32 +79,43 @@ class HJEditor {
             val end = editor.document.getLineEndOffset(toLine) + 1 // to account for line ending
             start == range.from && end == range.to
         }
+    private val getHJState
+        get() = HJState.getInstance(editor.project!!)
 
-    constructor(editor: Editor) {
-        this.editor = editor
-        this.language = HJFileGlobMatcher.match(editor.virtualFile.path)
+    init {
+        this.language = HJFileGlobMatcher.getInstance(editor.project!!).match(editor.virtualFile.path)
         this.selection = HJSelection(editor.caretModel)
 
         logger.debug("Created HJEditor with selection: $selection")
 
-        editor.settings.verticalScrollOffset = HJState.config.scrolloff
+        editor.settings.verticalScrollOffset = getHJState.config.scrolloff
         reloadCaretShapes()
+    }
+
+    /**
+     * Save new selection without changing the IDE's state.
+     * Used to sync IDE selection to the plugin.
+     */
+    fun ideSetNewSelection(selection: HJSelection) {
+        this.selection = selection.ensureInvariants(editor.document)
     }
 
     /**
      * Save new selection to the HJState and apply it to this HJEditor.
      */
     fun setNewSelection(selection: HJSelection) {
-        HJState.helixJetSettingCaret = true
-        this.selection = selection.ensureInvariants(editor.document)
+        val hjState = getHJState
+        selection.ensureInvariants(editor.document)
 
         editor.caretModel.removeSecondaryCarets()
         val primaryCaret = editor.caretModel.primaryCaret
 
+        isSettingNewSelection = true
+
         // need to process primary first because we can't delete the primaryCaret in the caretModel. Therefore we must
         // reuse it, and that means processing it first. Otherwise, we might have to create a secondary caret at the position
         // of the primary, which doesn't work.
-        for ((idx, range) in this.selection.rangesWithPrimaryFirst.withIndex()) {
+        for ((idx, range) in selection.rangesWithPrimaryFirst.withIndex()) {
             val isPrimary = idx == 0 // rangesWithPrimaryFirst, so first element is primary
 
             val pos = editor.offsetToLogicalPosition(range.cursor.coerceAtMost(editor.document.textLength))
@@ -113,11 +128,11 @@ class HJEditor {
             }
 
             if (caret != null) {
-                val color = if (isPrimary) HJState.config.primaryCursorColor else HJState.config.otherCursorsColor
+                val color = if (isPrimary) hjState.config.primaryCursorColor else hjState.config.otherCursorsColor
                 caret.visualAttributes = CaretVisualAttributes(color, CaretVisualAttributes.Weight.NORMAL)
 
                 // in normal/insert mode, don't show 1-width selections underneath the blinking block cursor
-                if (range.len <= 1 && HJState.mode != HJEditorMode.Select) {
+                if (range.len <= 1 && hjState.mode != HJEditorMode.Select) {
                     caret.removeSelection()
                 } else {
                     val from = range.from.coerceAtMost(editor.document.textLength - 1)
@@ -127,6 +142,9 @@ class HJEditor {
             }
         }
 
+        isSettingNewSelection = false
+        this.selection = selection
+        
         reloadCaretShapes()
         setCorrectScroll()
     }
@@ -174,7 +192,8 @@ class HJEditor {
     }
 
     fun reloadCaretShapes() {
-        editor.settings.isBlockCursor = HJState.mode != HJEditorMode.Insert && HJState.keymappingEnabled
+        val hjState = getHJState
+        editor.settings.isBlockCursor = hjState.mode != HJEditorMode.Insert && hjState.keymappingEnabled
     }
 
     fun setCorrectScroll() {

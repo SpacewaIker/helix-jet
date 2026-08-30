@@ -2,7 +2,10 @@
 
 import spacewaiker.helixjet.editor.HJEditor
 import spacewaiker.helixjet.editor.HJRegister
+import spacewaiker.helixjet.editor.HJState
+import spacewaiker.helixjet.input.HJInputHandler
 import spacewaiker.helixjet.input.HJInputKey
+import java.awt.event.InputEvent
 
 /**
  * Represents an editor action triggered by a key. Either an outright HJAction, or a Minor Mode
@@ -59,10 +62,14 @@ sealed class HJKeyAction(val name: String, val doc: String) {
 }
 
 data class HJActionContext(
+    val hjState: HJState,
     val hjEditor: HJEditor,
     val rawCount: Int? = null,
     val register: HJRegister? = null,
+    val inputEvent: InputEvent? = null,
 ) {
     val count get() = rawCount ?: 1
     val doc get() = hjEditor.editor.document
+    val project get() = hjState.project
+    val inputHandler get() = HJInputHandler.getInstance(hjState.project)
 }

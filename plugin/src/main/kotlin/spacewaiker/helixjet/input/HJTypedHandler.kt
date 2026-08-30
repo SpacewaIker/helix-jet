@@ -5,6 +5,7 @@ import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.actionSystem.ActionPlan
 import com.intellij.openapi.editor.actionSystem.TypedActionHandler
 import com.intellij.openapi.editor.actionSystem.TypedActionHandlerEx
+import spacewaiker.helixjet.actions.focusedEditor
 import spacewaiker.helixjet.editor.HJEditorMode
 import spacewaiker.helixjet.editor.HJSelection
 import spacewaiker.helixjet.editor.HJState
@@ -21,11 +22,18 @@ class HJTypedHandler(private val originalHandler: TypedActionHandler) : TypedAct
     }
 
     override fun execute(editor: Editor, c: Char, context: DataContext) {
-        if ((HJState.mode == HJEditorMode.Insert && !HJState.typedHandlerBlock)
-            || !HJState.keymappingEnabled
+        val hjState = editor.project?.let { HJState.getInstance(it) } ?: return
+
+        // focusedEditor is null if we're typing e.g. in the debugger drawer
+        if (editor.project?.focusedEditor == null && !hjState.typedHandlerBlock) {
+            originalHandler.execute(editor, c, context)
+        }
+
+        if ((hjState.mode == HJEditorMode.Insert && !hjState.typedHandlerBlock)
+            || !hjState.keymappingEnabled
         ) {
             originalHandler.execute(editor, c, context)
-            HJState.getHJEditor(editor)?.setNewSelection(HJSelection(editor.caretModel))
+            hjState.getHJEditor(editor)?.setNewSelection(HJSelection(editor.caretModel))
         }
     }
 }

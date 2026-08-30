@@ -46,9 +46,7 @@ class HJSelection {
         normalize()
     }
 
-    fun clone(): HJSelection {
-        return HJSelection(ranges, primaryIndex)
-    }
+    fun clone() = HJSelection(ranges, primaryIndex)
 
     /**
      * Adds a new range to the selection and makes it the primary range

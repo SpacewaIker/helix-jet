@@ -7,32 +7,31 @@ import spacewaiker.helixjet.editor.HJSelection
 import spacewaiker.helixjet.editor.HJState
 
 class HJMouseListener : EditorMouseListener {
-    var anchor: Int = 0
-    var head: Int = 0
-
-    override fun mouseClicked(event: EditorMouseEvent) {
-    }
+    override fun mouseClicked(event: EditorMouseEvent) {}
 
     override fun mousePressed(event: EditorMouseEvent) {
-        HJState.isMouseButtonDown = true
-        val editor = event.editor
-        val pos = editor.xyToVisualPosition(event.mouseEvent.point)
-        val offset = editor.visualPositionToOffset(pos)
-        anchor = offset
+        event.editor.project?.let { HJState.getInstance(it).isMouseButtonDown = true }
     }
 
     override fun mouseReleased(event: EditorMouseEvent) {
-        HJState.isMouseButtonDown = false
-        val editor = event.editor
-        val pos = editor.xyToVisualPosition(event.mouseEvent.point)
-        val offset = editor.visualPositionToOffset(pos)
-        head = offset
+        val project = event.editor.project ?: return
+        val hjState = HJState.getInstance(project)
+        val editor = hjState.getHJEditor(event.editor) ?: return
 
-        val selection = HJSelection(HJRange(anchor, head))
-        HJState.getHJEditor(editor)?.setNewSelection(selection)
+        // here we use setNewSelection instead of ideSetNewSelection to ensure the cursor and selection are agreed
+        if (event.mouseEvent.clickCount > 1) {
+            // multi-click selection: sets the cursor one character after the actual selection so we subtract 1
+            val selection = HJSelection(editor.editor.caretModel).transform { range ->
+                HJRange(range.from, range.to - 1).withDirection(range.direction)
+            }
+            editor.setNewSelection(selection)
+        } else {
+            // single click or click and drag
+            val selection = HJSelection(event.editor.caretModel)
+            editor.setNewSelection(selection)
+        }
 
-        // set focus back to HJPrompt, if applicable
-        HJState.activePrompt?.requestFocus()
+        hjState.isMouseButtonDown = false
     }
 
     override fun mouseEntered(event: EditorMouseEvent) {}

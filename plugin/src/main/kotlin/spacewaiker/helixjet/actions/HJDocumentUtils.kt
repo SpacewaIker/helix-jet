@@ -17,7 +17,6 @@ import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vfs.*
 import com.intellij.psi.PsiFile
 import com.intellij.psi.codeStyle.CodeStyleManager
-import spacewaiker.helixjet.editor.HJJump
 import spacewaiker.helixjet.editor.HJState
 import java.nio.file.Path
 import java.time.LocalDate
@@ -69,6 +68,11 @@ fun firstNonWhitespaceChar(line: String, startOffset: Int = 0): Int? {
     return if (idx == -1) null else startOffset + idx
 }
 
+fun lastNonWhitespaceChar(line: String, startOffset: Int = 0): Int? {
+    val idx = line.asSequence().indexOfLast { !it.isWhitespace() }
+    return if (idx == -1) null else startOffset + idx
+}
+
 /**
  * Returns the longest matching comment token of the given line (if it exists)
  */
@@ -84,8 +88,8 @@ fun getCommentToken(doc: Document, tokens: List<String>, lineNum: Int): String? 
 /**
  * Creates a Regex using settings from user config
  */
-fun regex(pattern: String, smartCase: Boolean? = null, ignoreCase: Boolean? = null): Regex? {
-    val smartCase = smartCase ?: HJState.config.searchSmartCase
+fun regex(pattern: String, hjState: HJState? = null, smartCase: Boolean? = null, ignoreCase: Boolean? = null): Regex? {
+    val smartCase = smartCase ?: hjState?.config?.searchSmartCase ?: true
     val ignoreCase = ignoreCase ?: smartCase && !pattern.any { it.isUpperCase() }
 
     val options = mutableSetOf<RegexOption>()
@@ -137,17 +141,15 @@ fun openFile(
     cx: HJActionContext,
     path: String,
     openLocation: HJFileOpenLocation = HJFileOpenLocation.InPlace,
-    pushJump: Boolean = true,
 ): FileEditor? {
     val path = Path(path)
-    return openFile(cx, path, openLocation, pushJump)
+    return openFile(cx, path, openLocation)
 }
 
 fun openFile(
     cx: HJActionContext,
     path: Path,
     openLocation: HJFileOpenLocation = HJFileOpenLocation.InPlace,
-    pushJump: Boolean = true,
 ): FileEditor? {
     // resolve WRT cx file path
     val cxPath = cx.hjEditor.editor.virtualFile.toNioPath()
@@ -168,20 +170,15 @@ fun openFile(
         return null
     }
 
-    return openFile(cx, file, openLocation, pushJump)
+    return openFile(cx, file, openLocation)
 }
 
 fun openFile(
     cx: HJActionContext,
     file: VirtualFile,
     openLocation: HJFileOpenLocation = HJFileOpenLocation.InPlace,
-    pushJump: Boolean = true,
 ): FileEditor? {
     val project = cx.hjEditor.editor.project!!
-
-    if (pushJump) {
-        HJState.jumps.push(HJJump(cx.hjEditor.editor.virtualFile, cx.hjEditor.selection))
-    }
 
     return when (openLocation) {
         HJFileOpenLocation.InPlace -> {
@@ -450,7 +447,7 @@ val Project.focusedEditor
         ?.let { if (it.contentComponent.hasFocus()) it else null }
 
 val Project.focusedHJEditor
-    get() = focusedEditor?.let { HJState.getHJEditor(it) }
+    get() = focusedEditor?.let { HJState.getInstance(this).getHJEditor(it) }
 
 /**
  * Get a list of all files in the project, ignoring files specified in .gitignore, .p4ignore, etc.
@@ -468,8 +465,9 @@ fun getAllProjectFiles(project: Project, callback: (VirtualFile) -> Unit) {
     val changeListManager = ChangeListManager.getInstance(project)
     val projectDir = project.guessProjectDir()!!
     val dirs = mutableListOf(projectDir)
+    val hjState = HJState.getInstance(project)
 
-    val customIgnore = HJState.config.ignoreList
+    val customIgnore = hjState.config.ignoreList
     customIgnore?.patterns?.forEach { (isWhitelist, pattern) ->
         if (!isWhitelist) return@forEach
         val path = projectDir.resolveFromRootOrRelative(pattern) ?: return@forEach
@@ -506,6 +504,11 @@ fun Document.logicalPositionToOffset(position: LogicalPosition): Int {
     return lineStart + position.column
 }
 
+/**
+ * Ensure the current file is writeable
+ *
+ * @return True if the file is writeable, false otherwise
+ */
 fun ensureFileWriteable(cx: HJActionContext): Boolean {
     val project = cx.hjEditor.editor.project!!
     val file = cx.hjEditor.editor.virtualFile

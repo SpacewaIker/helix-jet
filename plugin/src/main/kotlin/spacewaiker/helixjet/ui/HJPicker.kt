@@ -1,5 +1,6 @@
 ﻿package spacewaiker.helixjet.ui
 
+import com.intellij.ide.IdeEventQueue
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorFactory
@@ -10,6 +11,7 @@ import com.intellij.openapi.editor.highlighter.EditorHighlighterFactory
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.ui.popup.JBPopupListener
 import com.intellij.openapi.ui.popup.LightweightWindowEvent
+import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.wm.WindowManager
 import com.intellij.psi.codeStyle.NameUtil
@@ -26,10 +28,13 @@ import java.awt.BorderLayout
 import java.awt.Component
 import java.awt.Dimension
 import java.awt.event.ActionEvent
-import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import java.util.concurrent.Future
-import javax.swing.*
+import java.util.concurrent.atomic.AtomicLong
+import javax.swing.AbstractAction
+import javax.swing.JPanel
+import javax.swing.JTable
+import javax.swing.RowFilter
 import javax.swing.event.DocumentEvent
 import javax.swing.table.AbstractTableModel
 import javax.swing.table.DefaultTableCellRenderer
@@ -116,7 +121,7 @@ open class HJPicker(
         setShowGrid(false)
         rowSorter = sorter
 
-        addMappings(inputMap, actionMap)
+        addMappings()
 
         for ((colIdx, colorer) in columnColors) {
             val renderer = object : DefaultTableCellRenderer() {
@@ -137,7 +142,7 @@ open class HJPicker(
         font = editor.colorsScheme.getFont(EditorFontType.PLAIN)
     }
     protected val searchField = SearchTextField(false).apply {
-        addMappings(textEditor.getInputMap(JComponent.WHEN_FOCUSED), textEditor.actionMap)
+        addMappings()
 
         addDocumentListener(object : DocumentAdapter() {
             override fun textChanged(p0: DocumentEvent) {
@@ -197,10 +202,9 @@ open class HJPicker(
                         lastPicker.table.scrollRectToVisible(table.getCellRect(row, 0, true))
                     }
 
-                    HJState.lastPicker = lastPicker
+                    HJState.getInstance(editor.project!!).lastPicker = lastPicker
 
                     asyncTask?.cancel(true)
-                    println("asyncTask is null: ${asyncTask == null}")
                 }
             })
         }
@@ -212,33 +216,37 @@ open class HJPicker(
             table.setRowSelectionInterval(0, 0)
     }
 
-    protected open fun addMappings(inputMap: InputMap, actionMap: ActionMap) {
-        // confirm
-        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "confirm")
-        actionMap.put("confirm", confirmAction)
+    private fun addMappings() {
+        ApplicationManager.getApplication().invokeLater {
+            val dispatcher = IdeEventQueue.EventDispatcher { event ->
+                event is KeyEvent && event.id == KeyEvent.KEY_PRESSED && popup.isVisible && mappingsEventProcessor(event)?.let { action ->
+                    action.actionPerformed(ActionEvent(popup, ActionEvent.ACTION_PERFORMED, action.toString()))
+                    true
+                } ?: false
+            }
+            val disposable = Disposer.newDisposable()
+            IdeEventQueue.getInstance().addDispatcher(dispatcher, disposable)
+            popup.addListener(object : JBPopupListener {
+                override fun onClosed(event: LightweightWindowEvent) {
+                    Disposer.dispose(disposable)
+                }
+            })
+        }
+    }
 
-        // select up
-        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_UP, 0), "select_up")
-        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_P, InputEvent.CTRL_DOWN_MASK), "select_up")
-        actionMap.put("select_up", selectUpAction(1))
-
-        // select down
-        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_DOWN, 0), "select_down")
-        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_N, InputEvent.CTRL_DOWN_MASK), "select_down")
-        actionMap.put("select_down", selectDownAction(1))
-
-        // scroll
-        val scrollAmount = (computeSize().height - 80) / 22
-
-        // scroll up
-        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_PAGE_UP, 0), "scroll_up")
-        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_U, InputEvent.CTRL_DOWN_MASK), "scroll_up")
-        actionMap.put("scroll_up", selectUpAction(scrollAmount))
-
-        // scroll down
-        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_PAGE_DOWN, 0), "scroll_down")
-        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_D, InputEvent.CTRL_DOWN_MASK), "scroll_down")
-        actionMap.put("scroll_down", selectDownAction(scrollAmount))
+    protected open fun mappingsEventProcessor(event: KeyEvent): AbstractAction? {
+        return if (event.keyCode == KeyEvent.VK_ENTER) confirmAction
+        else if (event.keyCode == KeyEvent.VK_UP || (event.keyCode == KeyEvent.VK_P && event.isControlDown))
+            selectUpAction(1)
+        else if (event.keyCode == KeyEvent.VK_DOWN || (event.keyCode == KeyEvent.VK_N && event.isControlDown))
+            selectDownAction(1)
+        else if (event.keyCode == KeyEvent.VK_PAGE_UP || (event.keyCode == KeyEvent.VK_U && event.isControlDown)) {
+            val scrollAmount = (computeSize().height - 80) / 22
+            selectUpAction(scrollAmount)
+        } else if (event.keyCode == KeyEvent.VK_PAGE_DOWN || (event.keyCode == KeyEvent.VK_D && event.isControlDown)) {
+            val scrollAmount = (computeSize().height - 80) / 22
+            selectDownAction(scrollAmount)
+        } else null
     }
 
     fun populateRowsAsync(f: () -> Unit): HJPicker {
@@ -247,6 +255,7 @@ open class HJPicker(
     }
 
     fun show() {
+        HJState.getInstance(editor.project!!).typedHandlerBlock = true
         popup.showCenteredInCurrentWindow(editor.project!!)
 
         resizeColumnsToFit(table, table.model)
@@ -286,7 +295,9 @@ class HJPickerWithPreview(
             isRightMarginShown = false
         }
 
-        updatePreviewForRow(0)
+        ApplicationManager.getApplication().invokeLater {
+            updatePreviewForRow(0, 0)
+        }
     }
 
     private val splitPane = OnePixelSplitter(false, 0.5f).apply {
@@ -313,33 +324,33 @@ class HJPickerWithPreview(
             })
         }
 
+    private var previewUpdateTask: Future<*>? = null
+    private val previewUpdateGeneration = AtomicLong(0)
+
     init {
         table.selectionModel.addListSelectionListener { selectionEvent ->
             if (selectionEvent.valueIsAdjusting) return@addListSelectionListener
             val row = table.selectedRow.takeIf { it >= 0 } ?: return@addListSelectionListener
             val modelRow = table.convertRowIndexToModel(row)
-            updatePreviewForRow(modelRow)
+
+            val generation = previewUpdateGeneration.incrementAndGet()
+            previewUpdateTask?.cancel(true)
+            previewUpdateTask = AppExecutorUtil.getAppExecutorService().submit {
+                updatePreviewForRow(modelRow, generation)
+            }
         }
     }
 
-    override fun addMappings(inputMap: InputMap, actionMap: ActionMap) {
-        super.addMappings(inputMap, actionMap)
-
-        ApplicationManager.getApplication().invokeLater {
-            val ctrlShiftDownMask = InputEvent.CTRL_DOWN_MASK or InputEvent.SHIFT_DOWN_MASK
-            // scroll up preview
-            inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_PAGE_UP, InputEvent.SHIFT_DOWN_MASK), "scroll_preview_up")
-            inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_U, ctrlShiftDownMask), "scroll_preview_up")
-            actionMap.put("scroll_preview_up", scrollPreviewAction(HJDirection.Backward))
-
-            // scroll down preview
-            inputMap.put(
-                KeyStroke.getKeyStroke(KeyEvent.VK_PAGE_DOWN, InputEvent.SHIFT_DOWN_MASK),
-                "scroll_preview_down"
-            )
-            inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_D, ctrlShiftDownMask), "scroll_preview_down")
-            actionMap.put("scroll_preview_down", scrollPreviewAction(HJDirection.Forward))
-        }
+    override fun mappingsEventProcessor(event: KeyEvent): AbstractAction? {
+        // @formatter:off
+        return if ((event.keyCode == KeyEvent.VK_PAGE_UP && event.isShiftDown) ||
+                   (event.keyCode == KeyEvent.VK_U && event.isControlDown && event.isShiftDown))
+            scrollPreviewAction(HJDirection.Backward)
+        else if ((event.keyCode == KeyEvent.VK_PAGE_DOWN && event.isShiftDown) ||
+                 (event.keyCode == KeyEvent.VK_D && event.isControlDown && event.isShiftDown))
+            scrollPreviewAction(HJDirection.Forward)
+        else super.mappingsEventProcessor(event)
+        // @formatter:on
     }
 
     private fun fileContents(file: VirtualFile): String {
@@ -347,15 +358,21 @@ class HJPickerWithPreview(
         return String(file.contentsToByteArray()).trimStart('\uFEFF').replace("\r", "")
     }
 
-    private fun updatePreviewForRow(rowIdx: Int) {
+    private fun updatePreviewForRow(rowIdx: Int, generation: Long) {
         if (rowIdx > table.model.rowCount - 1) return
         val (file, offsets) = previewSelector(rowIdx) ?: return
+        if (previewEditor?.isDisposed ?: true) return
 
         val content = ApplicationManager.getApplication().runReadAction<String> {
             fileContents(file)
         }
 
+        if (previewUpdateGeneration.get() != generation) return
+
         ApplicationManager.getApplication().invokeLater {
+            if (previewUpdateGeneration.get() != generation) return@invokeLater
+
+            if (previewEditor == null || previewEditor.isDisposed) return@invokeLater
             ApplicationManager.getApplication().runWriteAction {
                 previewDocument.setText(content)
             }

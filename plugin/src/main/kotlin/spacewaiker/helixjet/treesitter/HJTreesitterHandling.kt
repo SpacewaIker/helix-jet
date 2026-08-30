@@ -204,10 +204,10 @@ object HJTreesitterHandling {
             cx.hjEditor.setNewSelection(HJSelection(HJRange(tag.startOffset, tag.endOffset)))
         }.populateRowsAsync {
             val documentManager = FileDocumentManager.getInstance()
-            getAllProjectFiles(cx.hjEditor.editor.project!!) { file ->
+            getAllProjectFiles(cx.project) { file ->
                 ReadAction.compute<Unit, Throwable> {
                     val document = documentManager.getDocument(file) ?: return@compute
-                    val language = HJFileGlobMatcher.match(file.path) ?: return@compute
+                    val language = HJFileGlobMatcher.getInstance(cx.project).match(file.path) ?: return@compute
                     val syntax = HJSyntaxLoader.getLanguageSyntax(language.name, document.text) ?: return@compute
                     model.addRows(tagsIter(syntax, document, file).toList())
                 }

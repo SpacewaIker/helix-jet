@@ -1,5 +1,6 @@
 ﻿package spacewaiker.helixjet.ui
 
+import com.intellij.openapi.components.Service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.StatusBar
 import com.intellij.openapi.wm.StatusBarWidget
@@ -8,21 +9,13 @@ import spacewaiker.helixjet.editor.HJState
 import spacewaiker.helixjet.input.HJInputHandler
 import java.awt.Component
 
-class HJStatusBarInputWidget(proj: Project) : StatusBarWidget, StatusBarWidget.TextPresentation {
-    init {
-        project = proj
-    }
-
+@Service(Service.Level.PROJECT)
+class HJStatusBarInputWidget(private val project: Project) : StatusBarWidget, StatusBarWidget.TextPresentation {
     companion object {
         const val ID = "HelixJetInputWidget"
 
-        private var project: Project? = null
-
-        fun updateInputWidget() {
-            project?.let {
-                WindowManager.getInstance().getStatusBar(it)?.updateWidget(ID)
-            }
-        }
+        fun getInstance(project: Project): HJStatusBarInputWidget =
+            project.getService(HJStatusBarInputWidget::class.java)
     }
 
     private var statusBar: StatusBar? = null
@@ -33,9 +26,10 @@ class HJStatusBarInputWidget(proj: Project) : StatusBarWidget, StatusBarWidget.T
     override fun getAlignment() = Component.LEFT_ALIGNMENT
 
     override fun getText(): String {
-        return HJInputHandler.actionCount +
-                (HJInputHandler.pendingActionKey ?: "") +
-                (HJState.selectedRegister?.let { "\treg=$it" } ?: "")
+        val hjState = HJState.getInstance(project)
+        val inputHandler = HJInputHandler.getInstance(project)
+        return inputHandler.actionCount + (inputHandler.pendingActionKey ?: "") +
+                (hjState.selectedRegister?.let { "\treg=$it" } ?: "")
     }
 
     override fun install(statusBar: StatusBar) {
@@ -44,5 +38,11 @@ class HJStatusBarInputWidget(proj: Project) : StatusBarWidget, StatusBarWidget.T
 
     override fun dispose() {
         statusBar = null
+    }
+
+    fun updateInputWidget() {
+        project.let {
+            WindowManager.getInstance().getStatusBar(it)?.updateWidget(ID)
+        }
     }
 }

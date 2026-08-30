@@ -87,8 +87,26 @@ object HJSyntaxLoader {
 
     private fun lazyQuery(name: String, queryName: String) = lazy {
         val language = languages[name]!!.value
-        javaClass.getResource("/runtime/queries/$name/$queryName.scm")?.readText()?.let { queryFile ->
+        loadQuery(name, queryName)?.let { queryFile ->
             Query(language, queryFile)
+        }
+    }
+
+    private fun loadQuery(language: String, queryName: String): String? {
+        val path = "/runtime/queries/$language/$queryName.scm"
+        return javaClass.getResource(path)?.readText()?.let { source ->
+            // support for inheriting/importing other queries
+            // e.g. in cpp/textobject.scm: "; inherits: c"
+            val inherited = source.lines()
+                .find { it.startsWith(";") && it.contains("inherits:") }
+                ?.let { line ->
+                    val idx = line.indexOf("inherits:") + 9
+                    val inherited = line.substring(idx, line.length).trim()
+                    loadQuery(inherited, queryName)
+                }
+
+            if (inherited != null) inherited + source
+            else source
         }
     }
 }

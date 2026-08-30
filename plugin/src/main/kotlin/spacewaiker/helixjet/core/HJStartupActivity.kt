@@ -12,7 +12,6 @@ import com.intellij.openapi.fileEditor.FileEditorManagerListener
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
-import spacewaiker.helixjet.actions.pushJump
 import spacewaiker.helixjet.editor.HJSelection
 import spacewaiker.helixjet.editor.HJState
 import spacewaiker.helixjet.input.HJKeyInterceptor
@@ -39,6 +38,8 @@ class HJStartupActivity : ProjectActivity {
             }
         }
 
+        val hjState = HJState.getInstance(project)
+
         EditorFactory.getInstance().addEditorFactoryListener(object : EditorFactoryListener {
             override fun editorCreated(event: EditorFactoryEvent) {
                 if (event.editor.virtualFile == null) return
@@ -46,57 +47,48 @@ class HJStartupActivity : ProjectActivity {
             }
 
             override fun editorReleased(event: EditorFactoryEvent) {
-                HJState.releaseEditor(event.editor)
+                hjState.releaseEditor(event.editor)
             }
-        }, HJProjectService.getInstance(project))
+        }, HJState.getInstance(project))
 
         project.messageBus.connect().subscribe(
             FileEditorManagerListener.FILE_EDITOR_MANAGER,
             object : FileEditorManagerListener {
                 override fun selectionChanged(event: FileEditorManagerEvent) {
-                    if (HJState.helixJetSettingCaret) {
-                        HJState.helixJetSettingCaret = false
-                        return
-                    }
-                    val textEditor = (event.newEditor as? TextEditor) ?: return
-                    val hjEditor = HJState.getHJEditor(textEditor.editor) ?: return
-
-                    // push previous to jumplist
-                    val oldTextEditor = event.oldEditor as? TextEditor
-                    oldTextEditor?.editor?.let {
-                        pushJump(HJState.getHJEditor(it) ?: return@let)
+                    event.oldEditor?.let {
+                        val editor = (it as? TextEditor)?.editor ?: return@let
+                        hjState.previousEditor = hjState.getHJEditor(editor) ?: return@let
                     }
 
-                    hjEditor.setNewSelection(HJSelection(textEditor.editor.caretModel))
+                    hjState.currentEditor = event.newEditor?.let {
+                        val editor = (it as? TextEditor)?.editor ?: return@let null
+                        hjState.getHJEditor(editor)
+                    }
                 }
             }
         )
     }
 
     fun handleNewEditor(editor: Editor) {
-        HJState.initEditor(editor)
+        val project = editor.project ?: return
+        val hjState = HJState.getInstance(project)
+        hjState.initEditor(editor)
         editor.addEditorMouseListener(HJMouseListener())
 
         editor.document.addDocumentListener(object : DocumentListener {
             override fun documentChanged(event: DocumentEvent) {
-                HJState.lastModification = Pair(editor.virtualFile, event.offset)
+                hjState.lastModification = Pair(editor.virtualFile, event.offset)
             }
         })
 
         editor.caretModel.addCaretListener(object : CaretListener {
             override fun caretPositionChanged(event: CaretEvent) {
-                if (HJState.helixJetSettingCaret) {
-                    HJState.helixJetSettingCaret = false
-                    return
-                }
-                if (HJState.isMouseButtonDown) return
+                if (hjState.isMouseButtonDown) return
 
-                val hjEditor = HJState.getHJEditor(editor) ?: return
+                val hjEditor = hjState.getHJEditor(editor) ?: return
+                if (hjEditor.isSettingNewSelection) return
 
-                // push previous to jumplist
-                pushJump(hjEditor)
-
-                hjEditor.setNewSelection(HJSelection(editor.caretModel))
+                hjEditor.ideSetNewSelection(HJSelection(editor.caretModel))
             }
         })
     }

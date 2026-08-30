@@ -69,7 +69,7 @@ class HJRange {
 
     constructor(caret: Caret) {
         val selectionStart = caret.selectionStart
-        val selectionEnd = caret.selectionEnd
+        val selectionEnd = caret.selectionEnd + 1 // include last selected character
         if (caret.offset == selectionStart) {
             this.head = selectionStart
             this.anchor = selectionEnd
@@ -153,9 +153,7 @@ class HJRange {
         }
     }
 
-    fun copy(): HJRange {
-        return HJRange(anchor, head, oldVisualPosition)
-    }
+    fun copy() = HJRange(anchor, head, oldVisualPosition)
 
     /**
      * The (inclusive) range of lines that the range overlaps

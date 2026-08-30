@@ -1,11 +1,14 @@
 ﻿package spacewaiker.helixjet.config
 
+import com.intellij.openapi.components.Service
+import com.intellij.openapi.project.Project
 import spacewaiker.helixjet.editor.HJState
 import java.nio.file.FileSystems
 import java.nio.file.Paths
 
-object HJFileGlobMatcher {
-    val globPatterns = HJState.config.languagesToml.values.flatMap { language ->
+@Service(Service.Level.PROJECT)
+class HJFileGlobMatcher(project: Project) {
+    val globPatterns = HJState.getInstance(project).config.languagesToml.values.flatMap { language ->
         (emptyList<String>() +
                 (language.fileTypesGlob ?: emptyList()) +
                 (language.fileTypesStr?.map { "*.$it" } ?: emptyList()))
@@ -25,5 +28,9 @@ object HJFileGlobMatcher {
             // match against full path or just filename
             matcher.matches(Paths.get(normalizedPath)) || matcher.matches(Paths.get(fileName))
         }?.second
+    }
+
+    companion object {
+        fun getInstance(project: Project): HJFileGlobMatcher = project.getService(HJFileGlobMatcher::class.java)
     }
 }

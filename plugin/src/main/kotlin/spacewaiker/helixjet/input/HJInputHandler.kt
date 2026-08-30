@@ -2,18 +2,15 @@
 
 import com.intellij.codeInsight.lookup.LookupManager
 import com.intellij.ide.IdeEventQueue
+import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.project.Project
 import spacewaiker.helixjet.actions.HJActionContext
 import spacewaiker.helixjet.actions.HJKeyAction
 import spacewaiker.helixjet.editor.HJEditor
 import spacewaiker.helixjet.editor.HJEditorMode
 import spacewaiker.helixjet.editor.HJState
-import spacewaiker.helixjet.input.HJInputHandler.actionCount
-import spacewaiker.helixjet.input.HJInputHandler.lastKey
-import spacewaiker.helixjet.input.HJInputHandler.minorModeName
-import spacewaiker.helixjet.input.HJInputHandler.onNextKeyCallback
-import spacewaiker.helixjet.input.HJInputHandler.pendingActionKey
 import spacewaiker.helixjet.ui.HJStatusBarInputWidget
 import java.awt.event.KeyEvent
 import java.util.*
@@ -27,7 +24,8 @@ import java.util.*
  * @property actionCount Numbers typed as part of the action count
  * @property minorModeName Name of the currently "active" minor mode
  */
-object HJInputHandler {
+@Service(Service.Level.PROJECT)
+class HJInputHandler(private val project: Project) {
     private val logger = Logger.getInstance(this::class.java)
     private val onNextKeyCallback: Queue<((HJInputKey) -> Unit)> = LinkedList()
     private var lastKey: HJInputKey? = null
@@ -43,11 +41,15 @@ object HJInputHandler {
     /**
      * Keys to treat as passthrough when an autocomplete popup is active in insert mode
      */
-    private val autocompletePassthroughKeys = listOf(
+    private val autocompletePopupPassthroughKeys = listOf(
         HJInputKey.fromString("up"),
         HJInputKey.fromString("down"),
         HJInputKey.fromString("tab"),
         HJInputKey.fromString("ret"),
+        HJInputKey.fromString("esc"),
+    )
+    private val autocompleteInlinePassthroughKeys = listOf(
+        HJInputKey.fromString("tab"),
         HJInputKey.fromString("esc"),
     )
 
@@ -55,15 +57,17 @@ object HJInputHandler {
      * Handle the given input key.
      * Returns true if the key event was handled, false if it should be handled by the caller.
      */
-    fun handle(editor: Editor, key: HJInputKey): Boolean {
+    fun handle(editor: Editor, key: HJInputKey, event: KeyEvent): Boolean {
+        val hjState = HJState.getInstance(project)
+
         // record all key presses, including insert mode presses
-        if (HJState.macroRecording != null) {
-            val keys = HJState.macroRecording!!.second
+        if (hjState.macroRecording != null) {
+            val keys = hjState.macroRecording!!.second
             keys.add(key)
         }
 
-        if (HJState.mode == HJEditorMode.Insert) {
-            HJState.lastInsertKeystrokes.add(key)
+        if (hjState.mode == HJEditorMode.Insert) {
+            hjState.lastInsertKeystrokes.add(key)
             if (key is HJInputKey.Character) {
                 return false
             }
@@ -73,8 +77,8 @@ object HJInputHandler {
 
         // clear help widget
         if (minorModeName != null && !minorModeIsSticky) {
-            HJState.helpWidget?.hide()
-            HJState.helpWidget = null
+            hjState.helpWidget?.hide()
+            hjState.helpWidget = null
         }
 
         // if there is a callback set for the next key, execute it instead of normal key handling
@@ -82,24 +86,33 @@ object HJInputHandler {
             onNextKeyCallback.remove().invoke(key)
             pendingActionKey = null
             minorModeName = null
-            HJStatusBarInputWidget.updateInputWidget()
+            hjState.helpWidget?.hide()
+            hjState.helpWidget = null
+            HJStatusBarInputWidget.getInstance(project).updateInputWidget()
             return true
         }
 
         // proceed with normal key handling
-        return handleKeyNormalBehaviour(editor, key)
+        return handleKeyNormalBehaviour(editor, key, event)
     }
 
-    private fun handleKeyNormalBehaviour(editor: Editor, key: HJInputKey): Boolean {
+    private fun handleKeyNormalBehaviour(editor: Editor, key: HJInputKey, event: KeyEvent): Boolean {
+        val hjState = HJState.getInstance(project)
+
         // special case: do not handle up/down/tab/enter if autocomplete is up
-        if (HJState.mode == HJEditorMode.Insert && LookupManager.getActiveLookup(editor) != null
-            && autocompletePassthroughKeys.contains(key)
+        // @formatter:off
+        if (hjState.mode == HJEditorMode.Insert && (
+                (LookupManager.getActiveLookup(editor) != null && autocompletePopupPassthroughKeys.contains(key))
+                || (editor.inlayModel.getInlineElementsInRange(editor.caretModel.offset, editor.caretModel.offset).isNotEmpty()
+                            && autocompleteInlinePassthroughKeys.contains(key))
+            )
         ) return false
+        // @formatter:on
 
         // if the key is a number, we're inputting an action count
         if (key is HJInputKey.Character && key.char.isDigit()) {
             actionCount += key.char
-            HJStatusBarInputWidget.updateInputWidget()
+            HJStatusBarInputWidget.getInstance(project).updateInputWidget()
             return true
         }
         val count = if (actionCount.isEmpty()) null else actionCount.toInt().coerceAtLeast(1)
@@ -108,7 +121,7 @@ object HJInputHandler {
         val getKeyAction: (HJInputKey) -> HJKeyAction? = minorModeMapping?.let {
             usingMinorMode = true
             { inputKey -> it[inputKey] }
-        } ?: { inputKey -> HJState.config.mapping[HJState.mode]!![inputKey] }
+        } ?: { inputKey -> hjState.config.mapping[hjState.mode]!![inputKey] }
 
         when (val keyAction = getKeyAction(key)) {
             null -> {
@@ -119,16 +132,16 @@ object HJInputHandler {
                         minorModeMapping = null
                         pendingActionKey = null
                         minorModeName = null
-                        HJStatusBarInputWidget.updateInputWidget()
+                        HJStatusBarInputWidget.getInstance(project).updateInputWidget()
 
                         // clear help widget if we were in a sticky minor mode
                         if (minorModeIsSticky) {
-                            HJState.helpWidget?.hide()
-                            HJState.helpWidget = null
+                            hjState.helpWidget?.hide()
+                            hjState.helpWidget = null
                         }
                     }
                 } else {
-                    logger.info("Could not find an action corresponding to $key in mode ${HJState.mode}")
+                    logger.info("Could not find an action corresponding to $key in mode ${hjState.mode}")
                 }
             }
 
@@ -136,12 +149,12 @@ object HJInputHandler {
                 if (usingMinorMode && !minorModeIsSticky) minorModeMapping = null
                 actionCount = ""
 
-                val hjEditor = HJState.getHJEditor(editor)
+                val hjEditor = hjState.getHJEditor(editor)
                 if (hjEditor == null) {
                     logger.error("Got null when trying to get HJEditor for Editor")
                     return true
                 }
-                val cx = HJActionContext(hjEditor, count, HJState.selectedRegister)
+                val cx = HJActionContext(hjState, hjEditor, count, hjState.selectedRegister, event)
                 keyAction.execute(cx)
 
                 // if action sets onNextKeyCallback, do not clear pending action key and minor mode name
@@ -149,17 +162,17 @@ object HJInputHandler {
                     pendingActionKey = null
                     if (usingMinorMode && !minorModeIsSticky) minorModeName = null
                 }
-                HJStatusBarInputWidget.updateInputWidget()
+                HJStatusBarInputWidget.getInstance(project).updateInputWidget()
             }
 
             is HJKeyAction.HJMinorMode -> {
                 pendingActionKey = if (pendingActionKey == null) lastKey.toString() else pendingActionKey + lastKey
                 minorModeName = keyAction.name
-                HJStatusBarInputWidget.updateInputWidget()
+                HJStatusBarInputWidget.getInstance(project).updateInputWidget()
                 minorModeMapping = keyAction.mapping
                 minorModeIsSticky = keyAction.sticky
 
-                HJState.getOrCreateHelpWidget(editor).setNewMinorMode(keyAction)
+                hjState.getOrCreateHelpWidget(editor).setNewMinorMode(keyAction)
             }
 
             is HJKeyAction.HJPassthroughAction -> {
@@ -168,7 +181,7 @@ object HJInputHandler {
             }
         }
 
-        HJState.selectedRegister = null
+        hjState.selectedRegister = null
 
         return true
     }
@@ -182,7 +195,7 @@ object HJInputHandler {
 
         lastKey?.let { lastKey ->
             pendingActionKey = pendingActionKey?.let { it + lastKey.toString() } ?: lastKey.toString()
-            HJStatusBarInputWidget.updateInputWidget()
+            HJStatusBarInputWidget.getInstance(project).updateInputWidget()
         }
     }
 
@@ -214,5 +227,9 @@ object HJInputHandler {
             )
             eventQueue.dispatchEvent(keyReleasedEvent)
         }
+    }
+
+    companion object {
+        fun getInstance(project: Project): HJInputHandler = project.getService(HJInputHandler::class.java)
     }
 }

@@ -1,14 +1,17 @@
 ﻿package spacewaiker.helixjet.ui
 
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.editor.colors.EditorFontType
-import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.ex.FileEditorManagerEx
 import com.intellij.psi.codeStyle.NameUtil
 import spacewaiker.helixjet.editor.HJEditor
 import spacewaiker.helixjet.editor.HJRegister
 import spacewaiker.helixjet.editor.HJState
 import java.awt.BorderLayout
+import java.awt.event.ComponentAdapter
+import java.awt.event.ComponentEvent
 import java.awt.event.KeyEvent
 import javax.swing.*
 
@@ -24,10 +27,11 @@ internal class HJPromptTextField(
     private val autocompleteUi: HJPromptAutocomplete?,
     private val commandPopup: HJCommandPopup?,
 ) : JTextField() {
-    private var registerIndex = historyRegister?.let { HJState.registers.read(it, hjEditor)?.size } ?: 0
+    private val hjState = HJState.getInstance(hjEditor.editor.project!!)
+    private var registerIndex = historyRegister?.let { hjState.registers.read(it, hjEditor)?.size } ?: 0
     private val historyEntry
-        get() = historyRegister?.let { HJState.registers.read(it, hjEditor)?.getOrNull(registerIndex) } ?: ""
-    private val hint = historyRegister?.let { HJState.registers.first(it, hjEditor) } ?: ""
+        get() = historyRegister?.let { hjState.registers.read(it, hjEditor)?.getOrNull(registerIndex) } ?: ""
+    private val hint = historyRegister?.let { hjState.registers.first(it, hjEditor) } ?: ""
     private var isHintShown = false
     private var autocompleteChoices: List<String>? = null
     private var autocompleteIdx: Int? = null
@@ -65,7 +69,7 @@ internal class HJPromptTextField(
         // check for these at all, we get duplicate events and send onEvent twice for some keys...
         when (e.keyCode) {
             KeyEvent.VK_ENTER if e.id == KeyEvent.KEY_PRESSED -> {
-                historyRegister?.let { HJState.registers.push(it, text, hjEditor) }
+                historyRegister?.let { hjState.registers.push(it, text, hjEditor) }
                 eventType = HJPromptEvent.Validate
             }
 
@@ -145,8 +149,9 @@ class HJPrompt(
     autocompleteUi: HJPromptAutocomplete? = null,
     commandPopup: HJCommandPopup? = null,
 ) {
-    private val editorsComponent =
-        (FileEditorManager.getInstance(hjEditor.editor.project!!) as FileEditorManagerEx).splitters
+    private val hjState = HJState.getInstance(hjEditor.editor.project!!)
+    private val editorsComponent = FileEditorManagerEx.getInstanceEx(hjEditor.editor.project!!).splitters
+    private val layeredPane = SwingUtilities.getRootPane(editorsComponent)?.layeredPane
 
     private val promptCmp = JLabel(prompt).apply {
         font = hjEditor.editor.colorsScheme.getFont(EditorFontType.PLAIN)
@@ -163,6 +168,11 @@ class HJPrompt(
         background = EditorColorsManager.getInstance().globalScheme.defaultBackground
     }
 
+    private val resizeListener = object : ComponentAdapter() {
+        override fun componentResized(e: ComponentEvent?) = updateBounds()
+        override fun componentMoved(e: ComponentEvent?) = updateBounds()
+    }
+
     private fun onEventInternal(e: HJPromptEvent, command: String?) {
         onEvent(e, command)
 
@@ -171,22 +181,50 @@ class HJPrompt(
     }
 
     fun show() {
-        editorsComponent.add(panel, BorderLayout.SOUTH)
-        editorsComponent.revalidate()
-        editorsComponent.repaint()
+        if (layeredPane == null) return
+
+        hjState.typedHandlerBlock = true
+
+        updateBounds()
+
+        layeredPane.add(panel, JLayeredPane.POPUP_LAYER as Any)
+        layeredPane.revalidate()
+        layeredPane.repaint()
         textField.requestFocusInWindow()
-        HJState.activePrompt = this
+        hjState.activePrompt = this
+
+        editorsComponent.addComponentListener(resizeListener)
     }
 
     fun hide() {
-        editorsComponent.remove(panel)
-        editorsComponent.revalidate()
-        editorsComponent.repaint()
-        hjEditor.editor.contentComponent.requestFocusInWindow()
-        HJState.activePrompt = null
+        if (layeredPane == null) return
+
+        editorsComponent.removeComponentListener(resizeListener)
+
+        layeredPane.remove(panel)
+        layeredPane.revalidate()
+        layeredPane.repaint()
+        hjState.activePrompt = null
+        ApplicationManager.getApplication().invokeLater {
+            hjEditor.editor.contentComponent.requestFocusInWindow()
+        }
     }
 
     fun requestFocus() {
         textField.requestFocusInWindow()
+    }
+
+    private fun updateBounds() {
+        if (layeredPane == null) return
+        val panelHeight = panel.preferredSize.height.takeIf { it > 0 } ?: 28
+
+        // convert editorsComponent's bottom-left to layeredPane coordinates
+        val origin =
+            SwingUtilities.convertPoint(editorsComponent, 0, editorsComponent.height - panelHeight, layeredPane)
+        panel.setBounds(origin.x, origin.y, editorsComponent.width, panelHeight)
+    }
+
+    companion object {
+        val logger = Logger.getInstance(this::class.java)
     }
 }

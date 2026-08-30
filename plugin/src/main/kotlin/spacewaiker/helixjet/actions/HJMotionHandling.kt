@@ -136,6 +136,7 @@ enum class HJWordMotionTarget {
 }
 
 fun wordMove(doc: Document, range: HJRange, target: HJWordMotionTarget, count: Int): HJRange {
+    // println("wordMove start: ${range.slice(doc)}")
     val isPrev = target.isPrev
 
     // special-case early out
@@ -170,6 +171,7 @@ fun wordMove(doc: Document, range: HJRange, target: HJWordMotionTarget, count: I
         range = nextRange
     }
 
+    // println("worldMove end: ${range.slice(doc)}")
     return range
 }
 

@@ -1,14 +1,19 @@
 ﻿package spacewaiker.helixjet.ui
 
+import com.intellij.openapi.components.Service
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.StatusBar
 import com.intellij.openapi.wm.StatusBarWidget
 import spacewaiker.helixjet.editor.HJEditorMode
 import spacewaiker.helixjet.editor.HJState
 import java.awt.Component
 
-class HJStatusBarModeWidget : StatusBarWidget, StatusBarWidget.TextPresentation {
+@Service(Service.Level.PROJECT)
+class HJStatusBarModeWidget(private val project: Project) : StatusBarWidget, StatusBarWidget.TextPresentation {
     companion object {
         const val ID = "HelixJetModeWidget"
+
+        fun getInstance(project: Project): HJStatusBarModeWidget = project.getService(HJStatusBarModeWidget::class.java)
     }
 
     private var statusBar: StatusBar? = null
@@ -19,7 +24,7 @@ class HJStatusBarModeWidget : StatusBarWidget, StatusBarWidget.TextPresentation 
     override fun getAlignment() = Component.LEFT_ALIGNMENT
 
     override fun getText(): String {
-        return when (HJState.mode) {
+        return when (HJState.getInstance(project).mode) {
             HJEditorMode.Normal -> "NOR"
             HJEditorMode.Insert -> "INS"
             HJEditorMode.Select -> "SEL"

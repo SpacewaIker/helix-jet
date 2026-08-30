@@ -2,16 +2,18 @@
 
 import com.intellij.lang.ASTNode
 import com.intellij.lang.tree.util.children
+import com.intellij.notification.Notification
 import com.intellij.notification.NotificationType
+import com.intellij.notification.NotificationsManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.vfs.readText
 import com.intellij.openapi.vfs.resolveFromRootOrRelative
 import com.intellij.psi.PsiElement
+import spacewaiker.helix.BuildConfig
 import spacewaiker.helixjet.config.HJConfiguration
 import spacewaiker.helixjet.config.HJFileGlobMatcher
 import spacewaiker.helixjet.editor.HJRegister
-import spacewaiker.helixjet.editor.HJState
 import spacewaiker.helixjet.treesitter.HJSyntaxLoader
 import kotlin.system.measureTimeMillis
 
@@ -69,8 +71,8 @@ private val helixCommands = arrayOf(
     HJCommand("write-all", listOf("wa"), "Save all files") { cx, _, _ ->
         executeIdeAction(cx, "SaveAll")
     },
-    HJCommand("config-reload", listOf(), "Reload user config") { _, _, _ ->
-        HJState.config = HJConfiguration()
+    HJCommand("config-reload", listOf(), "Reload user config") { cx, _, _ ->
+        cx.hjState.config = HJConfiguration(cx.hjState.project)
     },
     HJCommand("config-open", listOf(), "Open user config") { cx, _, _ ->
         openFile(cx, HJConfiguration.userConfigPath)
@@ -159,9 +161,14 @@ private val helixCommands = arrayOf(
             cx.hjEditor.setStatus("File type/Language: ${cx.hjEditor.language ?: "text"}")
         } else {
             val language = args[0]
-            cx.hjEditor.language = HJState.config.languagesToml[language]
+            cx.hjEditor.language = cx.hjState.config.languagesToml[language]
         }
     },
+    HJCommand("clear-notifications", listOf("cl"), "Clears the current notifications.") { cx, _, _ ->
+        NotificationsManager.getNotificationsManager()
+            .getNotificationsOfType(Notification::class.java, cx.project)
+            .forEach { it.expire() }
+    }
 )
 
 private val debugCommands = arrayOf(
@@ -183,25 +190,25 @@ private val debugCommands = arrayOf(
         val registerName = args.first()
         val register = HJRegister.GeneralPurpose(registerName[0])
         if (flags.contains("ow")) {
-            HJState.registers.write(register, args, cx.hjEditor)
+            cx.hjState.registers.write(register, args, cx.hjEditor)
         } else {
             for (arg in args.drop(1)) {
-                HJState.registers.push(register, arg, cx.hjEditor)
+                cx.hjState.registers.push(register, arg, cx.hjEditor)
             }
         }
     },
-    HJCommand("printRegisters", listOf(), "Print all register contents") { _, _, _ ->
+    HJCommand("printRegisters", listOf(), "Print all register contents") { cx, _, _ ->
         println("All registers:")
-        for ((register, contents) in HJState.allRegisterContents) {
+        for ((register, contents) in cx.hjState.allRegisterContents) {
             println("$register: $contents")
         }
     },
-    HJCommand("print-config", listOf(), "Print all config contents (not mappings)") { _, _, _ ->
+    HJCommand("print-config", listOf(), "Print all config contents (not mappings)") { cx, _, _ ->
         println("Config:")
-        println("scrolloff: ${HJState.config.scrolloff}")
-        println("continueComments: ${HJState.config.continueComments}")
-        println("searchSmartCase: ${HJState.config.searchSmartCase}")
-        println("searchWrapAround: ${HJState.config.searchWrapAround}")
+        println("scrolloff: ${cx.hjState.config.scrolloff}")
+        println("continueComments: ${cx.hjState.config.continueComments}")
+        println("searchSmartCase: ${cx.hjState.config.searchSmartCase}")
+        println("searchWrapAround: ${cx.hjState.config.searchWrapAround}")
     },
     HJCommand("print-psi-dot", doc = "Print DOT representation of PsiElement tree") { cx, _, _ ->
         val psi = cx.hjEditor.psiFile ?: return@HJCommand
@@ -293,9 +300,9 @@ private val debugCommands = arrayOf(
         }
         println("Took $time ms to parse $count files")
     },
-    HJCommand("test-file-type") { _, args, _ ->
+    HJCommand("test-file-type") { cx, args, _ ->
         val path = args.getOrNull(0) ?: return@HJCommand
-        println(HJFileGlobMatcher.match(path))
+        println(HJFileGlobMatcher.getInstance(cx.hjState.project).match(path))
     },
     HJCommand(
         "notify",
@@ -308,18 +315,16 @@ private val debugCommands = arrayOf(
 
         cx.hjEditor.notify(args.joinToString(separator = " "), type)
     },
-    HJCommand("print-jumplist") { _, _, _ ->
-        for (jump in HJState.jumps.jumps) {
-            println(jump)
-        }
-    },
-    HJCommand("clear-jumplist") { _, _, _ -> HJState.jumps.jumps.clear() },
-    HJCommand("print-hjeditors") { _, _, _ ->
-        HJState.forAllEditors { hjEditor ->
+    HJCommand("print-hjeditors") { cx, _, _ ->
+        cx.hjState.forAllEditors { hjEditor ->
             println(hjEditor.editor.virtualFile.path)
         }
     },
+    HJCommand("reload-hjeditor") { cx, _, _ ->
+        val editor = cx.hjEditor.editor
+        cx.hjState.releaseEditor(editor)
+        cx.hjState.initEditor(editor)
+    }
 )
 
-private val commandsRaw =
-    if (System.getProperty("idea.plugin.in.sandbox.mode") == "true") helixCommands + debugCommands else helixCommands
+private val commandsRaw = if (BuildConfig.DEBUG) helixCommands + debugCommands else helixCommands
