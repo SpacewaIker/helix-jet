@@ -28,7 +28,7 @@ internal class HJPromptTextField(
     private val commandPopup: HJCommandPopup?,
 ) : JTextField() {
     private val hjState = HJState.getInstance(hjEditor.editor.project!!)
-    private var registerIndex = historyRegister?.let { hjState.registers.read(it, hjEditor)?.size } ?: 0
+    private var registerIndex = 0// historyRegister?.let { hjState.registers.read(it, hjEditor)?.size } ?: 0
     private val historyEntry
         get() = historyRegister?.let { hjState.registers.read(it, hjEditor)?.getOrNull(registerIndex) } ?: ""
     private val hint = historyRegister?.let { hjState.registers.first(it, hjEditor) } ?: ""
@@ -77,14 +77,19 @@ internal class HJPromptTextField(
                 eventType = HJPromptEvent.Abort
             }
 
-            KeyEvent.VK_UP if e.id == KeyEvent.KEY_PRESSED -> {
+            KeyEvent.VK_DOWN if e.id == KeyEvent.KEY_PRESSED -> {
                 registerIndex = (registerIndex - 1).coerceAtLeast(0)
                 text = historyEntry
+                isHintShown = false
             }
 
-            KeyEvent.VK_DOWN if e.id == KeyEvent.KEY_PRESSED -> {
-                registerIndex = (registerIndex + 1).coerceAtMost(historyEntry.length)
+            KeyEvent.VK_UP if e.id == KeyEvent.KEY_PRESSED -> {
+                if (!isHintShown) {
+                    val historySize = historyRegister?.let { hjState.registers.read(it, hjEditor)?.size }
+                    registerIndex = (registerIndex + 1).coerceAtMost(historySize?.minus(1) ?: 0)
+                }
                 text = historyEntry
+                isHintShown = false
             }
 
             else if e.id == KeyEvent.KEY_TYPED -> {
@@ -117,7 +122,8 @@ internal class HJPromptTextField(
                 }
             } else if (e.keyCode != KeyEvent.VK_SHIFT && (e.keyCode == KeyEvent.VK_BACK_SPACE || e.id == KeyEvent.KEY_TYPED)) { // non-tab key typed
                 val matcher = NameUtil.buildMatcher("*$text*").build()
-                autocompleteChoices = autocompleteProvider.filter { matcher.matches(it) }
+                autocompleteChoices = if (isHintShown) autocompleteProvider
+                else autocompleteProvider.filter { matcher.matches(it) }
                     .sortedByDescending { matcher.matchingDegree(it) }
                 val height = autocompleteUi?.setNewEntries(autocompleteChoices!!)
                 if (height != null && commandPopup != null) {

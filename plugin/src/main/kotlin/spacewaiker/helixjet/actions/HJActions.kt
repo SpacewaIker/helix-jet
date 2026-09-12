@@ -263,7 +263,7 @@ private val actionsRaw = arrayOf(
     HJAction("signature_help", "Show signature help"),
     HJAction("smart_tab", "Insert tab if all cursors have all whitespace to their left; otherwise") { executeIdeAction(it, IdeActions.ACTION_EDITOR_TAB); it.hjEditor.setNewSelection(HJSelection(it.hjEditor.editor.caretModel)) },
     HJAction("insert_tab", "Insert tab char"),
-    HJAction("insert_newline", "Insert newline char") { executeIdeAction(it, IdeActions.ACTION_EDITOR_ENTER); it.hjEditor.setNewSelection(HJSelection(it.hjEditor.editor.caretModel)) },
+    HJAction("insert_newline", "Insert newline char") { insertNewline(it) },
     HJAction("insert_char_interactive", "Insert an interactively-chosen char"),
     HJAction("append_char_interactive", "Append an interactively-chosen char"),
     HJAction("delete_char_backward", "Delete previous char") { executeIdeAction(it, IdeActions.ACTION_EDITOR_BACKSPACE); it.hjEditor.setNewSelection(HJSelection(it.hjEditor.editor.caretModel)) },
@@ -1740,6 +1740,7 @@ private val surroundHelpTextLines = listOf(
 )
 
 private fun surroundAdd(cx: HJActionContext) {
+    if (!ensureFileWriteable(cx)) return
     cx.inputHandler.onNextKey { inputKey ->
         val (open, close, surroundLen) = when (inputKey) {
             is HJInputKey.Character -> {
@@ -1775,6 +1776,7 @@ private fun surroundAdd(cx: HJActionContext) {
 }
 
 private fun surroundReplace(cx: HJActionContext) {
+    if (!ensureFileWriteable(cx)) return
     cx.inputHandler.onNextKey { inputKey ->
         val surroundCh = when (inputKey) {
             is HJInputKey.Character if inputKey.char == 'm' -> null
@@ -1829,6 +1831,7 @@ private fun surroundReplace(cx: HJActionContext) {
 }
 
 private fun surroundDelete(cx: HJActionContext) {
+    if (!ensureFileWriteable(cx)) return
     cx.inputHandler.onNextKey { inputKey ->
         val surroundCh = when (inputKey) {
             is HJInputKey.Character if inputKey.char == 'm' -> null
@@ -2909,6 +2912,8 @@ private fun copyBetweenRegisters(cx: HJActionContext) {
 }
 
 private fun incrementImpl(cx: HJActionContext, direction: HJDirection) {
+    if (!ensureFileWriteable(cx)) return
+
     val sign = direction.value
     var amount = sign * cx.count
     // If the register is '#'/ selIdx, then increase or decrease the 'amount' by 1 per element
@@ -3148,4 +3153,9 @@ private fun undoImpl(cx: HJActionContext, direction: HJDirection) {
             } else cx.hjEditor.setError("Redo not available")
         }
     }
+}
+
+private fun insertNewline(cx: HJActionContext) {
+    // use 'open' to get comment continuation
+    open(cx, true, true)
 }

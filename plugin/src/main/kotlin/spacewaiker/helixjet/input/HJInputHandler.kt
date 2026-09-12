@@ -1,5 +1,6 @@
 ﻿package spacewaiker.helixjet.input
 
+import com.intellij.codeInsight.inline.completion.render.InlineCompletionLineRenderer
 import com.intellij.codeInsight.lookup.LookupManager
 import com.intellij.ide.IdeEventQueue
 import com.intellij.openapi.components.Service
@@ -101,12 +102,13 @@ class HJInputHandler(private val project: Project) {
 
         // special case: do not handle up/down/tab/enter if autocomplete is up
         // @formatter:off
-        if (hjState.mode == HJEditorMode.Insert && (
-                (LookupManager.getActiveLookup(editor) != null && autocompletePopupPassthroughKeys.contains(key))
-                || (editor.inlayModel.getInlineElementsInRange(editor.caretModel.offset, editor.caretModel.offset).isNotEmpty()
-                            && autocompleteInlinePassthroughKeys.contains(key))
-            )
-        ) return false
+        if (hjState.mode == HJEditorMode.Insert) {
+            if (LookupManager.getActiveLookup(editor) != null && autocompletePopupPassthroughKeys.contains(key)) return false
+
+            val inlays = editor.inlayModel.getInlineElementsInRange(editor.caretModel.offset, editor.caretModel.offset)
+            val hasInlineCompletion = inlays.any { it.renderer is InlineCompletionLineRenderer }
+            if (hasInlineCompletion && autocompleteInlinePassthroughKeys.contains(key)) return false
+        }
         // @formatter:on
 
         // if the key is a number, we're inputting an action count

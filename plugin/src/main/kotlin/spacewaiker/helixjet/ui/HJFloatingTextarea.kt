@@ -62,6 +62,8 @@ abstract class HJFloatingTextarea(editor: Editor) {
     }
 
     private fun panelHeight(): Int {
+        if (textArea.text.isEmpty()) return 0
+        
         // calculate height based on text content
         val lineCount = textArea.text.lines().size
         val lineHeight = textArea.getFontMetrics(textArea.font).height
