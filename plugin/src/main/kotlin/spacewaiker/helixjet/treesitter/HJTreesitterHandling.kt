@@ -216,20 +216,28 @@ object HJTreesitterHandling {
     }
 
     fun expandSelection(syntax: HJLanguageSyntax, document: Document, selection: HJSelection): HJSelection {
-        return selectNodeImpl(syntax, document, selection, null) { cursor ->
-            val range = cursor.currentNode.range
-            while (cursor.currentNode.range == range) {
+        return selectNodeImpl(syntax, document, selection, null) { hjRange, cursor ->
+            val rangeEqualsHJRange = { range: Range, hjRange: HJRange ->
+                val rangeStartOffset =
+                    document.getLineStartOffset(range.startPoint.row.toInt()) + range.startPoint.column.toInt()
+                val rangeEndOffset =
+                    document.getLineStartOffset(range.endPoint.row.toInt()) + range.endPoint.column.toInt()
+
+                rangeStartOffset == hjRange.from && rangeEndOffset == hjRange.to
+            }
+
+            while (rangeEqualsHJRange(cursor.currentNode.range, hjRange)) {
                 if (!cursor.gotoParent()) break
             }
         }
     }
 
     fun shrinkSelection(syntax: HJLanguageSyntax, document: Document, selection: HJSelection): HJSelection {
-        return selectNodeImpl(syntax, document, selection, null) { it.gotoFirstChild() }
+        return selectNodeImpl(syntax, document, selection, null) { _, cursor -> cursor.gotoFirstChild() }
     }
 
     fun selectNextSibling(syntax: HJLanguageSyntax, document: Document, selection: HJSelection): HJSelection {
-        return selectNodeImpl(syntax, document, selection, HJDirection.Forward) { cursor ->
+        return selectNodeImpl(syntax, document, selection, HJDirection.Forward) { _, cursor ->
             while (!cursor.gotoNextSibling()) {
                 if (!cursor.gotoParent()) break
             }
@@ -265,7 +273,7 @@ object HJTreesitterHandling {
     }
 
     fun selectPrevSibling(syntax: HJLanguageSyntax, document: Document, selection: HJSelection): HJSelection {
-        return selectNodeImpl(syntax, document, selection, HJDirection.Forward) { cursor ->
+        return selectNodeImpl(syntax, document, selection, HJDirection.Forward) { _, cursor ->
             while (!cursor.gotoPreviousSibling()) {
                 if (!cursor.gotoParent()) break
             }
@@ -331,7 +339,7 @@ object HJTreesitterHandling {
         document: Document,
         selection: HJSelection,
         direction: HJDirection?,
-        motion: (TreeCursor) -> Unit,
+        motion: (HJRange, TreeCursor) -> Unit,
     ): HJSelection {
         val cursor = syntax.tree.walk()
 
@@ -341,7 +349,7 @@ object HJTreesitterHandling {
 
             cursor.resetToPointRange(syntax.tree, fromPoint, toPoint)
 
-            motion(cursor)
+            motion(range, cursor)
 
             val node = cursor.currentNode
             val from = node.getStartOffset(document)

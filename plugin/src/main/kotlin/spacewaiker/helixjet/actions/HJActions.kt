@@ -297,7 +297,7 @@ private val actionsRaw = arrayOf(
     HJAction("paste_primary_clipboard_before", "Paste primary clipboard before selections"),
     HJAction("indent", "Indent selection") { indentImpl(it, HJDirection.Forward) },
     HJAction("unindent", "Unindent selection") { indentImpl(it, HJDirection.Backward) },
-    HJAction("format_selections", "Format selection") { executeIdeAction(it, IdeActions.ACTION_EDITOR_REFORMAT)}, // TODO: only format selected?
+    HJAction("format_selections", "Format selection") { formatSelections(it) },
     HJAction("join_selections", "Join lines inside selection") { joinSelectionsImpl(it, false) },
     HJAction("join_selections_space", "Join lines inside selection and select spaces") { joinSelectionsImpl(it, true) },
     HJAction("keep_selections", "Keep selections matching regex") { keepOrRemoveSelectionsImpl(it, false) },
@@ -696,7 +696,7 @@ private fun pasteImpl(cx: HJActionContext, pasteBefore: Boolean, registerOverrid
 }
 
 private fun replaceWithYanked(cx: HJActionContext) {
-    replaceSelectionsWithRegister(cx, HJRegister.LastYank, cx.count)
+    replaceSelectionsWithRegister(cx, cx.register ?: HJRegister.LastYank, cx.count)
     exitSelectMode(cx)
 }
 
@@ -1619,98 +1619,55 @@ private fun open(cx: HJActionContext, openBelow: Boolean, commentContinuationEna
     collapseSelection(cx)
     insertMode(cx, false)
 
-    var offs = 0
-    val ranges = mutableListOf<HJRange>()
+    val rangesOnFirstLine = mutableListOf<Int>()
+    val continueCommentTokens = cx.hjEditor.language?.commentTokens
+    val commentTokensToAdd = mutableMapOf<Int, String>()
 
-    val continueCommentTokens = if (commentContinuationEnabled && cx.hjState.config.continueComments) {
-        val language = cx.hjEditor.psiFile?.language
-        if (language != null) {
-            val commenter = LanguageCommenters.INSTANCE.forLanguage(language)
-            commenter?.lineCommentPrefixes
-        } else cx.hjEditor.language?.commentTokens
-    } else null
-
-    var transaction = cx.hjEditor.changeBySelection { range ->
+    val newLineRanges = cx.hjEditor.selection.ranges.withIndex().map { (idx, range) ->
         // the line number, where the cursor is currently
         val currLineNum = cx.doc.getLineNumber(if (openBelow) prevGraphemeBoundary(range.to) else range.from)
         // the next line number, where the cursor will be, after finishing the transaction
         val nextNewLineNum = if (openBelow) currLineNum + 1 else currLineNum
-        val aboveNextNewLineNum = (nextNewLineNum - 1).coerceAtLeast(0)
 
-        val continueCommentToken = continueCommentTokens?.let { getCommentToken(cx.doc, it, currLineNum) }
-
-        // index to insert newlines after, as well as the char width to use to compensate for those inserted newlines
-        val (aboveNextLineEndIndex, aboveNextLineEndWidth) = if (nextNewLineNum == 0) Pair(0, 0) else {
-            Pair(cx.doc.getLineEndOffset(aboveNextNewLineNum), 1)
+        continueCommentTokens?.let { getCommentToken(cx.doc, it, currLineNum) }?.let { token ->
+            commentTokensToAdd[nextNewLineNum] = token
         }
 
-        // TODO: for some reason CodeStyleManager.getLineIndent does not work properly in my project in Rider
-        //       tried this workaround below but it doesn't work for empty lines
-        //       e.g.:
-        //       |     } // end of code block, open on next line
-        //       |
-        //       |     ^ should open here but opens at very start of line instead
-//        val line = cx.doc.getLine(currLineNum)!!
-//        val indent = when (val pos = firstNonWhitespaceChar(line)) {
-//            is Int if continueCommentToken != null -> line.substring(0, pos)
-////            else -> cx.hjEditor.codeStyleManager?.getLineIndent(cx.doc, cx.doc.getLineStartOffset(nextNewLineNum))
-//            else -> cx.hjEditor.codeStyleManager?.getLineIndent(
-//                cx.doc,
-//                cx.doc.getLineEndOffset(if (openBelow) currLineNum else (currLineNum - 1).coerceAtLeast(0))
-//            )
-//                ?: (cx.hjEditor.language?.indent?.unit ?: "")
-//        }
-        var indent = ""
-        if (continueCommentToken != null) {
-            val line = cx.doc.getLine(currLineNum)!!
-            firstNonWhitespaceChar(line)?.let { indent = line.substring(0, it) }
+        if (currLineNum == 0 && !openBelow) {
+            rangesOnFirstLine.add(idx)
+            HJRange.point(0)
         } else {
-            cx.doc.getLine(nextNewLineNum)?.let { line ->
-                firstNonWhitespaceChar(line)?.let { indent = line.substring(0, it) }
-            }
+            val line = if (openBelow) currLineNum else currLineNum - 1
+            val lineEnd = cx.doc.getLineEndOffset(line)
+            HJRange.point(lineEnd)
         }
-
-        val builder = StringBuilder()
-        if (!openBelow && nextNewLineNum == 0) {
-            builder.append(indent)
-            if (continueCommentToken != null) {
-                builder.append(continueCommentToken)
-                builder.append(" ")
-            }
-            builder.append("\n")
-        } else {
-            builder.append("\n")
-            builder.append(indent)
-            if (continueCommentToken != null) {
-                builder.append(continueCommentToken)
-                builder.append(" ")
-            }
-        }
-        val text = builder.repeat(cx.count)
-
-        // calculate new selection ranges
-        val pos = offs + aboveNextLineEndIndex + aboveNextLineEndWidth
-        val commentLen = continueCommentToken?.let { it.length + 1 } ?: 0 // + 1 for the extra space added
-        for (i in 0 until cx.count) {
-            // pos                     -> beginning of reference line,
-            // + (i * (line_ending_len + indent_len + comment_len)) -> beginning of i'th line from pos (possibly including comment token)
-            // + indent_len + comment_len ->        -> indent for i'th line
-            ranges.add(
-                HJRange.point(
-                    pos + (i * (1 + indent.length + commentLen))
-                            + indent.length + commentLen
-                )
-            )
-        }
-
-        // update the offset for the next range
-        offs += text.length
-
-        HJChange.Insert(aboveNextLineEndIndex, text)
     }
 
-    transaction = transaction.copy(selection = HJSelection(ranges, cx.hjEditor.selection.primaryIndex))
-    cx.hjEditor.apply(transaction)
+    cx.hjEditor.setNewSelection(HJSelection(newLineRanges, cx.hjEditor.selection.primaryIndex))
+    executeIdeAction(cx, IdeActions.ACTION_EDITOR_ENTER)
+
+    val selection = HJSelection(cx.hjEditor.editor.caretModel)
+    for (index in rangesOnFirstLine) {
+        selection.ranges[index] = HJRange.point(0)
+    }
+    cx.hjEditor.setNewSelection(selection)
+
+    if (!(commentContinuationEnabled && cx.hjState.config.continueComments)) return
+
+    val newRanges = mutableListOf<HJRange>()
+    val transaction = cx.hjEditor.changeBySelection { range ->
+        val lineNum = range.cursorLine(cx.doc)
+        val token = commentTokensToAdd[lineNum]
+        if (token == null) {
+            newRanges.add(range)
+            null
+        } else {
+            newRanges.add(HJRange.point(range.cursor + token.length + 1))
+            HJChange.Insert(range.cursor, "$token ")
+        }
+    }
+
+    cx.hjEditor.apply(transaction.copy(selection = HJSelection(newRanges, cx.hjEditor.selection.primaryIndex)))
 }
 
 private fun matchBrackets(cx: HJActionContext) {
@@ -3067,6 +3024,7 @@ private fun lastPicker(cx: HJActionContext) {
 }
 
 private fun indentImpl(cx: HJActionContext, direction: HJDirection) {
+    if (!ensureFileWriteable(cx)) return
     // TODO: indent manually? First must be able to get correct indentation here and in open
     //       in any case, ensure cursor is in right place after indenting
     // TODO: modify selection to be on the same text as before the document modification
@@ -3156,6 +3114,48 @@ private fun undoImpl(cx: HJActionContext, direction: HJDirection) {
 }
 
 private fun insertNewline(cx: HJActionContext) {
-    // use 'open' to get comment continuation
-    open(cx, true, true)
+    if (!ensureFileWriteable(cx)) return
+    collapseSelection(cx)
+    insertMode(cx, false)
+
+    val continueCommentTokens = cx.hjEditor.language?.commentTokens
+    val commentTokensToAdd = mutableMapOf<Int, String>()
+
+    cx.hjEditor.selection.ranges.withIndex().forEach { (idx, range) ->
+        // the line number, where the cursor is currently
+        val currLineNum = cx.doc.getLineNumber(prevGraphemeBoundary(range.to))
+        // the next line number, where the cursor will be, after finishing the transaction
+        val nextNewLineNum = currLineNum + 1
+
+        continueCommentTokens?.let { getCommentToken(cx.doc, it, currLineNum) }?.let { token ->
+            commentTokensToAdd[nextNewLineNum] = token
+        }
+    }
+
+    executeIdeAction(cx, IdeActions.ACTION_EDITOR_ENTER)
+    cx.hjEditor.setNewSelection(HJSelection(cx.hjEditor.editor.caretModel))
+
+    if (!cx.hjState.config.continueComments) return
+    if (continueCommentTokens == null) return
+
+    val newRanges = mutableListOf<HJRange>()
+    val transaction = cx.hjEditor.changeBySelection { range ->
+        val lineNum = range.cursorLine(cx.doc)
+        val token = commentTokensToAdd[lineNum]
+        val alreadyCommented = getCommentToken(cx.doc, continueCommentTokens, lineNum) != null
+        if (token == null || alreadyCommented) {
+            newRanges.add(range)
+            null
+        } else {
+            newRanges.add(HJRange.point(range.cursor + token.length + 1))
+            HJChange.Insert(range.cursor, "$token ")
+        }
+    }
+
+    cx.hjEditor.apply(transaction.copy(selection = HJSelection(newRanges, cx.hjEditor.selection.primaryIndex)))
+}
+
+private fun formatSelections(cx: HJActionContext) {
+    if (!ensureFileWriteable(cx)) return
+    executeIdeAction(cx, IdeActions.ACTION_EDITOR_REFORMAT)
 }
