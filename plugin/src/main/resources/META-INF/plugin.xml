@@ -32,6 +32,7 @@
         <statusBarWidgetFactory implementation="spacewaiker.helixjet.ui.HJStatusBarFileTypeWidgetFactory"
                                 id="HelixFileTypeWidget" order="first"/>
         <notificationGroup id="HelixJet Notifications" displayType="BALLOON" isLogByDefault="false"/>
+        <errorHandler implementation="spacewaiker.helixjet.core.HJErrorReporter"/>
     </extensions>
 
 </idea-plugin>

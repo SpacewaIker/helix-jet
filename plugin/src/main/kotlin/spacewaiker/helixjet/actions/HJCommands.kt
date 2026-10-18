@@ -324,6 +324,9 @@ private val debugCommands = arrayOf(
         val editor = cx.hjEditor.editor
         cx.hjState.releaseEditor(editor)
         cx.hjState.initEditor(editor)
+    },
+    HJCommand("exception") { _, _, _ ->
+        throw Exception("exception!")
     }
 )
 
