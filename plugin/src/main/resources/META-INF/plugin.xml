@@ -1,7 +1,7 @@
 <!-- Plugin Configuration File: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
     <!-- Unique identifier of the plugin. It should be FQN, cannot be changed between the plugin versions. -->
-    <id>spacewaiker.helix-jet</id>
+    <id>io.github.spacewaiker.helix-jet</id>
 
     <!-- Public plugin name should be written in Title Case.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#plugin-name -->
@@ -22,17 +22,17 @@
     <!-- Extensions defined by the plugin.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
     <extensions defaultExtensionNs="com.intellij">
-        <postStartupActivity implementation="spacewaiker.helixjet.core.HJStartupActivity"/>
-        <statusBarWidgetFactory implementation="spacewaiker.helixjet.ui.HJStatusBarInputWidgetFactory"
+        <postStartupActivity implementation="io.github.spacewaiker.helixjet.core.HJStartupActivity"/>
+        <statusBarWidgetFactory implementation="io.github.spacewaiker.helixjet.ui.HJStatusBarInputWidgetFactory"
                                 id="HelixInputWidget" order="first"/>
-        <statusBarWidgetFactory implementation="spacewaiker.helixjet.ui.HJStatusBarModeWidgetFactory"
+        <statusBarWidgetFactory implementation="io.github.spacewaiker.helixjet.ui.HJStatusBarModeWidgetFactory"
                                 id="HelixModeWidget" order="first"/>
-        <statusBarWidgetFactory implementation="spacewaiker.helixjet.ui.HJStatusBarLogoWidgetFactory"
+        <statusBarWidgetFactory implementation="io.github.spacewaiker.helixjet.ui.HJStatusBarLogoWidgetFactory"
                                 id="HelixLogoWidget" order="first"/>
-        <statusBarWidgetFactory implementation="spacewaiker.helixjet.ui.HJStatusBarFileTypeWidgetFactory"
+        <statusBarWidgetFactory implementation="io.github.spacewaiker.helixjet.ui.HJStatusBarFileTypeWidgetFactory"
                                 id="HelixFileTypeWidget" order="first"/>
         <notificationGroup id="HelixJet Notifications" displayType="BALLOON" isLogByDefault="false"/>
-        <errorHandler implementation="spacewaiker.helixjet.core.HJErrorReporter"/>
+        <errorHandler implementation="io.github.spacewaiker.helixjet.core.HJErrorReporter"/>
     </extensions>
 
 </idea-plugin>
