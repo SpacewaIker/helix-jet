@@ -1,0 +1,27 @@
+name: Exception report
+description: Report an exception thrown by the plugin
+title: "[Exception] <Summary>"
+labels: ["exception"]
+body:
+  - type: textarea
+    id: details
+    attributes:
+      label: What were you doing?
+      description: Steps to reproduce, or anything else that might help.
+    validations:
+      required: true
+  - type: input
+    id: plugin_version
+    attributes:
+      label: Plugin version
+  - type: input
+    id: ide_version
+    attributes:
+      label: IDE name and version
+  - type: textarea
+    id: stacktrace
+    attributes:
+      label: Stack trace
+      render: text
+    validations:
+      required: true
