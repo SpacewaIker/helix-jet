@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="typescript-jvm">
+    <output-path>$PROJECT_DIR$/grammars/typescript/build/libs</output-path>
+    <root id="archive" name="typescript-jvm.jar">
+      <element id="module-output" name="helix-jet.grammars.typescript.jvmMain" />
+    </root>
+  </artifact>
+</component>

@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="cpp-jvm">
+    <output-path>$PROJECT_DIR$/grammars/cpp/build/libs</output-path>
+    <root id="archive" name="cpp-jvm.jar">
+      <element id="module-output" name="helix-jet.grammars.cpp.jvmMain" />
+    </root>
+  </artifact>
+</component>

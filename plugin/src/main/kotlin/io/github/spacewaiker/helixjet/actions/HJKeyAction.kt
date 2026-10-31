@@ -24,9 +24,9 @@ sealed class HJKeyAction(val name: String, val doc: String) {
         fun execute(cx: HJActionContext) {
             if (action == null) {
                 cx.hjEditor.setWarning("Action $name is not yet implemented")
-                HJActions.logger.warn("Action $name is not yet implemented")
+                HJActions.getInstance(cx.project).logger.warn("Action $name is not yet implemented")
             } else {
-                HJActions.logger.debug("Executing action $name")
+                HJActions.getInstance(cx.project).logger.debug("Executing action $name")
                 action(cx)
             }
         }

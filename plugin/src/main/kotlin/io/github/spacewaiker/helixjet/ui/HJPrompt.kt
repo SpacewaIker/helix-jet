@@ -92,6 +92,14 @@ internal class HJPromptTextField(
                 isHintShown = false
             }
 
+            KeyEvent.VK_LEFT if e.id == KeyEvent.KEY_PRESSED -> {
+                super.processKeyEvent(e)
+            }
+
+            KeyEvent.VK_RIGHT if e.id == KeyEvent.KEY_PRESSED -> {
+                super.processKeyEvent(e)
+            }
+
             else if e.id == KeyEvent.KEY_TYPED -> {
                 // not key released because otherwise this triggers when the key used to create this prompt is released
                 if (isHintShown) {

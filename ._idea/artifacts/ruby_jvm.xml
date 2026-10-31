@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="ruby-jvm">
+    <output-path>$PROJECT_DIR$/grammars/ruby/build/libs</output-path>
+    <root id="archive" name="ruby-jvm.jar">
+      <element id="module-output" name="helix-jet.grammars.ruby.jvmMain" />
+    </root>
+  </artifact>
+</component>

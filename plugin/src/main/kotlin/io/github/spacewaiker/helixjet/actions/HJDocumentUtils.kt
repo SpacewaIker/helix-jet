@@ -211,7 +211,7 @@ fun openFile(
             val currentWindow = fileEditorManagerEx.currentWindow ?: return null
             val orientation =
                 if (openLocation == HJFileOpenLocation.HSplit) JSplitPane.VERTICAL_SPLIT else JSplitPane.HORIZONTAL_SPLIT
-            val editorWindow = currentWindow.split(orientation, true, file, true)
+            val editorWindow = currentWindow.split(orientation, true, file, true, false)
             editorWindow?.selectedComposite?.selectedEditor
         }
     }

@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="css-jvm">
+    <output-path>$PROJECT_DIR$/grammars/css/build/libs</output-path>
+    <root id="archive" name="css-jvm.jar">
+      <element id="module-output" name="helix-jet.grammars.css.jvmMain" />
+    </root>
+  </artifact>
+</component>

@@ -61,7 +61,7 @@ data class HJFileIgnore(
     }
 }
 
-class HJConfiguration {
+class HJConfiguration(val project: Project) {
     @Suppress("PropertyName")
     val LANGUAGES_TOML = "/runtime/languages.toml"
 
@@ -90,12 +90,12 @@ class HJConfiguration {
         private set
     // ======================================================================================
 
-    constructor(project: Project) {
+    init {
         val colorScheme = EditorColorsManager.getInstance().globalScheme
         primaryCursorColor = colorScheme.getColor(EditorColors.CARET_COLOR) ?: JBColor.LIGHT_GRAY
         otherCursorsColor = colorScheme.getColor(EditorColors.SELECTED_TEARLINE_COLOR) ?: JBColor.GRAY
 
-        applyConfig(project)
+        applyConfig()
     }
 
     /**
@@ -125,15 +125,15 @@ class HJConfiguration {
         return toml
     }
 
-    private fun applyConfig(project: Project) {
+    private fun applyConfig() {
         val config = loadConfigurationFile(userConfigPath) ?: return
-        applyConfigFile(project, config, userConfigPath)
+        applyConfigFile(config, userConfigPath)
     }
 
     /**
      * Overload default keymap configuration with user defined config file, if one exists.
      */
-    private fun applyConfigFile(project: Project, config: TomlFile, path: String) {
+    private fun applyConfigFile(config: TomlFile, path: String) {
         config.getPrimitiveValue<String>("extend")?.let { extendFile ->
             var extendFile = extendFile.replace("~/", System.getProperty("user.home") + "/")
             extendFile = Path(path).resolve(extendFile).absolute().toString()
@@ -142,7 +142,7 @@ class HJConfiguration {
                 return@let
             }
             val extend = loadConfigurationFile(extendFile) ?: return@let
-            applyConfigFile(project, extend, extendFile)
+            applyConfigFile(extend, extendFile)
         }
 
         // editor settings
@@ -231,11 +231,11 @@ class HJConfiguration {
             when (tomlNode) {
                 is TomlKeyValuePrimitive -> {
                     var action = (tomlNode.value.content as? String)?.let {
-                        if (it == "passthrough") HJKeyAction.HJPassthroughAction else HJActions.getAction(it)
+                        if (it == "passthrough") HJKeyAction.HJPassthroughAction else HJActions.getInstance(project).getAction(it)
                     }
                     if (action == null) {
                         logger.warn("Missing action ${tomlNode.value.content} for key $inputKey defined in user config. Mapping to no_op.")
-                        action = HJActions.getAction("no_op")!!
+                        action = HJActions.getInstance(project).getAction("no_op")!!
                     } else {
                         logger.debug("Remapping $inputKey to ${action.name} as defined in user config")
                     }
@@ -280,7 +280,7 @@ class HJConfiguration {
      * Get a list of all HJKeyAction.HJAction's, with a list of bindings for that action
      */
     fun allActionsWithBindings(mode: HJEditorMode): List<Pair<HJKeyAction.HJAction, List<List<HJInputKey>>>> {
-        val actions = HJActions.allActions.associate { action ->
+        val actions = HJActions.getInstance(project).allActions.associate { action ->
             Pair(
                 action.name,
                 Pair(action, mutableListOf<List<HJInputKey>>())
@@ -330,83 +330,83 @@ class HJConfiguration {
         return HJFileIgnore(patterns)
     }
 
+    /**
+     * The default key mapping, parsed.
+     */
+    private fun defaultMappingParsed(): Map<HJEditorMode, MutableMap<HJInputKey, HJKeyAction>> {
+        val map: Map<HJEditorMode, MutableMap<HJInputKey, HJKeyAction>> = mapOf(
+            HJEditorMode.Normal to mutableMapOf(),
+            HJEditorMode.Select to mutableMapOf(),
+            HJEditorMode.Insert to mutableMapOf(),
+        )
+
+        for ((key, value) in defaultMappingNormal) {
+            parseKeyActionDefinition(key, value)?.let { (inputKey, keyAction) ->
+                map[HJEditorMode.Normal]!![inputKey] = keyAction
+            }
+        }
+        for ((key, value) in defaultMappingSelect) {
+            parseKeyActionDefinition(key, value)?.let { (inputKey, keyAction) ->
+                map[HJEditorMode.Select]!![inputKey] = keyAction
+            }
+        }
+        for ((key, value) in defaultMappingInsert) {
+            parseKeyActionDefinition(key, value)?.let { (inputKey, keyAction) ->
+                map[HJEditorMode.Insert]!![inputKey] = keyAction
+            }
+        }
+
+        return map
+    }
+
+    private fun parseKeyActionDefinition(key: String, value: Any): Pair<HJInputKey, HJKeyAction>? {
+        val inputKey = HJInputKey.fromString(key)
+        if (inputKey == null) {
+            logger.warn("Unknown key $key in default keymap. Skipping")
+            return null
+        }
+
+        return when (value) {
+            is String -> {
+                var action = HJActions.getInstance(project).getAction(value)
+                if (action == null) {
+                    logger.error("Missing action $value for key $inputKey in default keymap. Mapping to no_op.")
+                    action = HJActions.getInstance(project).getAction("no_op")!!
+                }
+                Pair(inputKey, action)
+            }
+
+            is Pair<*, *> if value.second is Map<*, *> -> {
+                val name = value.first as? String ?: return null
+                val map = value.second as? Map<*, *> ?: return null
+
+                Pair(inputKey, parseKeyActionMinorModeDefinition(name, false, map))
+            }
+
+            is Triple<*, *, *> if value.third is Map<*, *> -> {
+                val name = value.first as? String ?: return null
+                val sticky = value.second as? Boolean ?: return null
+                val map = value.third as? Map<*, *> ?: return null
+                Pair(inputKey, parseKeyActionMinorModeDefinition(name, sticky, map))
+            }
+
+            else -> null
+        }
+    }
+
+    private fun parseKeyActionMinorModeDefinition(name: String, sticky: Boolean, map: Map<*, *>): HJKeyAction {
+        val mapping = map.mapNotNull { (key, value) ->
+            if (key is String && value != null) parseKeyActionDefinition(key, value)
+            else null
+        }.toMap().toMutableMap()
+
+        return HJKeyAction.HJMinorMode(name, name, mapping, sticky)
+    }
+
     companion object {
         private val logger = Logger.getInstance(this::class.java)
 
         val userConfigPath = System.getProperty("user.home") + "/.helixjet.toml"
-
-        /**
-         * The default key mapping, parsed.
-         */
-        private fun defaultMappingParsed(): Map<HJEditorMode, MutableMap<HJInputKey, HJKeyAction>> {
-            val map: Map<HJEditorMode, MutableMap<HJInputKey, HJKeyAction>> = mapOf(
-                HJEditorMode.Normal to mutableMapOf(),
-                HJEditorMode.Select to mutableMapOf(),
-                HJEditorMode.Insert to mutableMapOf(),
-            )
-
-            for ((key, value) in defaultMappingNormal) {
-                parseKeyActionDefinition(key, value)?.let { (inputKey, keyAction) ->
-                    map[HJEditorMode.Normal]!![inputKey] = keyAction
-                }
-            }
-            for ((key, value) in defaultMappingSelect) {
-                parseKeyActionDefinition(key, value)?.let { (inputKey, keyAction) ->
-                    map[HJEditorMode.Select]!![inputKey] = keyAction
-                }
-            }
-            for ((key, value) in defaultMappingInsert) {
-                parseKeyActionDefinition(key, value)?.let { (inputKey, keyAction) ->
-                    map[HJEditorMode.Insert]!![inputKey] = keyAction
-                }
-            }
-
-            return map
-        }
-
-        private fun parseKeyActionDefinition(key: String, value: Any): Pair<HJInputKey, HJKeyAction>? {
-            val inputKey = HJInputKey.fromString(key)
-            if (inputKey == null) {
-                logger.warn("Unknown key $key in default keymap. Skipping")
-                return null
-            }
-
-            return when (value) {
-                is String -> {
-                    var action = HJActions.getAction(value)
-                    if (action == null) {
-                        logger.error("Missing action $value for key $inputKey in default keymap. Mapping to no_op.")
-                        action = HJActions.getAction("no_op")!!
-                    }
-                    Pair(inputKey, action)
-                }
-
-                is Pair<*, *> if value.second is Map<*, *> -> {
-                    val name = value.first as? String ?: return null
-                    val map = value.second as? Map<*, *> ?: return null
-
-                    Pair(inputKey, parseKeyActionMinorModeDefinition(name, false, map))
-                }
-
-                is Triple<*, *, *> if value.third is Map<*, *> -> {
-                    val name = value.first as? String ?: return null
-                    val sticky = value.second as? Boolean ?: return null
-                    val map = value.third as? Map<*, *> ?: return null
-                    Pair(inputKey, parseKeyActionMinorModeDefinition(name, sticky, map))
-                }
-
-                else -> null
-            }
-        }
-
-        private fun parseKeyActionMinorModeDefinition(name: String, sticky: Boolean, map: Map<*, *>): HJKeyAction {
-            val mapping = map.mapNotNull { (key, value) ->
-                if (key is String && value != null) parseKeyActionDefinition(key, value)
-                else null
-            }.toMap().toMutableMap()
-
-            return HJKeyAction.HJMinorMode(name, name, mapping, sticky)
-        }
     }
 }
 

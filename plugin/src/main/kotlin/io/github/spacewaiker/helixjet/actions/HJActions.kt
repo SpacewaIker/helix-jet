@@ -15,6 +15,7 @@ import com.intellij.openapi.actionSystem.IdeActions
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.command.CommandProcessor
 import com.intellij.openapi.command.undo.UndoManager
+import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.LogicalPosition
@@ -28,6 +29,7 @@ import com.intellij.openapi.fileEditor.ex.IdeDocumentHistory
 import com.intellij.openapi.fileEditor.impl.EditorComposite
 import com.intellij.openapi.fileEditor.impl.EditorWindow
 import com.intellij.openapi.fileTypes.PlainTextLanguage
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.ui.Splitter
 import com.intellij.openapi.util.TextRange
@@ -40,6 +42,7 @@ import com.intellij.ui.JBColor
 import io.github.spacewaiker.helixjet.actions.HJKeyAction.HJAction
 import io.github.spacewaiker.helixjet.config.HJLanguage
 import io.github.spacewaiker.helixjet.editor.*
+import io.github.spacewaiker.helixjet.input.HJInputHandler
 import io.github.spacewaiker.helixjet.input.HJInputKey
 import io.github.spacewaiker.helixjet.treesitter.HJLanguageSyntax
 import io.github.spacewaiker.helixjet.treesitter.HJTreesitterHandling
@@ -55,7 +58,8 @@ import kotlin.io.path.isDirectory
 import kotlin.math.max
 import kotlin.math.min
 
-object HJActions {
+@Service(Service.Level.PROJECT)
+class HJActions {
     val logger = Logger.getInstance(this::class.java)
 
     private val actions: MutableMap<String, HJAction> = createActionsMap()
@@ -85,6 +89,10 @@ object HJActions {
         }
 
         return map
+    }
+
+    companion object {
+        fun getInstance(project: Project): HJActions = project.getService(HJActions::class.java)
     }
 }
 
@@ -772,7 +780,7 @@ private fun findChar(cx: HJActionContext, direction: HJDirection, inclusive: Boo
                         Pair(false, HJDirection.Forward) -> cursorHead + 1
                         Pair(false, HJDirection.Backward) -> cursorAnchor - 1
                         else -> { // Should never happen
-                            HJActions.logger.error("Impossible condition")
+                            HJActions.getInstance(cx.project).logger.error("Impossible condition")
                             0
                         }
                     }
@@ -792,7 +800,7 @@ private fun findChar(cx: HJActionContext, direction: HJDirection, inclusive: Boo
                             Pair(false, HJDirection.Forward) -> pos - 1
                             Pair(false, HJDirection.Backward) -> pos + 1
                             else -> { // Should never happen
-                                HJActions.logger.error("Impossible condition")
+                                HJActions.getInstance(cx.project).logger.error("Impossible condition")
                                 0
                             }
                         }
@@ -1028,7 +1036,7 @@ private fun selectRegex(cx: HJActionContext) {
                         cx.hjEditor.setNewSelection(selection)
                     } else if (e == HJPromptEvent.Validate) {
                         cx.hjEditor.setError("Nothing selected")
-                        HJActions.logger.debug("selectRegex - nothing is selected")
+                        HJActions.getInstance(cx.project).logger.debug("selectRegex - nothing is selected")
                     }
                 }
             }
@@ -1208,7 +1216,7 @@ private fun gotoFileImpl(cx: HJActionContext, location: HJFileOpenLocation) {
                 .find { pos <= searchStart + it.last }
                 ?.let { searchRange.substring(it) }
 
-            HJActions.logger.debug("gotoFile auto-detected path: $path")
+            HJActions.getInstance(cx.project).logger.debug("gotoFile auto-detected path: $path")
 
             path
         } else range.slice(cx.doc)?.trim()?.let { it.ifEmpty { null } }
@@ -2681,7 +2689,7 @@ private fun swapViewImpl(cx: HJActionContext, direction: HJNavDirection) {
     val targetParent = target.parent
 
     if (!(currentParent is Splitter && targetParent is Splitter)) {
-        HJActions.logger.error("Error in swapViewImpl: one of the parent components is not a splitter.")
+        HJActions.getInstance(cx.project).logger.error("Error in swapViewImpl: one of the parent components is not a splitter.")
         return
     }
 
@@ -2992,30 +3000,31 @@ private fun saveSelection(cx: HJActionContext) {
 }
 
 private fun jumplistPicker(cx: HJActionContext) {
-    val data = IdeDocumentHistory.getInstance(cx.project).let { it.backPlaces + it.forwardPlaces }.reversed()
-
-    val projectRoot = cx.project.guessProjectDir()?.path ?: ""
-    val model = HJTableModel(data, listOf("Path")) { jump, _ -> jump.file.path.removePrefix(projectRoot) }
-
-    val previewSelector = previewSelector@{ rowIdx: Int ->
-        val placeInfo = data.getOrNull(rowIdx) ?: return@previewSelector null
-        val range = placeInfo.caretPosition?.textRange
-        Pair(placeInfo.file, Pair(range?.startOffset ?: 0, (range?.endOffset ?: 0) + 1))
-    }
-
-    HJPickerWithPreview(
-        cx.hjEditor.editor, "Jumplist Picker", model, previewSelector
-    ) { rowIdx ->
-        val placeInfo = data[rowIdx]
-
-        openFile(cx, placeInfo.file, HJFileOpenLocation.InPlace)?.let { fileEditor ->
-            val editor = (fileEditor as TextEditor).editor
-            placeInfo.caretPosition?.textRange?.let { range ->
-                cx.hjState.getHJEditor(editor)
-                    ?.setNewSelection(HJSelection(HJRange(range.startOffset, range.endOffset)))
-            }
-        }
-    }.show()
+//    val data = IdeDocumentHistory.getInstance(cx.project).let { it.backPlaces + it.forwardPlaces }.reversed()
+//
+//    val projectRoot = cx.project.guessProjectDir()?.path ?: ""
+//    val model = HJTableModel(data, listOf("Path")) { jump, _ -> jump.file.path.removePrefix(projectRoot) }
+//
+//    val previewSelector = previewSelector@{ rowIdx: Int ->
+//        val placeInfo = data.getOrNull(rowIdx) ?: return@previewSelector null
+//        val range = placeInfo.caretPosition?.textRange
+//        Pair(placeInfo.file, Pair(range?.startOffset ?: 0, (range?.endOffset ?: 0) + 1))
+//    }
+//
+//    HJPickerWithPreview(
+//        cx.hjEditor.editor, "Jumplist Picker", model, previewSelector
+//    ) { rowIdx ->
+//        val placeInfo = data[rowIdx]
+//
+//        openFile(cx, placeInfo.file, HJFileOpenLocation.InPlace)?.let { fileEditor ->
+//            val editor = (fileEditor as TextEditor).editor
+//            placeInfo.caretPosition?.textRange?.let { range ->
+//                cx.hjState.getHJEditor(editor)
+//                    ?.setNewSelection(HJSelection(HJRange(range.startOffset, range.endOffset)))
+//            }
+//        }
+//    }.show()
+    cx.hjEditor.setWarning("Not implemented")
 }
 
 @Suppress("unused")

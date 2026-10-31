@@ -71,6 +71,12 @@ private val helixCommands = arrayOf(
     HJCommand("write-all", listOf("wa"), "Save all files") { cx, _, _ ->
         executeIdeAction(cx, "SaveAll")
     },
+    HJCommand("reload", listOf("rl"), "Discard changes and reload from the source file") { cx, _, _ ->
+        executeIdeAction(cx, "SynchronizeCurrentFile")
+    },
+    HJCommand("reload-all", listOf("rla"), "Discard all changes and reload from the source files") { cx, _, _ ->
+        executeIdeAction(cx, "Synchronize")
+    },
     HJCommand("config-reload", listOf(), "Reload user config") { cx, _, _ ->
         cx.hjState.config = HJConfiguration(cx.hjState.project)
     },
