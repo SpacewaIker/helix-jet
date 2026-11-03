@@ -8,7 +8,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import io.github.spacewaiker.helixjet.config.HJConfiguration
 import io.github.spacewaiker.helixjet.input.HJInputKey
 import io.github.spacewaiker.helixjet.ui.HJHelpWidget
-import io.github.spacewaiker.helixjet.ui.HJPicker
+import io.github.spacewaiker.helixjet.ui.HJPickerState
 import io.github.spacewaiker.helixjet.ui.HJPrompt
 import io.github.spacewaiker.helixjet.ui.HJStatusBarInputWidget
 
@@ -50,7 +50,7 @@ class HJState(val project: Project) : Disposable {
     var macroRecording: Pair<HJRegister, MutableList<HJInputKey>>? = null
     val macroReplaying: MutableList<HJRegister> = mutableListOf()
     val lastInsertKeystrokes: MutableList<HJInputKey> = mutableListOf()
-    var lastPicker: HJPicker? = null
+    var lastPicker: HJPickerState? = null
     var lastModification: Pair<VirtualFile, Int>? = null
     var previousEditor: HJEditor? = null
     var currentEditor: HJEditor? = null

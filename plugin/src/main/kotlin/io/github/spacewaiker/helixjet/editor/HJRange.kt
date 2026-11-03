@@ -159,10 +159,10 @@ class HJRange {
      * The (inclusive) range of lines that the range overlaps
      */
     fun lineRange(doc: Document): Pair<Int, Int> {
-        val from = this.from
-        val to = if (this.isEmpty) this.to else {
-            max(prevGraphemeBoundary(this.to), from)
-        }
+        val from = this.from.coerceAtMost(doc.textLength - 1)
+        val to = (if (this.isEmpty) this.to else {
+            prevGraphemeBoundary(this.to).coerceAtLeast(from)
+        }).coerceAtMost(doc.textLength - 1)
         return Pair(doc.getLineNumber(from), doc.getLineNumber(to))
     }
 

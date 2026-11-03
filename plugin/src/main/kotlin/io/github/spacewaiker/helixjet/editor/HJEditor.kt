@@ -174,14 +174,28 @@ class HJEditor(
             for (change in changes) {
                 when (change) {
                     is HJChange.Insert -> {
+                        if (change.at < 0 || change.at >= editor.document.textLength) {
+                            logger.warn("Attempted to apply HJChange.Insert at offset ${change.at}. Document length is ${editor.document.textLength}.")
+                            continue
+                        }
                         editor.document.insertString(change.at, change.str)
                     }
 
                     is HJChange.Replace -> {
+                        if (change.from < 0 || change.from >= editor.document.textLength
+                            || change.to < 0 || change.to >= editor.document.textLength) {
+                            logger.warn("Attempted to apply HJChange.Replace in offset range [${change.from}, ${change.to}]. Document length is ${editor.document.textLength}.")
+                            continue
+                        }
                         editor.document.replaceString(change.from, change.to, change.replacement)
                     }
 
                     is HJChange.Delete -> {
+                        if (change.from < 0 || change.from >= editor.document.textLength
+                            || change.to < 0 || change.to >= editor.document.textLength) {
+                            logger.warn("Attempted to apply HJChange.Delete in offset range [${change.from}, ${change.to}]. Document length is ${editor.document.textLength}.")
+                            continue
+                        }
                         editor.document.deleteString(change.from, change.to)
                     }
                 }

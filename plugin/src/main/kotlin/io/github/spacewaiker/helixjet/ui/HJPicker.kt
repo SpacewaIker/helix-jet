@@ -202,7 +202,7 @@ open class HJPicker(
                         lastPicker.table.scrollRectToVisible(table.getCellRect(row, 0, true))
                     }
 
-                    HJState.getInstance(editor.project!!).lastPicker = lastPicker
+                    HJState.getInstance(editor.project!!).lastPicker = HJPickerState(lastPicker, searchField.text, table.selectedRow)
 
                     asyncTask?.cancel(true)
                 }
@@ -259,6 +259,15 @@ open class HJPicker(
         popup.showCenteredInCurrentWindow(editor.project!!)
 
         resizeColumnsToFit(table, table.model)
+    }
+
+    fun setSearchText(text: String) {
+        searchField.text = text
+    }
+
+    fun setSelectedRow(index: Int) {
+        table.setRowSelectionInterval(index, index)
+        table.scrollRectToVisible(table.getCellRect(index, 0, true))
     }
 
     protected fun computeSize() = WindowManager.getInstance().getIdeFrame(editor.project!!)?.component?.size?.let {
@@ -443,3 +452,9 @@ private fun resizeColumnsToFit(table: JBTable, model: TableModel) {
 
     table.doLayout()
 }
+
+data class HJPickerState(
+    val picker: HJPicker,
+    val searchText: String,
+    val selectedIndex: Int,
+)

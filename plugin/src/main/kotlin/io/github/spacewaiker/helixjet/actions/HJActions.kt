@@ -714,6 +714,8 @@ private fun replaceWithClipboard(cx: HJActionContext) {
 }
 
 private fun replaceSelectionsWithRegister(cx: HJActionContext, register: HJRegister, count: Int) {
+    if (!ensureFileWriteable(cx)) return
+
     val values = cx.hjState.registers.read(register, cx.hjEditor)?.filter { it.isNotEmpty() } ?: return
 
     val mapValue = { value: String ->
@@ -1835,7 +1837,7 @@ private fun searchImpl(
     val start = when (direction) {
         HJDirection.Forward -> snapshot.primary.to
         HJDirection.Backward -> snapshot.primary.from
-    }
+    }.coerceIn(0, cx.doc.textLength - 1)
 
     var mat = when (direction) {
         HJDirection.Forward -> regex.find(doc, start)
@@ -3027,9 +3029,12 @@ private fun jumplistPicker(cx: HJActionContext) {
     cx.hjEditor.setWarning("Not implemented")
 }
 
-@Suppress("unused")
 private fun lastPicker(cx: HJActionContext) {
-    cx.hjState.lastPicker?.show()
+    cx.hjState.lastPicker?.let { (picker, searchText, selectionIndex) ->
+        picker.show()
+        picker.setSearchText(searchText)
+        picker.setSelectedRow(selectionIndex)
+    }
 }
 
 private fun indentImpl(cx: HJActionContext, direction: HJDirection) {

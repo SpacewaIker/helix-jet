@@ -1,6 +1,5 @@
 ﻿package io.github.spacewaiker.helixjet.input
 
-import com.intellij.codeInsight.inline.completion.render.InlineCompletionLineRenderer
 import com.intellij.codeInsight.lookup.LookupManager
 import com.intellij.ide.IdeEventQueue
 import com.intellij.openapi.components.Service
@@ -106,7 +105,7 @@ class HJInputHandler(private val project: Project) {
             if (LookupManager.getActiveLookup(editor) != null && autocompletePopupPassthroughKeys.contains(key)) return false
 
             val inlays = editor.inlayModel.getInlineElementsInRange(editor.caretModel.offset, editor.caretModel.offset)
-            val hasInlineCompletion = inlays.any { it.renderer is InlineCompletionLineRenderer }
+            val hasInlineCompletion = inlays.any { it.renderer.javaClass.toString() == "class com.intellij.codeInsight.inline.completion.render.InlineCompletionLineRenderer" }
             if (hasInlineCompletion && autocompleteInlinePassthroughKeys.contains(key)) return false
         }
         // @formatter:on
