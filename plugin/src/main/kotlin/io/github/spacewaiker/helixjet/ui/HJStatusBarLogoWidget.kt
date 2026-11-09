@@ -1,8 +1,10 @@
 ﻿package io.github.spacewaiker.helixjet.ui
 
 import com.intellij.ide.DataManager
+import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.components.Service
+import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.naturalSorted
@@ -44,9 +46,14 @@ class HJStatusBarLogoWidget(private val project: Project) : StatusBarWidget, Sta
         val group = DefaultActionGroup().apply {
             add(object : AnAction("About HelixJet Plugin") {
                 override fun actionPerformed(e: AnActionEvent) {
-                    Messages.showInfoMessage(
-                        project, "HelixJet keybindings plugin v0.1", "About"
-                    )
+                    val version = PluginManagerCore.getPlugin(PluginId.getId("io.github.spacewaiker.helix-jet"))?.version ?: "?"
+
+                    val message = "HelixJet keybindings plugin v$version\n" +
+                            "\n" +
+                            "<a href=\"https://github.com/spacewaiker/helix-jet/\">See Source on GitHub</a>\n" +
+                            "<a href=\"https://plugins.jetbrains.com/plugin/35261-helix-jet/\">View Plugin in JetBrains Marketplace</a>"
+
+                    Messages.showInfoMessage(project, message, "About")
                 }
             })
             add(object : ToggleAction("Enabled") {
