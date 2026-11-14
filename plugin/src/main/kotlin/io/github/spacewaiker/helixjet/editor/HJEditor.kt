@@ -14,6 +14,7 @@ import com.intellij.psi.codeStyle.CodeStyleManager
 import com.intellij.psi.util.elementType
 import io.github.spacewaiker.helixjet.config.HJFileGlobMatcher
 import io.github.spacewaiker.helixjet.config.HJLanguage
+import io.github.spacewaiker.helixjet.input.HJInputHandler
 import io.github.spacewaiker.helixjet.treesitter.HJSyntaxLoader
 import io.github.spacewaiker.helixjet.ui.HJJumpLabelOverlay
 import io.github.spacewaiker.helixjet.ui.HJStatusBarFileTypeWidget
@@ -233,8 +234,6 @@ class HJEditor(
         notify(message, NotificationType.ERROR)
     }
 
-    private lateinit var jumpLabelMouseWheelListener: MouseWheelListener
-
     fun setJumpLabels(labels: List<Pair<Int, String>>) {
         var overlay = editor.getUserData(JUMP_OVERLAY_KEY)
         if (overlay == null) {
@@ -244,12 +243,9 @@ class HJEditor(
             editor.putUserData(JUMP_OVERLAY_KEY, overlay)
 
             // hide labels on mouse scroll
-            jumpLabelMouseWheelListener = MouseWheelListener { event ->
-                hideJumpLabels()
-                editor.contentComponent.parent.dispatchEvent(event)
-                editor.contentComponent.removeMouseWheelListener(jumpLabelMouseWheelListener)
-            }
-            editor.contentComponent.addMouseWheelListener(jumpLabelMouseWheelListener)
+            editor.scrollingModel.addVisibleAreaListener({ event ->
+                if (event.oldRectangle.y != event.newRectangle.y) hideJumpLabels()
+            }, getHJState)
         }
         overlay.setLabels(labels)
     }
@@ -260,6 +256,9 @@ class HJEditor(
             editor.contentComponent.revalidate()
             editor.contentComponent.repaint()
             editor.putUserData(JUMP_OVERLAY_KEY, null)
+        }
+        editor.project?.let { project ->
+            HJInputHandler.getInstance(project).clearOnNextKey()
         }
     }
 }

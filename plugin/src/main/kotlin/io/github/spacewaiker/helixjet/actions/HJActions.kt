@@ -1000,19 +1000,19 @@ private fun alignViewMiddle(cx: HJActionContext) {
 private fun alignViewImpl(cx: HJActionContext, align: HJAlignment) {
     val scrollingModel = cx.hjEditor.editor.scrollingModel
 
-    val cursor = cx.hjEditor.selection.primary.cursor
-    val cursorRow = cx.hjEditor.editor.offsetToVisualPosition(cursor).line
+    val cursorY = cx.hjEditor.editor.offsetToXY(cx.hjEditor.selection.primary.cursor).y
 
     val lineHeight = cx.hjEditor.editor.lineHeight
-    val lastLineHeight = ((scrollingModel.visibleArea.height / lineHeight) - 1).coerceAtLeast(0)
+    val visibleHeight = scrollingModel.visibleArea.height
+    val scrolloffPx = cx.hjState.config.scrolloff * lineHeight
 
-    val relative = when (align) {
-        HJAlignment.Center -> lastLineHeight / 2
-        HJAlignment.Top -> cx.hjState.config.scrolloff
-        HJAlignment.Bottom -> lastLineHeight - cx.hjState.config.scrolloff
+    val target = when (align) {
+        HJAlignment.Center -> (visibleHeight - lineHeight) / 2
+        HJAlignment.Top -> scrolloffPx
+        HJAlignment.Bottom -> visibleHeight - lineHeight - scrolloffPx
     }
 
-    val scrollTo = (cursorRow - relative).coerceAtLeast(0) * lineHeight
+    val scrollTo = (cursorY - target).coerceAtLeast(0)
     scrollingModel.scrollVertically(scrollTo)
 }
 
@@ -1663,12 +1663,14 @@ private fun open(cx: HJActionContext, openBelow: Boolean, commentContinuationEna
     cx.hjEditor.setNewSelection(selection)
 
     if (!(commentContinuationEnabled && cx.hjState.config.continueComments)) return
+    if (continueCommentTokens == null) return
 
     val newRanges = mutableListOf<HJRange>()
     val transaction = cx.hjEditor.changeBySelection { range ->
         val lineNum = range.cursorLine(cx.doc)
         val token = commentTokensToAdd[lineNum]
-        if (token == null) {
+        val alreadyCommented = getCommentToken(cx.doc, continueCommentTokens, lineNum) != null
+        if (token == null || alreadyCommented) {
             newRanges.add(range)
             null
         } else {
@@ -3039,23 +3041,14 @@ private fun lastPicker(cx: HJActionContext) {
 
 private fun indentImpl(cx: HJActionContext, direction: HJDirection) {
     if (!ensureFileWriteable(cx)) return
-    // TODO: indent manually? First must be able to get correct indentation here and in open
-    //       in any case, ensure cursor is in right place after indenting
-    // TODO: modify selection to be on the same text as before the document modification
-
-    // must select something, otherwise Ide action "indent" does not work
-    val selection = cx.hjEditor.selection.clone()
-    val temp = cx.hjEditor.selection.transform { range ->
-        if (range.isSingleGrapheme) extendRange(cx, true, range)
-        else range
-    }
-    cx.hjEditor.setNewSelection(temp)
 
     val ideAction = when (direction) {
-        HJDirection.Forward -> IdeActions.ACTION_EDITOR_INDENT_SELECTION
+        HJDirection.Forward -> "EditorIndentLineOrSelection"
         HJDirection.Backward -> IdeActions.ACTION_EDITOR_UNINDENT_SELECTION
     }
     executeIdeAction(cx, ideAction)
+
+    val selection = HJSelection(cx.hjEditor.editor.caretModel)
     cx.hjEditor.setNewSelection(selection)
 }
 

@@ -69,7 +69,11 @@ class HJRange {
 
     constructor(caret: Caret) {
         val selectionStart = caret.selectionStart
-        val selectionEnd = caret.selectionEnd + 1 // include last selected character
+        // There seems to be some inconsistency with how selections are handled. If you double/triple click, we need to add
+        // 1 to the selection to have it correspond. However, when e.g. selecting a full line and indenting it, the resulting
+        // caret does NOT need 1 added, otherwise it'll select the first character of the next line...
+        val selectionEndCorrection = if (caret.selectedText?.endsWith("\n") ?: false) 0 else 1
+        val selectionEnd = caret.selectionEnd + selectionEndCorrection // include last selected character
         if (caret.offset == selectionStart) {
             this.head = selectionStart
             this.anchor = selectionEnd

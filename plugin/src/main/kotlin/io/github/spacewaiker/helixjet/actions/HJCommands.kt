@@ -5,6 +5,7 @@ import com.intellij.lang.tree.util.children
 import com.intellij.notification.Notification
 import com.intellij.notification.NotificationType
 import com.intellij.notification.NotificationsManager
+import com.intellij.openapi.actionSystem.IdeActions
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.vfs.readText
@@ -174,7 +175,13 @@ private val helixCommands = arrayOf(
         NotificationsManager.getNotificationsManager()
             .getNotificationsOfType(Notification::class.java, cx.project)
             .forEach { it.expire() }
-    }
+    },
+    HJCommand("format", listOf("fmt"), "Format the current file.") { cx, _, _ ->
+        executeIdeAction(cx, IdeActions.ACTION_EDITOR_REFORMAT)
+    },
+    HJCommand("ide-action", listOf("act"), "Execute an IDE action from its ID.") { cx, args, _ ->
+        if (args.isNotEmpty()) executeIdeAction(cx, args[0])
+    },
 )
 
 private val debugCommands = arrayOf(

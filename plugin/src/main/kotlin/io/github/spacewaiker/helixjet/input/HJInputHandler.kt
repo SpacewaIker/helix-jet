@@ -200,6 +200,10 @@ class HJInputHandler(private val project: Project) {
         }
     }
 
+    fun clearOnNextKey() {
+        onNextKeyCallback.clear()
+    }
+
     fun sendInputKeyKeyEvent(hjEditor: HJEditor, inputKey: HJInputKey) {
         val eventQueue = IdeEventQueue.getInstance()
 

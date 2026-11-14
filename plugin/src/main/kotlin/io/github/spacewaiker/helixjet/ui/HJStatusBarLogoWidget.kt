@@ -91,6 +91,15 @@ class HJStatusBarLogoWidget(private val project: Project) : StatusBarWidget, Sta
                         }
                     }
                 })
+                add(object : AnAction("Print Selection") {
+                    override fun actionPerformed(e: AnActionEvent) {
+                        val editor = hjState.currentEditor ?: return
+                        println("Selection:")
+                        for (caret in editor.editor.caretModel.allCarets) {
+                            println("\t${caret.selectionStart}, ${caret.selectionEnd}")
+                        }
+                    }
+                })
             }
             addSeparator()
             add(object : AnAction("Open Config") {
