@@ -24,6 +24,6 @@ jobs:
           PRIVATE_KEY_PASSWORD: ${{ secrets.PRIVATE_KEY_PASSWORD }}
           PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
       - name: Attached signed zip to the GitHub release
-        run: gh release upload "$GITHUB_REF_NAME" plugin/build/distributions/*-signed.zip --clobber
+        run: gh release upload "$GITHUB_REF_NAME" plugin/build/distributions/plugin-*.zip --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
