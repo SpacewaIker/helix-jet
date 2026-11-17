@@ -398,7 +398,7 @@ class HJPickerWithPreview(
             )
 
             // set highlight / selection
-            if (offsets != null) {
+            if (offsets != null && offsets.first < previewEditor.document.textLength && offsets.second < previewEditor.document.textLength) {
                 previewEditor.selectionModel.setSelection(offsets.first, offsets.second)
             }
         }
