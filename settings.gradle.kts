@@ -64,7 +64,17 @@ try {
             // Create build file
             val buildFile = subprojectDir.resolve("build.gradle.kts")
             if (!buildFile.exists()) {
-                buildFile.writeText("apply<GrammarPlugin>()")
+                buildFile.writeText("""
+                    apply<GrammarPlugin>()
+                    
+                    plugins {
+                        base
+                    }
+                    
+                    base {
+                        archivesName = "ktreesitter-$grammarName"
+                    }
+                """.trimIndent())
             }
 
             // clone, then checkout tree-sitter grammar
@@ -87,7 +97,7 @@ try {
                 // incorrect revision, nuke and checkout
                 if (!isCorrectRevision) {
                     runCommand(listOf("git", "-C", repoDir.absolutePath, "reset", "--hard"), 10, TimeUnit.SECONDS)
-                    runCommand(listOf("git", "-C", repoDir.absolutePath, "checkout", rev), 10, TimeUnit.SECONDS)
+                    runCommand(listOf("git", "-C", repoDir.absolutePath, "checkout", rev), 1, TimeUnit.MINUTES)
                 }
             }
 

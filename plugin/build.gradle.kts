@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "spacewaiker"
-version = "0.1.3-SNAPSHOT"
+version = "0.1.4-SNAPSHOT"
 
 repositories {
     mavenCentral()
@@ -37,14 +37,14 @@ dependencies {
 }
 
 intellijPlatform {
+    projectName = "helix-jet"
+
     pluginConfiguration {
         ideaVersion {
             sinceBuild = "252.25557"
         }
 
-        changeNotes = """
-            Initial version
-        """.trimIndent()
+        changeNotes = providers.environmentVariable("CHANGE_NOTES")
     }
 
     signing {
