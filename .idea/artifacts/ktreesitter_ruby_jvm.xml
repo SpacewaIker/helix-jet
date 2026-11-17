@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="ktreesitter-ruby-jvm">
+    <output-path>$PROJECT_DIR$/grammars/ruby/build/libs</output-path>
+    <root id="archive" name="ktreesitter-ruby-jvm.jar">
+      <element id="module-output" name="helix-jet.grammars.ruby.jvmMain" />
+    </root>
+  </artifact>
+</component>

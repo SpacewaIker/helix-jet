@@ -67,7 +67,7 @@ class HJEditor(
     var language: HJLanguage? = null
         set(value) {
             field = value
-            HJStatusBarFileTypeWidget.updateFileTypeWidget()
+            HJStatusBarFileTypeWidget.updateFileTypeWidgetDelayed()
         }
     val syntax
         get() = language?.let { HJSyntaxLoader.getLanguageSyntax(it.grammarOrName, editor.document.text) }

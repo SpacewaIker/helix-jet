@@ -16,6 +16,7 @@ import io.github.spacewaiker.helixjet.config.HJConfiguration
 import io.github.spacewaiker.helixjet.config.HJFileGlobMatcher
 import io.github.spacewaiker.helixjet.editor.HJRegister
 import io.github.spacewaiker.helixjet.treesitter.HJSyntaxLoader
+import io.github.spacewaiker.helixjet.ui.HJStatusBarFileTypeWidget
 import kotlin.system.measureTimeMillis
 
 class HJCommand(
@@ -162,13 +163,23 @@ private val helixCommands = arrayOf(
     HJCommand(
         "set-language",
         listOf("lang"),
-        "Set the language of current buffer (show current language if no value is specified)."
-    ) { cx, args, _ ->
+        "Set the language of current buffer (show current language if no value is specified).",
+        listOf("-l  List available languages"),
+    ) { cx, args, flags ->
+        if (flags.isNotEmpty() && flags.contains("l")) {
+            cx.hjEditor.setStatus("Available languages:\n" + cx.hjState.config.languagesToml.keys.sorted().joinToString(", "))
+            return@HJCommand
+        }
+
         if (args.isEmpty()) {
-            cx.hjEditor.setStatus("File type/Language: ${cx.hjEditor.language ?: "text"}")
+            cx.hjEditor.setStatus("File type/Language: ${cx.hjEditor.language?.name ?: "text"}")
         } else {
             val language = args[0]
-            cx.hjEditor.language = cx.hjState.config.languagesToml[language]
+            if (language in cx.hjState.config.languagesToml.keys) {
+                cx.hjEditor.language = cx.hjState.config.languagesToml[language]
+            } else {
+                cx.hjEditor.setError("Unknown language '$language'")
+            }
         }
     },
     HJCommand("clear-notifications", listOf("cl"), "Clears the current notifications.") { cx, _, _ ->

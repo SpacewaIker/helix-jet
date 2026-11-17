@@ -27,6 +27,11 @@ class HJStatusBarFileTypeWidget(proj: Project) : StatusBarWidget, StatusBarWidge
                 WindowManager.getInstance().getStatusBar(it)?.updateWidget(ID)
             }
         }
+
+        fun updateFileTypeWidgetDelayed() {
+            AppExecutorUtil.getAppScheduledExecutorService()
+                .schedule(::updateFileTypeWidget, 100, TimeUnit.MILLISECONDS)
+        }
     }
 
     private var statusBar: StatusBar? = null
@@ -51,8 +56,7 @@ class HJStatusBarFileTypeWidget(proj: Project) : StatusBarWidget, StatusBarWidge
             FileEditorManagerListener.FILE_EDITOR_MANAGER,
             object : FileEditorManagerListener {
                 override fun selectionChanged(event: FileEditorManagerEvent) {
-                    AppExecutorUtil.getAppScheduledExecutorService()
-                        .schedule(::updateFileTypeWidget, 100, TimeUnit.MILLISECONDS)
+                    updateFileTypeWidgetDelayed()
                 }
             }
         )

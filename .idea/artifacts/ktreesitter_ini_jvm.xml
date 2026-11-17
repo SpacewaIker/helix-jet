@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="ktreesitter-ini-jvm">
+    <output-path>$PROJECT_DIR$/grammars/ini/build/libs</output-path>
+    <root id="archive" name="ktreesitter-ini-jvm.jar">
+      <element id="module-output" name="helix-jet.grammars.ini.jvmMain" />
+    </root>
+  </artifact>
+</component>
