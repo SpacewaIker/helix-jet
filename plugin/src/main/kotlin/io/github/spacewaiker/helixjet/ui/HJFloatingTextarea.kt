@@ -6,7 +6,7 @@ import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.editor.colors.EditorFontType
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.ex.FileEditorManagerEx
-import com.intellij.rml.dfa.Quadruple
+import io.github.spacewaiker.helixjet.utils.Quadruple
 import java.awt.BorderLayout
 import java.awt.Point
 import java.awt.event.ComponentAdapter
@@ -63,7 +63,7 @@ abstract class HJFloatingTextarea(editor: Editor) {
 
     private fun panelHeight(): Int {
         if (textArea.text.isEmpty()) return 0
-        
+
         // calculate height based on text content
         val lineCount = textArea.text.lines().size
         val lineHeight = textArea.getFontMetrics(textArea.font).height

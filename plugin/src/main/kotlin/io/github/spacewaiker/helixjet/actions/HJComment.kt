@@ -1,12 +1,12 @@
 ﻿package io.github.spacewaiker.helixjet.actions
 
 import com.intellij.openapi.editor.Document
-import com.intellij.rml.dfa.Quadruple
 import io.github.spacewaiker.helixjet.config.HJLanguage
 import io.github.spacewaiker.helixjet.editor.HJChange
 import io.github.spacewaiker.helixjet.editor.HJRange
 import io.github.spacewaiker.helixjet.editor.HJSelection
 import io.github.spacewaiker.helixjet.editor.HJTransaction
+import io.github.spacewaiker.helixjet.utils.Quadruple
 import kotlin.math.min
 
 object HJComment {

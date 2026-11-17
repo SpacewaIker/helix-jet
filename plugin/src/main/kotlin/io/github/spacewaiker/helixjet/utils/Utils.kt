@@ -53,3 +53,5 @@ fun java.nio.file.Path.anyCumulative(f: (java.nio.file.Path) -> Boolean) =
     runningFold<java.nio.file.Path, java.nio.file.Path?>(null) { acc, path ->
         acc?.resolve(path) ?: path
     }.filterNotNull().any(f)
+
+data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
