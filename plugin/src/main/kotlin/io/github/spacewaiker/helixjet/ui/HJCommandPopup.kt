@@ -2,6 +2,7 @@
 
 import com.intellij.openapi.editor.Editor
 import io.github.spacewaiker.helixjet.actions.HJCommand
+import io.github.spacewaiker.helixjet.utils.wrapOnSpaces
 
 private const val WIDTH = 700
 private const val PROMPT_HEIGHT = 38
@@ -36,7 +37,7 @@ class HJCommandPopup(val editor: Editor) : HJFloatingTextarea(editor) {
         val sb = StringBuilder()
 
         // description
-        sb.append(command.doc)
+        sb.append(command.doc.wrapOnSpaces(maxChars))
 
         // aliases
         if (command.aliases.isNotEmpty()) {

@@ -55,3 +55,5 @@ fun java.nio.file.Path.anyCumulative(f: (java.nio.file.Path) -> Boolean) =
     }.filterNotNull().any(f)
 
 data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
+
+fun String.wrapOnSpaces(maxLength: Int) = this.replace(Regex("(.{1,$maxLength}\\S)(?: +|$)"), "$1\n")
