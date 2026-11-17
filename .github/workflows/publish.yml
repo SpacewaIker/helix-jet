@@ -78,4 +78,4 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.event.release.tag_name || inputs.tag }}
-        run: gh release upload "$GITHUB_REF_NAME" plugin/build/distributions/plugin-*.zip --clobber
+        run: gh release upload "$TAG" plugin/build/distributions/plugin-*.zip --clobber
