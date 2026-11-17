@@ -2,6 +2,11 @@
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish
+        required: true
 
 permissions:
   contents: write
@@ -51,22 +56,26 @@ jobs:
       - name: Render release notes to HTML
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_BODY: ${{ github.event.release.body }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
         run: |
+          RELEASE_BODY=$(gh release view "$TAG" --json body -q .body)
           gh api markdown -f mode=gfm -f text="$RELEASE_BODY" > notes.html
           {
             echo "CHANGE_NOTES<<__NOTES_EOF__"
             cat notes.html
+            echo
             echo "__NOTES_EOF__"
           } >> "$GITHUB_ENV"
       - name: Publish to Marketplace
-        run: ./gradlew :plugin:publishPlugin -PpluginVersion=${GITHUB_REF_NAME#v}
         env:
           CERTIFICATE_CHAIN: ${{ secrets.CERTIFICATE_CHAIN }}
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
           PRIVATE_KEY_PASSWORD: ${{ secrets.PRIVATE_KEY_PASSWORD }}
           PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: ./gradlew :plugin:publishPlugin -PpluginVersion=$(TAG)
       - name: Attached signed zip to the GitHub release
-        run: gh release upload "$GITHUB_REF_NAME" plugin/build/distributions/plugin-*.zip --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: gh release upload "$GITHUB_REF_NAME" plugin/build/distributions/plugin-*.zip --clobber
